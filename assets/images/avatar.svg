@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- 背景圆 -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#B8AED6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B7EC8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="faceGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFF5F0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFE8DC;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景 -->
+  <circle cx="100" cy="100" r="100" fill="url(#bgGradient)"/>
+  
+  <!-- 头部 -->
+  <circle cx="100" cy="85" r="38" fill="url(#faceGradient)"/>
+  
+  <!-- 头发 -->
+  <path d="M 62 80 Q 65 45 100 42 Q 135 45 138 80 Q 135 65 100 60 Q 65 65 62 80 Z" fill="#4A3F5C"/>
+  
+  <!-- 眼睛 -->
+  <ellipse cx="85" cy="85" rx="4" ry="5" fill="#4A3F5C"/>
+  <ellipse cx="115" cy="85" rx="4" ry="5" fill="#4A3F5C"/>
+  
+  <!-- 眼睛高光 -->
+  <circle cx="86" cy="83" r="1.5" fill="#FFFFFF"/>
+  <circle cx="116" cy="83" r="1.5" fill="#FFFFFF"/>
+  
+  <!-- 眉毛 -->
+  <path d="M 78 75 Q 85 72 92 75" stroke="#4A3F5C" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M 108 75 Q 115 72 122 75" stroke="#4A3F5C" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- 鼻子 -->
+  <path d="M 100 90 Q 97 98 100 100 Q 103 98 100 90" fill="#E8C4B0" opacity="0.6"/>
+  
+  <!-- 嘴巴 -->
+  <path d="M 90 108 Q 100 115 110 108" stroke="#D4846E" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  
+  <!-- 腮红 -->
+  <ellipse cx="75" cy="98" rx="8" ry="5" fill="#FFB5B5" opacity="0.4"/>
+  <ellipse cx="125" cy="98" rx="8" ry="5" fill="#FFB5B5" opacity="0.4"/>
+  
+  <!-- 身体/衣服 -->
+  <path d="M 50 200 Q 50 145 100 140 Q 150 145 150 200 Z" fill="#6B5BA3"/>
+  
+  <!-- 衣领 -->
+  <path d="M 85 140 L 100 155 L 115 140" fill="#5A4D8F"/>
+  
+  <!-- 装饰圆点 -->
+  <circle cx="30" cy="30" r="8" fill="#FFFFFF" opacity="0.15"/>
+  <circle cx="170" cy="170" r="12" fill="#FFFFFF" opacity="0.1"/>
+  <circle cx="175" cy="40" r="5" fill="#FFFFFF" opacity="0.12"/>
+</svg>

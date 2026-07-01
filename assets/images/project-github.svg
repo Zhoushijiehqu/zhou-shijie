@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" width="400" height="200">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B7EC8;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#A78BFA;stop-opacity:0.9" />
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="400" height="200" fill="url(#bgGrad)" rx="12"/>
+  
+  <!-- 装饰光晕 -->
+  <ellipse cx="100" cy="50" rx="120" ry="60" fill="url(#glowGrad)"/>
+  <ellipse cx="350" cy="180" rx="80" ry="40" fill="url(#glowGrad)"/>
+  
+  <!-- GitHub 图标 -->
+  <g transform="translate(170, 50)" fill="white">
+    <path d="M30 0C13.432 0 0 13.431 0 30c0 13.267 8.607 24.534 20.546 28.507 1.5.276 2.049-.652 2.049-1.447 0-.714-.027-2.605-.041-5.116-8.356 1.817-10.125-4.026-10.125-4.026-1.364-3.468-3.333-4.39-3.333-4.39-2.725-1.862.207-1.824.207-1.824 3.015.213 4.604 3.096 4.604 3.096 2.679 4.595 7.026 3.268 8.737 2.5.272-1.944 1.049-3.269 1.908-4.02-6.674-.76-13.697-3.337-13.697-14.851 0-3.282 1.172-5.965 3.093-8.069-.31-.758-1.34-3.822.294-7.977 0 0 2.523-.808 8.27 3.084A28.773 28.773 0 0 1 30 13.313c2.55.004 5.113.344 7.518 1.008 5.742-3.892 8.263-3.084 8.263-3.084 1.638 4.155.608 7.219.296 7.977 1.924 2.104 3.091 4.787 3.091 8.069 0 11.543-7.036 14.083-13.727 14.835 1.079.93 2.042 2.766 2.042 5.576 0 4.027-.037 7.276-.037 8.267 0 .801.542 1.736 2.06 1.443C51.398 54.528 60 43.262 60 30 60 13.431 46.569 0 30 0z"/>
+  </g>
+  
+  <!-- 标题文字 -->
+  <text x="200" y="140" text-anchor="middle" fill="white" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="600">开源作品集</text>
+  <text x="200" y="165" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="system-ui, -apple-system, sans-serif" font-size="14">Open Source Projects</text>
+  
+  <!-- 装饰代码符号 -->
+  <text x="40" y="160" fill="rgba(255,255,255,0.3)" font-family="monospace" font-size="14">{ ... }</text>
+  <text x="320" y="160" fill="rgba(255,255,255,0.3)" font-family="monospace" font-size="14">/* */</text>
+</svg>

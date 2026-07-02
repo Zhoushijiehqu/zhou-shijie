@@ -543,6 +543,7 @@ body { overflow-wrap: break-word; }
   border-radius: 8px;
   border: 2px solid var(--border);
   box-shadow: 0 0 30px rgba(0,0,0,0.5);
+  transition: opacity 0.3s ease;
 }
 #memory-overlay .memory-countdown {
   font-size: 48px;
@@ -558,6 +559,20 @@ body { overflow-wrap: break-word; }
   max-width: 320px;
   text-align: center;
   line-height: 1.5;
+}
+#memory-overlay .memory-skip-tip {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 14px;
+  letter-spacing: 0.5px;
+  opacity: 0.55;
+  font-family: var(--font-ui);
+}
+#memory-overlay .memory-img {
+  cursor: pointer;
+}
+#memory-overlay.hidden .memory-img {
+  cursor: default;
 }
 
 /* 自动通关覆盖层 */
@@ -725,6 +740,7 @@ body { overflow-wrap: break-word; }
           <img class="memory-img" id="memory-img" src="" alt="记忆图片预览" />
           <div class="memory-countdown" id="memory-countdown">3</div>
           <div class="memory-hint" id="memory-hint"></div>
+          <div class="memory-skip-tip" id="memory-skip-tip">点击图片可跳过记忆阶段</div>
         </div>
         <div id="puzzle-container">
           <div id="slots-area">
@@ -1028,31 +1044,64 @@ body { overflow-wrap: break-word; }
 
     // 加载图片
     var imgUrl = isCustomImage ? customImageData : getLevelImageUrl(currentLevel);
-    memoryImg.src = imgUrl;
 
-    // 预览阶段：网格显示完整大图
-    showGridPreview(imgUrl);
-
-    // 记忆倒计时
+    // 记忆倒计时配置（教程关给 5 秒，其他 3 秒）
     var countdownSecs = currentLevel.id === 0 ? 5 : 3;
     memoryHint.textContent = currentLevel.hint || '';
-    memoryCountdown.textContent = String(countdownSecs);
-    memoryCountdown.style.color = 'var(--gold)';
+    memoryCountdown.textContent = '加载中…';
+    memoryCountdown.style.color = 'var(--text-muted)';
+    memoryImg.style.opacity = '0'; // 加载完成前隐藏，避免看到旧图
 
-    var countdown = countdownSecs;
-    memoryTimer = setInterval(function() {
-      countdown--;
-      memoryCountdown.textContent = String(countdown);
-      if (countdown <= 1) memoryCountdown.style.color = 'var(--red)';
-      if (countdown <= 0) {
+    var memoryStarted = false; // 防止重复启动
+    function beginMemoryCountdown() {
+      if (memoryStarted) return;
+      memoryStarted = true;
+
+      memoryImg.style.opacity = '1';
+      memoryCountdown.textContent = String(countdownSecs);
+      memoryCountdown.style.color = 'var(--gold)';
+      // 预览阶段：网格显示完整大图
+      showGridPreview(imgUrl);
+
+      var countdown = countdownSecs;
+      memoryTimer = setInterval(function() {
+        countdown--;
+        memoryCountdown.textContent = String(countdown);
+        if (countdown <= 1) memoryCountdown.style.color = 'var(--red)';
+        if (countdown <= 0) {
+          clearInterval(memoryTimer);
+          memoryTimer = null;
+          memoryOverlay.classList.add('hidden');
+          clearGridPreview();
+          startPuzzlePhase(imgUrl);
+        }
+      }, 1000);
+      allTimers.push(memoryTimer);
+    }
+
+    memoryImg.onload = beginMemoryCountdown;
+    // 若加载失败（如离线），1.2 秒后兜底启动，避免卡死
+    var fallbackTid = setTimeout(function() {
+      if (!memoryStarted && scenes.playing.classList.contains('active')) {
+        beginMemoryCountdown();
+      }
+    }, 1200);
+    registerTimer(fallbackTid);
+
+    // 点击图片可跳过记忆阶段，直接开始拼图
+    var skipHandler = function() {
+      if (memoryStarted && memoryTimer) {
         clearInterval(memoryTimer);
         memoryTimer = null;
         memoryOverlay.classList.add('hidden');
         clearGridPreview();
         startPuzzlePhase(imgUrl);
       }
-    }, 1000);
-    allTimers.push(memoryTimer);
+    };
+    memoryImg.addEventListener('click', skipHandler);
+    registerCleanup(function() { memoryImg.removeEventListener('click', skipHandler); });
+
+    memoryImg.src = imgUrl;
   }
 
   function showGridPreview(imgUrl) {
@@ -1229,6 +1278,12 @@ body { overflow-wrap: break-word; }
     var newLeft = clientXInContainer - dragInfo.offsetX;
     var newTop = clientYInContainer - dragInfo.offsetY;
 
+    // 限制在 puzzle-container 范围内，避免拖出视口
+    var containerW = puzzleContainer.clientWidth || 800;
+    var containerH = puzzleContainer.clientHeight || 406;
+    newLeft = Math.max(0, Math.min(containerW - cellSize, newLeft));
+    newTop = Math.max(0, Math.min(containerH - cellSize, newTop));
+
     // GPU 加速位移
     var dx = newLeft - dragInfo.startLeft;
     var dy = newTop - dragInfo.startTop;
@@ -1257,6 +1312,12 @@ body { overflow-wrap: break-word; }
 
     var newLeft = clientXInContainer - dragInfo.offsetX;
     var newTop = clientYInContainer - dragInfo.offsetY;
+
+    // 限制在 puzzle-container 范围内
+    var containerW = puzzleContainer.clientWidth || 800;
+    var containerH = puzzleContainer.clientHeight || 406;
+    newLeft = Math.max(0, Math.min(containerW - cellSize, newLeft));
+    newTop = Math.max(0, Math.min(containerH - cellSize, newTop));
 
     // 写回 left/top，清除 translate3d，立即提交位置
     el.style.transition = 'none';
@@ -1353,6 +1414,8 @@ body { overflow-wrap: break-word; }
 
   // ==================== 通关 ====================
   function onLevelComplete() {
+    // 防御：若已退出（currentLevel 被清空或不在游戏场景），不触发通关
+    if (!currentLevel || !scenes.playing.classList.contains('active')) return;
     isPlaying = false;
     stopTimer();
     var elapsed = getElapsed();
@@ -1384,12 +1447,10 @@ body { overflow-wrap: break-word; }
       bestEl.textContent = '';
     }
 
+    // 下一关按钮：仅预设关卡且非最后一关才显示
     var nextBtn = document.getElementById('btn-next-level');
-    if (isCustomImage || !currentLevel || currentLevel.id >= 10) {
-      nextBtn.style.display = 'none';
-    } else {
-      nextBtn.style.display = '';
-    }
+    var canNext = !isCustomImage && currentLevel && currentLevel.id >= 0 && currentLevel.id < 10;
+    nextBtn.style.display = canNext ? '' : 'none';
   }
 
   // ==================== 自动通关 ====================
@@ -1486,10 +1547,9 @@ body { overflow-wrap: break-word; }
   // ==================== 重置关卡 ====================
   function resetLevel() {
     if (isAutoSolving) return;
+    if (!currentLevel) return; // 防御：无当前关卡则不重置
     _cleanup();
-    if (currentLevel) {
-      startLevel(currentLevel.id, isCustomImage);
-    }
+    startLevel(currentLevel.id, isCustomImage);
   }
 
   // ==================== 自定义图片 ====================
@@ -1572,13 +1632,13 @@ body { overflow-wrap: break-word; }
   });
 
   document.getElementById('btn-next-level').addEventListener('click', function() {
-    if (currentLevel && currentLevel.id < 10) {
-      var nextId = currentLevel.id + 1;
-      currentLevel = LEVELS[nextId];
-      isCustomImage = false;
-      customImageData = null;
-      startLevel(nextId, false);
-    }
+    // 防御：仅预设关卡（id >= 0）且非最后一关才允许进入下一关
+    if (!currentLevel || isCustomImage || currentLevel.id < 0 || currentLevel.id >= 10) return;
+    var nextId = currentLevel.id + 1;
+    currentLevel = LEVELS[nextId];
+    isCustomImage = false;
+    customImageData = null;
+    startLevel(nextId, false);
   });
 
   document.getElementById('btn-back-menu').addEventListener('click', function() {

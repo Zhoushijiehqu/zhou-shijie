@@ -1,0 +1,1941 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>解谜剧场 · 周世杰</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,400..700&family=Manrope:wght@300..800&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/layout.css">
+<link rel="stylesheet" href="../assets/css/components.css">
+<link rel="stylesheet" href="../assets/css/animations.css">
+<script>
+  // 主题预载（防闪烁）
+  (function() {
+    var t = localStorage.getItem('theme');
+    if (!t) t = 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<style>
+/* ===== 解谜剧场页面特有样式 =====
+   颜色全部走主页面 CSS 变量（由 base.css 定义），
+   字体用 Fraunces（标题）+ Manrope（正文）+ Noto Serif SC（游戏内汉字，保留剧场感）
+*/
+
+/* 顶部 sticky header */
+.puzzle-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 28px;
+  background: rgba(var(--color-bg-primary-rgb, 26,21,16), 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--color-border-light);
+}
+.puzzle-header-left { display: flex; align-items: center; gap: 16px; }
+.puzzle-back-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  font-family: var(--font-family-base);
+  font-size: 13px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-card);
+  transition: all 0.25s;
+}
+.puzzle-back-btn:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent-light);
+  background: var(--color-accent-lighter);
+}
+.puzzle-title-area { text-align: center; flex: 1; }
+.puzzle-eyebrow {
+  display: block;
+  font-family: var(--font-family-base);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.34em; text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: 2px;
+}
+.puzzle-title-area h1 {
+  font-family: var(--font-family-display);
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 400;
+  font-variation-settings: 'opsz' 60, 'SOFT' 50;
+  color: var(--color-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+/* 主题切换按钮（复用主页 .theme-toggle） */
+.puzzle-header .theme-toggle { flex-shrink: 0; }
+
+/* 游戏容器：居中，最大宽度 900px */
+#game-root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 70px);
+  padding: 32px 20px;
+}
+
+/* ===== 游戏内 :root 变量映射 =====
+   原游戏用 --bg/--surface/--gold 等变量，
+   这里映射到主页面的 CSS 变量，保持游戏内样式不破坏
+*/
+:root {
+  --bg: var(--color-bg-primary);
+  --surface: var(--color-bg-card);
+  --surface-light: var(--color-bg-tertiary);
+  --text: var(--color-text-primary);
+  --text-muted: var(--color-text-secondary);
+  --gold: var(--color-accent);
+  --gold-bright: var(--color-accent);
+  --red: #c4554d;
+  --green: #5a9e6f;
+  --border: var(--color-border-medium);
+  --shadow: var(--shadow-md);
+  --disabled: var(--color-text-tertiary);
+}
+
+/* body 用主页面字体 + 纸张纹理（base.css 提供） */
+body {
+  margin: 0; padding: 0;
+  background: var(--color-bg-primary);
+  font-family: 'Manrope', 'Noto Serif SC', 'STSong', serif, sans-serif;
+  color: var(--color-text-primary);
+  min-height: 100vh;
+  overflow-x: hidden; overflow-y: auto;
+  user-select: none; -webkit-user-select: none;
+}
+
+/* 游戏内汉字用 Noto Serif SC 保持剧场感 */
+.menu-title, .settings-title, .level-select-title,
+.level-title-display, .scene-element, .prop-element,
+.pass-button, .countdown, .floating-msg {
+  font-family: 'Noto Serif SC', 'Fraunces', serif !important;
+}
+
+/* 菜单标题加渐变文字 */
+.menu-title {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+/* 按钮风格统一为编辑体 */
+.menu-btn, .settings-btn, .bar-btn {
+  font-family: 'Manrope', sans-serif;
+  border-radius: var(--radius-full);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.menu-btn:hover, .settings-btn:hover, .bar-btn:hover {
+  box-shadow: var(--shadow-sm);
+}
+.menu-btn.primary {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  border-color: transparent;
+  color: var(--color-text-inverse);
+}
+
+/* 关卡卡片编辑体化 */
+.level-card {
+  border-radius: var(--radius-md);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.level-card:hover:not(.locked) {
+  box-shadow: var(--shadow-md);
+}
+
+/* 游戏视口编辑体化 */
+#game-viewport {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg), inset 0 0 60px rgba(0,0,0,0.2);
+}
+
+/* 模态框编辑体化 */
+#modal {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+#modal h2 {
+  font-family: 'Fraunces', serif;
+  font-variation-settings: 'opsz' 60;
+}
+
+/* toast 编辑体化 */
+.toast {
+  border-radius: var(--radius-full);
+  backdrop-filter: blur(8px);
+}
+
+/* 响应式 */
+@media (max-width: 840px) {
+  .puzzle-header { padding: 10px 16px; }
+  #game-root { padding: 16px 12px; }
+}
+
+/* ===== 以下为原游戏样式（保留功能，变量已上方映射） ===== */
+*, *::before, *::after { box-sizing: border-box; }
+img, video { max-width: 100%; height: auto; display: block; }
+body { overflow-wrap: break-word; }
+
+/* ========== SCENE CONTAINERS ========== */
+.scene {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.4s ease;
+  padding: 20px;
+}
+.scene.active { opacity: 1; pointer-events: auto; position: relative; }
+
+/* ========== MAIN MENU ========== */
+#main-menu { gap: 32px; }
+.menu-title {
+  font-size: 2.8rem; font-weight: 700; color: var(--gold-bright);
+  letter-spacing: 0.12em; text-align: center;
+  text-shadow: 0 0 40px rgba(232,200,138,0.3);
+  line-height: 1.3;
+}
+.menu-subtitle {
+  font-size: 1rem; color: var(--text-muted); letter-spacing: 0.08em;
+  margin-top: -20px;
+}
+.menu-btns { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+.menu-btn {
+  background: transparent; color: var(--text);
+  border: 1px solid var(--border); padding: 14px 48px; border-radius: 8px;
+  font-family: inherit; font-size: 1.1rem; cursor: pointer;
+  transition: all 0.25s; letter-spacing: 0.06em; min-width: 240px; text-align: center;
+}
+.menu-btn:hover { border-color: var(--gold); color: var(--gold); background: rgba(212,165,116,0.06); }
+.menu-btn.primary { border-color: var(--gold); color: var(--gold); background: rgba(212,165,116,0.1); }
+.menu-btn.primary:hover { background: rgba(212,165,116,0.2); }
+
+/* ========== SETTINGS ========== */
+#settings { gap: 28px; }
+.settings-title { font-size: 1.8rem; color: var(--gold); letter-spacing: 0.08em; }
+.settings-group { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.settings-label { font-size: 0.95rem; color: var(--text-muted); letter-spacing: 0.04em; }
+.toggle-row { display: flex; gap: 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.toggle-opt {
+  padding: 10px 24px; font-family: inherit; font-size: 0.9rem; cursor: pointer;
+  background: transparent; color: var(--text-muted); border: none;
+  transition: all 0.2s; letter-spacing: 0.04em;
+}
+.toggle-opt:not(:last-child) { border-right: 1px solid var(--border); }
+.toggle-opt.active { background: rgba(212,165,116,0.15); color: var(--gold); }
+.toggle-opt:hover:not(.active) { background: rgba(255,255,255,0.03); }
+.settings-btn {
+  background: transparent; color: var(--text-muted);
+  border: 1px solid var(--border); padding: 10px 28px; border-radius: 6px;
+  font-family: inherit; font-size: 0.9rem; cursor: pointer;
+  transition: all 0.2s; letter-spacing: 0.04em;
+}
+.settings-btn:hover { border-color: var(--gold); color: var(--gold); }
+.settings-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+/* ========== LEVEL SELECT ========== */
+#level-select-scene { gap: 24px; }
+.level-select-title { font-size: 1.6rem; color: var(--gold); letter-spacing: 0.08em; }
+.level-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 12px; max-width: 640px; width: 100%;
+}
+.level-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px 8px; text-align: center; cursor: pointer;
+  transition: all 0.25s; display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.level-card:hover:not(.locked) {
+  border-color: var(--gold); background: var(--surface-light);
+  transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.level-card.locked {
+  cursor: not-allowed; opacity: 0.4;
+  border-color: var(--disabled); background: rgba(255,255,255,0.02);
+}
+.level-card.completed { border-color: var(--green); }
+.level-card.completed::after { content: '✓'; color: var(--green); font-size: 0.8rem; }
+.level-num { font-size: 1.3rem; font-weight: 700; color: var(--gold); letter-spacing: 0.04em; }
+.level-card.locked .level-num { color: var(--disabled); }
+.level-card-name { font-size: 0.75rem; color: var(--text-muted); letter-spacing: 0.04em; }
+.lock-icon { font-size: 1rem; margin-top: 2px; }
+
+/* ========== GAMEPLAY ========== */
+#gameplay { gap: 12px; width: 100%; max-width: 900px; }
+.gameplay-bar {
+  display: flex; align-items: center; gap: 10px; width: 100%; max-width: 800px;
+  flex-wrap: wrap; justify-content: center;
+}
+.gameplay-bar .bar-btn {
+  background: transparent; color: var(--text-muted);
+  border: 1px solid var(--border); padding: 7px 14px; border-radius: 6px;
+  font-family: inherit; font-size: 0.85rem; cursor: pointer;
+  transition: all 0.2s; letter-spacing: 0.04em; white-space: nowrap;
+}
+.gameplay-bar .bar-btn:hover { border-color: var(--gold); color: var(--gold); }
+.gameplay-bar .bar-btn.auto-btn:hover { border-color: var(--green); color: var(--green); }
+.level-title-display { font-size: 1rem; color: var(--gold); letter-spacing: 0.06em; font-weight: 700; margin: 0 8px; }
+.hint-display { font-size: 0.9rem; color: var(--text-muted); letter-spacing: 0.04em; text-align: center; min-height: 22px; }
+
+#viewport-wrapper {
+  position: relative; width: 100%; max-width: 800px; aspect-ratio: 16 / 9;
+}
+#game-viewport {
+  position: absolute; top: 0; left: 0; width: 800px; height: 450px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  overflow: hidden; transform-origin: top left;
+  box-shadow: 0 8px 32px var(--shadow), inset 0 0 60px rgba(0,0,0,0.3);
+}
+#game-viewport::before {
+  content: ''; position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 40px 40px; pointer-events: none; z-index: 0;
+}
+
+/* Darken overlay for level 8 */
+.viewport-darken {
+  position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 14;
+  pointer-events: none; opacity: 0; transition: opacity 0.5s;
+}
+.viewport-darken.on { opacity: 1; }
+
+/* Scene elements */
+.scene-element {
+  position: absolute; transform: translate(-50%, -50%);
+  font-weight: 700; color: var(--text);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  transition: color 0.4s, text-shadow 0.4s, opacity 0.4s, transform 0.3s;
+  z-index: 1; pointer-events: none; letter-spacing: 0.04em;
+}
+
+/* Props (draggable) */
+.prop-element {
+  position: absolute; transform: translate(-50%, -50%);
+  font-weight: 700; cursor: grab; z-index: 10;
+  padding: 8px 14px; border: 2px solid var(--gold); border-radius: 8px;
+  background: rgba(212,165,116,0.08); color: var(--gold);
+  text-shadow: 0 0 12px rgba(212,165,116,0.3);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s, color 0.3s, opacity 0.4s, transform 0.15s;
+  letter-spacing: 0.04em;
+}
+.prop-element:hover {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 20px rgba(212,165,116,0.35), 0 4px 12px rgba(0,0,0,0.3);
+  background: rgba(212,165,116,0.15);
+}
+.prop-element.dragging {
+  cursor: grabbing; transform: translate(-50%, -50%) scale(1.12);
+  box-shadow: 0 0 28px rgba(212,165,116,0.5), 0 8px 24px rgba(0,0,0,0.4);
+  border-color: var(--gold-bright); background: rgba(212,165,116,0.2); z-index: 20;
+}
+.prop-element.clickable { cursor: pointer; }
+.prop-element.clickable:hover {
+  border-color: var(--red);
+  box-shadow: 0 0 16px rgba(196,85,77,0.3); background: rgba(196,85,77,0.1);
+}
+
+/* Pass button */
+.pass-button {
+  position: absolute; transform: translate(-50%, -50%);
+  font-weight: 700; font-size: 2rem; color: var(--green); cursor: pointer; z-index: 15;
+  padding: 10px 24px; border: 2px solid var(--green); border-radius: 8px;
+  background: rgba(90,158,111,0.1);
+  text-shadow: 0 0 16px rgba(90,158,111,0.4);
+  transition: all 0.2s; letter-spacing: 0.06em;
+  animation: pulse-pass 2s ease-in-out infinite;
+}
+.pass-button:hover {
+  background: rgba(90,158,111,0.25);
+  box-shadow: 0 0 24px rgba(90,158,111,0.4);
+  transform: translate(-50%, -50%) scale(1.08);
+}
+@keyframes pulse-pass {
+  0%,100% { box-shadow: 0 0 12px rgba(90,158,111,0.2); }
+  50% { box-shadow: 0 0 28px rgba(90,158,111,0.45); }
+}
+
+/* Floating message */
+.floating-msg {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 1.3rem; font-weight: 700; color: var(--red);
+  text-shadow: 0 0 12px rgba(196,85,77,0.5);
+  z-index: 30; pointer-events: none;
+  animation: float-up 2s ease-out forwards; letter-spacing: 0.06em;
+}
+@keyframes float-up {
+  0% { opacity: 1; transform: translate(-50%, -50%); }
+  60% { opacity: 0.8; transform: translate(-50%, -80%); }
+  100% { opacity: 0; transform: translate(-50%, -120%); }
+}
+
+/* Countdown */
+.countdown {
+  position: absolute; transform: translate(-50%, -50%);
+  font-size: 3rem; font-weight: 700; color: var(--gold-bright);
+  text-shadow: 0 0 24px rgba(232,200,138,0.6);
+  z-index: 25; pointer-events: none;
+  animation: count-pulse 0.8s ease-out; letter-spacing: 0.06em;
+}
+@keyframes count-pulse {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  50% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+}
+
+/* Particle */
+.particle {
+  position: absolute; pointer-events: none; z-index: 25;
+  font-size: 0.8rem; font-weight: 700; color: var(--gold-bright);
+  animation: particle-burst 0.7s ease-out forwards;
+}
+@keyframes particle-burst {
+  0% { opacity: 1; transform: translate(0,0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--px), var(--py)) scale(0.3); }
+}
+
+/* Modal */
+#modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.35s;
+}
+#modal-overlay.active { opacity: 1; pointer-events: auto; }
+#modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 36px 40px; text-align: center; max-width: 420px; width: 90%;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  transform: translateY(20px); transition: transform 0.35s;
+}
+#modal-overlay.active #modal { transform: translateY(0); }
+#modal h2 { font-size: 1.8rem; color: var(--gold-bright); margin: 0 0 8px; letter-spacing: 0.06em; }
+#modal p { color: var(--text-muted); margin: 0 0 24px; font-size: 1rem; }
+#modal .modal-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+#modal button {
+  background: transparent; color: var(--text); border: 1px solid var(--border);
+  padding: 10px 22px; border-radius: 6px; font-family: inherit; font-size: 0.95rem;
+  cursor: pointer; transition: all 0.2s; letter-spacing: 0.04em;
+}
+#modal button:hover { border-color: var(--gold); color: var(--gold); }
+#modal button.primary { background: rgba(212,165,116,0.15); border-color: var(--gold); color: var(--gold); }
+#modal button.primary:hover { background: rgba(212,165,116,0.25); }
+
+/* Toast */
+.toast {
+  position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 24px; color: var(--text); font-family: inherit; font-size: 0.9rem;
+  z-index: 200; letter-spacing: 0.04em; opacity: 0;
+  transition: opacity 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+
+/* Responsive */
+@media (max-width: 840px) {
+  .menu-title { font-size: 2rem; }
+  .level-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .level-card { padding: 12px 6px; }
+  .gameplay-bar { gap: 6px; }
+  .gameplay-bar .bar-btn { padding: 6px 10px; font-size: 0.78rem; }
+}
+@media (max-width: 500px) {
+  .level-grid { grid-template-columns: repeat(3, 1fr); }
+  .menu-title { font-size: 1.6rem; }
+}
+</style>
+</head>
+<body>
+
+<header class="puzzle-header">
+  <div class="puzzle-header-left">
+    <a href="../games.html" class="puzzle-back-btn">← 游戏小屋</a>
+  </div>
+  <div class="puzzle-title-area">
+    <span class="puzzle-eyebrow">— 文字谜题 —</span>
+    <h1>解谜剧场</h1>
+  </div>
+  <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+    <span class="icon" id="themeIcon"></span>
+  </button>
+</header>
+<div id="game-root">
+
+<!-- ========== SCENE: MAIN MENU ========== -->
+<div id="main-menu" class="scene active">
+  <div class="menu-title">文字交互<br>解谜剧场</div>
+  <div class="menu-subtitle">— 21 道汉字谜题，考验你的智慧 —</div>
+  <div class="menu-btns">
+    <button class="menu-btn primary" data-action="start">开始游戏</button>
+    <button class="menu-btn" data-action="tutorial">教程关卡</button>
+    <button class="menu-btn" data-action="settings">游戏设置</button>
+  </div>
+</div>
+
+<!-- ========== SCENE: SETTINGS ========== -->
+<div id="settings" class="scene">
+  <div class="settings-title">游戏设置</div>
+  <div class="settings-group">
+    <div class="settings-label">关卡模式</div>
+    <div class="toggle-row" id="mode-toggle">
+      <button class="toggle-opt active" data-mode="linear">线性挑战（不可跳关）</button>
+      <button class="toggle-opt" data-mode="free">自由探索（可跳关）</button>
+    </div>
+  </div>
+  <button class="settings-btn danger" id="btn-clear-save">清除存档</button>
+  <button class="settings-btn" data-action="back-to-menu">← 返回主菜单</button>
+</div>
+
+<!-- ========== SCENE: LEVEL SELECT ========== -->
+<div id="level-select-scene" class="scene">
+  <div class="level-select-title">选择关卡</div>
+  <div class="level-grid" id="level-grid"></div>
+  <button class="settings-btn" data-action="back-to-menu">← 返回主菜单</button>
+</div>
+
+<!-- ========== SCENE: GAMEPLAY ========== -->
+<div id="gameplay" class="scene">
+  <div class="gameplay-bar">
+    <button class="bar-btn" id="btn-back-levels">← 返回选关</button>
+    <span class="level-title-display" id="level-title-display"></span>
+    <button class="bar-btn" id="btn-reset">⟳ 重置</button>
+    <button class="bar-btn auto-btn" id="btn-auto-solve">💡 看答案</button>
+  </div>
+  <div class="hint-display" id="hint-display"></div>
+  <div id="viewport-wrapper">
+    <div id="game-viewport">
+      <div class="viewport-darken" id="viewport-darken"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODAL ========== -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h2 id="modal-title">🎉 通关！</h2>
+    <p id="modal-msg"></p>
+    <div class="modal-btns">
+      <button id="modal-retry">重玩本关</button>
+      <button id="modal-next" class="primary">下一关 →</button>
+      <button id="modal-menu">返回主菜单</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== TOAST ========== -->
+<div class="toast" id="toast"></div>
+</div><!-- /#game-root -->
+
+<script>
+// ==================== LEVEL DATA (21 levels: 0-20) ====================
+const levels = [
+  // Level 0: Tutorial
+  {
+    id: 0, title: "新手教学", hint: "按住并拖拽【人】字，放入【口】字中央",
+    sceneElements: [
+      { id: "env_mouth", text: "口", x: 400, y: 200, fontSize: 64 }
+    ],
+    props: [
+      { id: "prop_person0", text: "人", x: 120, y: 320, fontSize: 44 }
+    ],
+    rules: [
+      { type: "MERGE", trigger: "prop_person0", target: "env_mouth", result: { text: "囚", newId: "env_prisoner" } }
+    ],
+    checkWin: function(gs) { return gs.hasElement("env_prisoner"); }
+  },
+  // Level 1
+  {
+    id: 1, title: "初试锋芒", hint: "水火不容，以水灭火",
+    sceneElements: [
+      { id: "env_fire", text: "火", x: 400, y: 200, fontSize: 56 }
+    ],
+    props: [
+      { id: "prop_water", text: "水", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "ELIMINATE", trigger: "prop_water", target: "env_fire" }
+    ],
+    checkWin: function(gs) { return !gs.hasElement("env_fire"); }
+  },
+  // Level 2
+  {
+    id: 2, title: "组字为机", hint: "木+几=机，乘机过河",
+    sceneElements: [
+      { id: "env_river", text: "河", x: 550, y: 200, fontSize: 52 }
+    ],
+    props: [
+      { id: "prop_wood", text: "木", x: 120, y: 340, fontSize: 40 },
+      { id: "prop_ji", text: "几", x: 220, y: 340, fontSize: 40 },
+      { id: "prop_me", text: "我", x: 120, y: 200, fontSize: 40 }
+    ],
+    rules: [
+      { type: "MERGE", trigger: "prop_wood", target: "prop_ji", result: { text: "机", newId: "prop_machine" } }
+    ],
+    checkWin: function(gs) {
+      var me = gs.getElement("prop_me");
+      var river = gs.getElement("env_river");
+      return me && river && me.x > river.x;
+    }
+  },
+  // Level 3
+  {
+    id: 3, title: "凿壁偷光", hint: "日光入暗室，化暗为明",
+    sceneElements: [
+      { id: "env_dark", text: "暗", x: 400, y: 200, fontSize: 56 }
+    ],
+    props: [
+      { id: "prop_sun", text: "日", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "TRANSFORM", trigger: "prop_sun", target: "env_dark", result: { text: "明", newId: "env_bright" } }
+    ],
+    checkWin: function(gs) { return gs.hasElement("env_bright"); }
+  },
+  // Level 4
+  {
+    id: 4, title: "愚公移山", hint: "坚持不懈，挖山三次",
+    sceneElements: [
+      { id: "env_mountain", text: "山", x: 400, y: 200, fontSize: 60 }
+    ],
+    props: [
+      { id: "prop_dig", text: "挖", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "HIT_COUNT", trigger: "prop_dig", target: "env_mountain", hitCount: 3, onComplete: "removeTarget" }
+    ],
+    checkWin: function(gs) { return !gs.hasElement("env_mountain"); }
+  },
+  // Level 5
+  {
+    id: 5, title: "以石击卵", hint: "以石击卵，卵破",
+    sceneElements: [
+      { id: "env_egg", text: "卵", x: 400, y: 200, fontSize: 52 }
+    ],
+    props: [
+      { id: "prop_stone", text: "石", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "ELIMINATE", trigger: "prop_stone", target: "env_egg" }
+    ],
+    checkWin: function(gs) { return !gs.hasElement("env_egg"); }
+  },
+  // Level 6
+  {
+    id: 6, title: "冰雪融化", hint: "日出冰融，化为水",
+    sceneElements: [
+      { id: "env_ice", text: "冰", x: 400, y: 200, fontSize: 52 }
+    ],
+    props: [
+      { id: "prop_sun2", text: "日", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "TRANSFORM", trigger: "prop_sun2", target: "env_ice", result: { text: "水", newId: "env_water2" } }
+    ],
+    checkWin: function(gs) { return gs.hasElement("env_water2"); }
+  },
+  // Level 7
+  {
+    id: 7, title: "顺风耳", hint: "隔墙有耳，探听秘密",
+    sceneElements: [
+      { id: "env_wall", text: "墙", x: 400, y: 200, fontSize: 52 },
+      { id: "env_secret", text: "密", x: 560, y: 200, fontSize: 44, hidden: true }
+    ],
+    props: [
+      { id: "prop_ear", text: "耳", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "TRANSFORM", trigger: "prop_ear", target: "env_wall", result: { text: "路", newId: "env_path" }, transformTarget: "fadeReveal" }
+    ],
+    checkWin: function(gs) { return gs.hasElement("env_path"); }
+  },
+  // Level 8
+  {
+    id: 8, title: "一叶障目", hint: "一叶障目，不见泰山",
+    sceneElements: [
+      { id: "env_eye", text: "目", x: 400, y: 200, fontSize: 56 }
+    ],
+    props: [
+      { id: "prop_leaf", text: "叶", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "TRANSFORM", trigger: "prop_leaf", target: "env_eye", result: { text: "通过", newId: "btn_pass", isButton: true } }
+    ],
+    checkWin: function(gs) { return gs.getFlag("passClicked") === true; }
+  },
+  // Level 9
+  {
+    id: 9, title: "按图索骥", hint: "按图索骥，迷途知返",
+    sceneElements: [
+      { id: "env_maze", text: "迷", x: 400, y: 200, fontSize: 52 }
+    ],
+    props: [
+      { id: "prop_map", text: "图", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "TRANSFORM", trigger: "prop_map", target: "env_maze", result: { text: "路", newId: "env_path2" } }
+    ],
+    checkWin: function(gs) { return gs.hasElement("env_path2"); }
+  },
+  // Level 10
+  {
+    id: 10, title: "画龙点睛", hint: "画龙点睛，一笔传神——将丶精准放在龙字右上方",
+    sceneElements: [
+      { id: "env_dragon", text: "龙", x: 400, y: 200, fontSize: 60 }
+    ],
+    props: [
+      { id: "prop_dot", text: "丶", x: 120, y: 320, fontSize: 32 }
+    ],
+    rules: [
+      { type: "MERGE", trigger: "prop_dot", target: "env_dragon", result: { text: "龙", newId: "env_dragon_golden" }, precisionZone: { relX: 28, relY: -22, radius: 30 }, goldenResult: true }
+    ],
+    checkWin: function(gs) { return gs.hasElement("env_dragon_golden"); }
+  },
+  // Level 11
+  {
+    id: 11, title: "借酒浇愁", hint: "借酒浇愁，愁更愁？不，愁消了",
+    sceneElements: [
+      { id: "env_sorrow", text: "愁", x: 400, y: 200, fontSize: 56 }
+    ],
+    props: [
+      { id: "prop_wine", text: "酒", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "ELIMINATE", trigger: "prop_wine", target: "env_sorrow" }
+    ],
+    checkWin: function(gs) { return !gs.hasElement("env_sorrow"); }
+  },
+  // Level 12
+  {
+    id: 12, title: "水落石出", hint: "加热液体，水落石出——需加热两次",
+    sceneElements: [
+      { id: "env_liquid", text: "液", x: 400, y: 200, fontSize: 52 }
+    ],
+    props: [
+      { id: "prop_heat", text: "热", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "TRANSFORM", trigger: "prop_heat", target: "env_liquid", result: { text: "水", newId: "env_water3" } },
+      { type: "TRANSFORM", trigger: "prop_heat", target: "env_water3", result: { text: "石", newId: "env_stone2" } }
+    ],
+    checkWin: function(gs) { return gs.hasElement("env_stone2"); }
+  },
+  // Level 13
+  {
+    id: 13, title: "点石成金", hint: "点石成金，化腐朽为神奇",
+    sceneElements: [
+      { id: "env_rock", text: "石", x: 400, y: 200, fontSize: 52 }
+    ],
+    props: [
+      { id: "prop_hand", text: "手", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "TRANSFORM", trigger: "prop_hand", target: "env_rock", result: { text: "金", newId: "env_gold" } }
+    ],
+    checkWin: function(gs) { return gs.hasElement("env_gold"); }
+  },
+  // Level 14
+  {
+    id: 14, title: "守株待兔", hint: "点击兔子，让它跑向树桩",
+    sceneElements: [
+      { id: "env_stump", text: "株", x: 520, y: 200, fontSize: 52 }
+    ],
+    props: [
+      { id: "prop_rabbit", text: "兔", x: 120, y: 320, fontSize: 40, onClick: "autoMove" }
+    ],
+    rules: [],
+    checkWin: function(gs) { return gs.getFlag("rabbitDown") === true; }
+  },
+  // Level 15
+  {
+    id: 15, title: "集思广益", hint: "三人成众，集思广益——将可拖动的人放到两个静态人中间",
+    sceneElements: [
+      { id: "env_person1", text: "人", x: 300, y: 220, fontSize: 44 },
+      { id: "env_person2", text: "人", x: 500, y: 220, fontSize: 44 }
+    ],
+    props: [
+      { id: "prop_person3", text: "人", x: 120, y: 340, fontSize: 40 }
+    ],
+    rules: [
+      { type: "MERGE", trigger: "prop_person3", target: "env_person1", extraTarget: "env_person2", result: { text: "众", newId: "env_zhong" } }
+    ],
+    checkWin: function(gs) { return gs.hasElement("env_zhong"); }
+  },
+  // Level 16
+  {
+    id: 16, title: "网开一面", hint: "剪开网，让我出去",
+    sceneElements: [
+      { id: "env_net", text: "网", x: 450, y: 200, fontSize: 52 }
+    ],
+    props: [
+      { id: "prop_scissors", text: "剪", x: 120, y: 340, fontSize: 40 },
+      { id: "prop_me2", text: "我", x: 160, y: 200, fontSize: 40 }
+    ],
+    rules: [
+      { type: "ELIMINATE", trigger: "prop_scissors", target: "env_net" }
+    ],
+    checkWin: function(gs) {
+      var me = gs.getElement("prop_me2");
+      var net = gs.getElement("env_net");
+      if (!me) return false;
+      if (net && net.visible) return false;
+      return me.x > 450;
+    }
+  },
+  // Level 17
+  {
+    id: 17, title: "名落孙山", hint: "名落孙山——将我拖到孙山下方",
+    sceneElements: [
+      { id: "env_sunshan", text: "孙山", x: 400, y: 180, fontSize: 48 }
+    ],
+    props: [
+      { id: "prop_me3", text: "我", x: 400, y: 110, fontSize: 40 }
+    ],
+    rules: [],
+    checkWin: function(gs) {
+      var me = gs.getElement("prop_me3");
+      var ss = gs.getElement("env_sunshan");
+      return me && ss && me.y > ss.y;
+    }
+  },
+  // Level 18
+  {
+    id: 18, title: "对牛弹琴", hint: "对牛弹琴？不如喂草——用草喂牛通关",
+    sceneElements: [
+      { id: "env_cow", text: "牛", x: 400, y: 200, fontSize: 56 }
+    ],
+    props: [
+      { id: "prop_qin", text: "琴", x: 120, y: 300, fontSize: 40 },
+      { id: "prop_grass", text: "草", x: 220, y: 340, fontSize: 40 }
+    ],
+    rules: [
+      { type: "TRANSFORM", trigger: "prop_qin", target: "env_cow", message: "牛不理你", resetTrigger: true, noTransform: true },
+      { type: "ELIMINATE", trigger: "prop_grass", target: "env_cow" }
+    ],
+    checkWin: function(gs) { return !gs.hasElement("env_cow"); }
+  },
+  // Level 19
+  {
+    id: 19, title: "顶天立地", hint: "点击人使其成长，顶天立地——点击5次",
+    sceneElements: [
+      { id: "env_sky", text: "天", x: 400, y: 70, fontSize: 48 },
+      { id: "env_earth", text: "地", x: 400, y: 380, fontSize: 48 }
+    ],
+    props: [
+      { id: "prop_person4", text: "人", x: 400, y: 225, fontSize: 24, onClick: "grow" }
+    ],
+    rules: [],
+    checkWin: function(gs) { return gs.getFlag("touchingBoth") === true; }
+  },
+  // Level 20
+  {
+    id: 20, title: "化茧成蝶", hint: "时间流逝，破茧成蝶",
+    sceneElements: [
+      { id: "env_cocoon", text: "茧", x: 400, y: 200, fontSize: 56 }
+    ],
+    props: [
+      { id: "prop_time", text: "时", x: 120, y: 320, fontSize: 40 }
+    ],
+    rules: [
+      { type: "TRANSFORM", trigger: "prop_time", target: "env_cocoon", result: { text: "蝶", newId: "env_butterfly" }, delay: 3000, countdown: true }
+    ],
+    checkWin: function(gs) { return gs.getFlag("butterflyFlew") === true; }
+  }
+];
+
+// ==================== APP ENGINE ====================
+var App = {
+  // State
+  mode: 'linear',
+  maxUnlocked: 1,
+  completedLevels: [],
+  currentLevelIndex: -1,
+  isTutorial: false,
+  gameState: null,
+  dragState: null,
+  animFrameId: null,
+  countdownTimer: null,
+  autoSolving: false,
+  butterflyFlyTimer: null,
+  butterflyLandTimer: null,
+
+  // DOM refs (populated in init)
+  scenes: {},
+  viewport: null,
+  darkenOverlay: null,
+  hintDisplay: null,
+  levelTitleDisplay: null,
+  modalOverlay: null,
+  modalTitle: null,
+  modalMsg: null,
+  modalRetry: null,
+  modalNext: null,
+  modalMenu: null,
+  toast: null,
+  levelGrid: null,
+
+  // Bound handlers
+  _boundPointerMove: null,
+  _boundPointerUp: null,
+  _boundPassClick: null,
+
+  // ---- INIT ----
+  init: function() {
+    var self = this;
+
+    // Cache DOM
+    self.scenes = {
+      menu: document.getElementById('main-menu'),
+      settings: document.getElementById('settings'),
+      levelSelect: document.getElementById('level-select-scene'),
+      gameplay: document.getElementById('gameplay')
+    };
+    self.viewport = document.getElementById('game-viewport');
+    self.darkenOverlay = document.getElementById('viewport-darken');
+    self.hintDisplay = document.getElementById('hint-display');
+    self.levelTitleDisplay = document.getElementById('level-title-display');
+    self.modalOverlay = document.getElementById('modal-overlay');
+    self.modalTitle = document.getElementById('modal-title');
+    self.modalMsg = document.getElementById('modal-msg');
+    self.modalRetry = document.getElementById('modal-retry');
+    self.modalNext = document.getElementById('modal-next');
+    self.modalMenu = document.getElementById('modal-menu');
+    self.toast = document.getElementById('toast');
+    self.levelGrid = document.getElementById('level-grid');
+
+    self._boundPointerMove = self._onPointerMove.bind(self);
+    self._boundPointerUp = self._onPointerUp.bind(self);
+    self._boundPassClick = self._onPassClick.bind(self);
+
+    // Load saved data
+    self._loadSave();
+
+    // Bind global actions
+    self._bindActions();
+
+    // Rescale viewport
+    self._rescale();
+    window.addEventListener('resize', function() { self._rescale(); });
+
+    // Show menu
+    self._showScene('menu');
+  },
+
+  // ---- SAVE / LOAD ----
+  _loadSave: function() {
+    try {
+      var saved = JSON.parse(localStorage.getItem('textPuzzle_save') || '{}');
+      this.mode = saved.mode || 'linear';
+      this.maxUnlocked = saved.maxUnlocked || 1;
+      this.completedLevels = saved.completedLevels || [];
+    } catch(e) {
+      this.mode = 'linear';
+      this.maxUnlocked = 1;
+      this.completedLevels = [];
+    }
+    this._updateModeUI();
+  },
+
+  _save: function() {
+    try {
+      localStorage.setItem('textPuzzle_save', JSON.stringify({
+        mode: this.mode,
+        maxUnlocked: this.maxUnlocked,
+        completedLevels: this.completedLevels
+      }));
+    } catch(e) {}
+  },
+
+  _clearSave: function() {
+    this.mode = 'linear';
+    this.maxUnlocked = 1;
+    this.completedLevels = [];
+    try { localStorage.removeItem('textPuzzle_save'); } catch(e) {}
+    this._updateModeUI();
+    this._showToast('存档已清除');
+  },
+
+  _updateModeUI: function() {
+    var toggles = document.querySelectorAll('#mode-toggle .toggle-opt');
+    toggles.forEach(function(t) {
+      t.classList.toggle('active', t.dataset.mode === App.mode);
+    });
+  },
+
+  // ---- SCENE MANAGEMENT ----
+  _showScene: function(name) {
+    var self = this;
+    Object.keys(self.scenes).forEach(function(k) {
+      self.scenes[k].classList.toggle('active', k === name);
+    });
+    if (name === 'levelSelect') self._renderLevelGrid();
+    if (name === 'gameplay') self._rescale();
+  },
+
+  // ---- TOAST ----
+  _showToast: function(msg) {
+    var self = this;
+    self.toast.textContent = msg;
+    self.toast.classList.add('show');
+    clearTimeout(self._toastTimer);
+    self._toastTimer = setTimeout(function() {
+      self.toast.classList.remove('show');
+    }, 2000);
+  },
+
+  // ---- ACTION BINDING ----
+  _bindActions: function() {
+    var self = this;
+
+    // Delegate: any [data-action] button
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      var action = btn.dataset.action;
+      switch (action) {
+        case 'start':
+          self._showScene('levelSelect');
+          break;
+        case 'tutorial':
+          self.isTutorial = true;
+          self._loadLevel(0);
+          self._showScene('gameplay');
+          break;
+        case 'settings':
+          self._showScene('settings');
+          break;
+        case 'back-to-menu':
+          self._showScene('menu');
+          break;
+      }
+    });
+
+    // Mode toggle
+    document.getElementById('mode-toggle').addEventListener('click', function(e) {
+      var opt = e.target.closest('.toggle-opt');
+      if (!opt) return;
+      self.mode = opt.dataset.mode;
+      self._updateModeUI();
+      self._save();
+      self._showToast(self.mode === 'free' ? '已切换为自由探索模式' : '已切换为线性挑战模式');
+    });
+
+    // Clear save
+    document.getElementById('btn-clear-save').addEventListener('click', function() {
+      self._clearSave();
+    });
+
+    // Level grid delegation
+    self.levelGrid.addEventListener('click', function(e) {
+      var card = e.target.closest('.level-card');
+      if (!card || card.classList.contains('locked')) return;
+      var idx = parseInt(card.dataset.index);
+      if (isNaN(idx)) return;
+      self.isTutorial = false;
+      self._loadLevel(idx);
+      self._showScene('gameplay');
+    });
+
+    // Gameplay bar buttons
+    document.getElementById('btn-back-levels').addEventListener('click', function() {
+      self._cleanup();
+      self._showScene('levelSelect');
+    });
+    document.getElementById('btn-reset').addEventListener('click', function() {
+      self._loadLevel(self.currentLevelIndex);
+    });
+    document.getElementById('btn-auto-solve').addEventListener('click', function() {
+      self._autoSolve();
+    });
+
+    // Modal buttons
+    self.modalRetry.addEventListener('click', function() {
+      self._closeModal();
+      self._loadLevel(self.currentLevelIndex);
+    });
+    self.modalNext.addEventListener('click', function() {
+      self._closeModal();
+      self._onNextLevel();
+    });
+    self.modalMenu.addEventListener('click', function() {
+      self._closeModal();
+      self._cleanup();
+      self._showScene('menu');
+    });
+    self.modalOverlay.addEventListener('click', function(e) {
+      if (e.target === self.modalOverlay) self._closeModal();
+    });
+  },
+
+  // ---- LEVEL SELECT GRID ----
+  _renderLevelGrid: function() {
+    var self = this;
+    var html = '';
+    for (var i = 1; i <= 20; i++) {
+      var level = levels[i]; // levels[1] = id:1
+      var locked = (self.mode === 'linear' && i > self.maxUnlocked);
+      var completed = self.completedLevels.indexOf(i) !== -1;
+      var cls = 'level-card';
+      if (locked) cls += ' locked';
+      if (completed) cls += ' completed';
+      html += '<div class="' + cls + '" data-index="' + i + '">';
+      html += '<span class="level-num">' + i + '</span>';
+      html += '<span class="level-card-name">' + level.title + '</span>';
+      if (locked) html += '<span class="lock-icon">🔒</span>';
+      html += '</div>';
+    }
+    self.levelGrid.innerHTML = html;
+  },
+
+  // ---- LEVEL LOADING ----
+  _loadLevel: function(index) {
+    this._cleanup();
+    this.currentLevelIndex = index;
+    this.autoSolving = false;
+
+    var level = levels[index];
+    if (!level) return;
+
+    // Init game state with embedded helper methods
+    var gs = {
+      level: level,
+      elements: new Map(),
+      hitCounts: new Map(),
+      flags: new Map(),
+      completed: false
+    };
+    gs.hasElement = function(id) {
+      var el = this.elements.get(id);
+      return el && el.visible;
+    };
+    gs.getElement = function(id) {
+      var el = this.elements.get(id);
+      if (!el || !el.visible) return null;
+      return { id: el.id, x: el.x, y: el.y, text: el.text, visible: el.visible };
+    };
+    gs.getFlag = function(key) { return this.flags.get(key) || false; };
+    this.gameState = gs;
+
+    // Clear viewport (keep darken overlay)
+    var children = this.viewport.children;
+    for (var c = children.length - 1; c >= 0; c--) {
+      if (children[c] !== this.darkenOverlay) {
+        this.viewport.removeChild(children[c]);
+      }
+    }
+    this.darkenOverlay.classList.remove('on');
+
+    // Create scene elements
+    var self = this;
+    level.sceneElements.forEach(function(el) {
+      var dom = self._createElement(el, 'scene-element');
+      self.viewport.appendChild(dom);
+      self.gameState.elements.set(el.id, {
+        id: el.id, text: el.text, x: el.x, y: el.y,
+        fontSize: el.fontSize || 48, dom: dom,
+        visible: !el.hidden, draggable: false,
+        originalX: el.x, originalY: el.y, hidden: !!el.hidden
+      });
+      if (el.hidden) {
+        dom.style.opacity = '0';
+        dom.style.pointerEvents = 'none';
+      }
+    });
+
+    // Create props
+    level.props.forEach(function(el) {
+      var cls = el.onClick ? 'prop-element clickable' : 'prop-element';
+      var dom = self._createElement(el, cls);
+      if (el.onClick) {
+        dom.addEventListener('pointerdown', function(e) {
+          e.stopPropagation();
+          if (self.autoSolving) return;
+          self._handlePropClick(el);
+        });
+      } else {
+        dom.addEventListener('pointerdown', function(e) {
+          e.preventDefault();
+          if (self.autoSolving) return;
+          self._onDragStart(el.id, e);
+        });
+      }
+      self.viewport.appendChild(dom);
+      self.gameState.elements.set(el.id, {
+        id: el.id, text: el.text, x: el.x, y: el.y,
+        fontSize: el.fontSize || 40, dom: dom,
+        visible: true, draggable: true,
+        originalX: el.x, originalY: el.y,
+        onClick: el.onClick || null
+      });
+    });
+
+    // Init hit counts
+    level.rules.forEach(function(rule) {
+      if (rule.type === 'HIT_COUNT') {
+        self.gameState.hitCounts.set(rule.trigger + '->' + rule.target, 0);
+      }
+    });
+
+    // Update UI
+    this.hintDisplay.textContent = '💡 ' + level.hint;
+    this.levelTitleDisplay.textContent = '第' + (index === 0 ? '0' : level.id) + '关 · ' + level.title;
+  },
+
+  _createElement: function(el, className) {
+    var dom = document.createElement('div');
+    dom.className = className;
+    dom.textContent = el.text;
+    dom.style.left = el.x + 'px';
+    dom.style.top = el.y + 'px';
+    dom.style.fontSize = (el.fontSize || 40) + 'px';
+    dom.setAttribute('data-id', el.id);
+    return dom;
+  },
+
+  _cleanup: function() {
+    if (this.animFrameId) { cancelAnimationFrame(this.animFrameId); this.animFrameId = null; }
+    if (this.countdownTimer) { clearInterval(this.countdownTimer); this.countdownTimer = null; }
+    if (this.solveTimeoutId) { clearTimeout(this.solveTimeoutId); this.solveTimeoutId = null; }
+    if (this.butterflyFlyTimer) { clearTimeout(this.butterflyFlyTimer); this.butterflyFlyTimer = null; }
+    if (this.butterflyLandTimer) { clearTimeout(this.butterflyLandTimer); this.butterflyLandTimer = null; }
+    document.removeEventListener('pointermove', this._boundPointerMove);
+    document.removeEventListener('pointerup', this._boundPointerUp);
+    this.viewport.removeEventListener('click', this._boundPassClick);
+    this.dragState = null;
+    this.autoSolving = false;
+  },
+
+  // ---- DRAG SYSTEM ----
+  _onDragStart: function(id, e) {
+    if (this.gameState.completed) return;
+    var elData = this.gameState.elements.get(id);
+    if (!elData || !elData.visible) return;
+
+    var dom = elData.dom;
+    var viewportRect = this.viewport.getBoundingClientRect();
+    var domRect = dom.getBoundingClientRect();
+
+    this.dragState = {
+      id: id, dom: dom, elData: elData,
+      startX: elData.x, startY: elData.y,
+      initialX: elData.x, initialY: elData.y,
+      offsetX: e.clientX - domRect.left - domRect.width / 2,
+      offsetY: e.clientY - domRect.top - domRect.height / 2,
+      viewportLeft: viewportRect.left,
+      viewportTop: viewportRect.top
+    };
+
+    dom.classList.add('dragging');
+    dom.setPointerCapture(e.pointerId);
+    document.addEventListener('pointermove', this._boundPointerMove);
+    document.addEventListener('pointerup', this._boundPointerUp);
+  },
+
+  _onPointerMove: function(e) {
+    if (!this.dragState) return;
+    var ds = this.dragState;
+    var scale = this._getViewportScale();
+    var newX = (e.clientX - ds.viewportLeft) / scale - ds.offsetX;
+    var newY = (e.clientY - ds.viewportTop) / scale - ds.offsetY;
+    ds.elData.x = Math.max(20, Math.min(780, newX));
+    ds.elData.y = Math.max(20, Math.min(430, newY));
+    // GPU-accelerated: use translate3d offset from initial position
+    var dx = ds.elData.x - ds.initialX;
+    var dy = ds.elData.y - ds.initialY;
+    ds.dom.style.transform = 'translate(-50%, -50%) translate3d(' + dx + 'px, ' + dy + 'px, 0) scale(1.12)';
+  },
+
+  _onPointerUp: function(e) {
+    if (!this.dragState) return;
+    var ds = this.dragState;
+    // Release pointer capture to prevent mobile gesture stickiness
+    if (ds.dom && ds.dom.releasePointerCapture) {
+      ds.dom.releasePointerCapture(e.pointerId);
+    }
+    ds.dom.classList.remove('dragging');
+    document.removeEventListener('pointermove', this._boundPointerMove);
+    document.removeEventListener('pointerup', this._boundPointerUp);
+    // Write final position back to left/top, clear GPU transform
+    ds.dom.style.left = ds.elData.x + 'px';
+    ds.dom.style.top = ds.elData.y + 'px';
+    ds.dom.style.transform = '';
+    this._checkCollisions(ds.id);
+    this.dragState = null;
+  },
+
+  _getViewportScale: function() {
+    var rect = this.viewport.getBoundingClientRect();
+    return rect.width / 800;
+  },
+
+  // ---- COLLISION DETECTION ----
+  _checkCollisions: function(triggerId) {
+    if (this.gameState.completed) return;
+    var level = this.gameState.level;
+    var triggerEl = this.gameState.elements.get(triggerId);
+    if (!triggerEl || !triggerEl.visible) return;
+
+    var triggerDom = triggerEl.dom;
+    var triggerRect = triggerDom.getBoundingClientRect();
+    var triggerArea = triggerRect.width * triggerRect.height;
+
+    for (var i = 0; i < level.rules.length; i++) {
+      var rule = level.rules[i];
+      if (rule.trigger !== triggerId) continue;
+
+      var targetEl = this.gameState.elements.get(rule.target);
+      if (!targetEl || !targetEl.visible) continue;
+
+      var targetDom = targetEl.dom;
+      var targetRect = targetDom.getBoundingClientRect();
+
+      var overlapX = Math.max(0, Math.min(triggerRect.right, targetRect.right) - Math.max(triggerRect.left, targetRect.left));
+      var overlapY = Math.max(0, Math.min(triggerRect.bottom, targetRect.bottom) - Math.max(triggerRect.top, targetRect.top));
+      var overlapArea = overlapX * overlapY;
+
+      if (triggerArea > 0 && overlapArea / triggerArea < 0.3) continue;
+
+      // Extra target
+      if (rule.extraTarget) {
+        var extraEl = this.gameState.elements.get(rule.extraTarget);
+        if (!extraEl || !extraEl.visible) continue;
+        var extraDom = extraEl.dom;
+        var extraRect = extraDom.getBoundingClientRect();
+        var exOverlapX = Math.max(0, Math.min(triggerRect.right, extraRect.right) - Math.max(triggerRect.left, extraRect.left));
+        var exOverlapY = Math.max(0, Math.min(triggerRect.bottom, extraRect.bottom) - Math.max(triggerRect.top, extraRect.top));
+        if (triggerArea > 0 && (exOverlapX * exOverlapY) / triggerArea < 0.3) continue;
+      }
+
+      // Precision zone
+      if (rule.precisionZone) {
+        var pz = rule.precisionZone;
+        var dist = Math.sqrt(
+          Math.pow(triggerEl.x - (targetEl.x + pz.relX), 2) +
+          Math.pow(triggerEl.y - (targetEl.y + pz.relY), 2)
+        );
+        if (dist > pz.radius) continue;
+      }
+
+      this._executeRule(rule, triggerEl, targetEl);
+      break;
+    }
+
+    if (!this.gameState.completed && level.checkWin(this.gameState)) {
+      this._onWin();
+    }
+  },
+
+  // ---- RULE EXECUTION ----
+  _executeRule: function(rule, triggerEl, targetEl) {
+    var gs = this.gameState;
+    var self = this;
+
+    switch (rule.type) {
+      case 'ELIMINATE':
+        this._spawnParticles(triggerEl.x, triggerEl.y);
+        this._spawnParticles(targetEl.x, targetEl.y);
+        this._hideElement(triggerEl);
+        this._hideElement(targetEl);
+        break;
+
+      case 'MERGE':
+        this._spawnParticles(targetEl.x, targetEl.y);
+        this._hideElement(triggerEl);
+        this._hideElement(targetEl);
+        this._createResultElement(rule, targetEl.x, targetEl.y);
+        break;
+
+      case 'TRANSFORM':
+        if (rule.noTransform) {
+          this._showMessage(rule.message, targetEl.x, targetEl.y - 40);
+          this._resetElement(triggerEl);
+          break;
+        }
+        if (rule.countdown && rule.delay) {
+          this._hideElement(triggerEl);
+          this._startCountdown(rule, targetEl);
+          break;
+        }
+        if (rule.transformTarget === 'fadeReveal') {
+          this._spawnParticles(targetEl.x, targetEl.y);
+          targetEl.dom.style.opacity = '0.15';
+          targetEl.visible = false;
+          this._resetElement(triggerEl);
+          var secretEl = gs.elements.get('env_secret');
+          if (secretEl) { secretEl.visible = true; secretEl.dom.style.opacity = '1'; }
+          this._createResultElement(rule, targetEl.x, targetEl.y);
+          break;
+        }
+        if (rule.message) {
+          this._showMessage(rule.message, targetEl.x, targetEl.y - 40);
+          if (rule.resetTrigger) this._resetElement(triggerEl);
+          break;
+        }
+        this._spawnParticles(targetEl.x, targetEl.y);
+        this._hideElement(targetEl);
+        this._resetElement(triggerEl);
+        this._createResultElement(rule, targetEl.x, targetEl.y);
+        break;
+
+      case 'HIT_COUNT':
+        var key = rule.trigger + '->' + rule.target;
+        var count = (gs.hitCounts.get(key) || 0) + 1;
+        gs.hitCounts.set(key, count);
+        this._spawnParticles(targetEl.x, targetEl.y);
+        this._resetElement(triggerEl);
+        targetEl.dom.style.transform = 'translate(-50%, -50%) scale(' + (1 + count * 0.06) + ')';
+        targetEl.dom.style.color = 'hsl(30, ' + (40 + count * 15) + '%, ' + (60 + count * 5) + '%)';
+        if (count >= rule.hitCount && rule.onComplete === 'removeTarget') {
+          this._spawnParticles(targetEl.x, targetEl.y);
+          this._hideElement(targetEl);
+        }
+        break;
+    }
+  },
+
+  _hideElement: function(elData) {
+    elData.visible = false;
+    elData.dom.style.opacity = '0';
+    elData.dom.style.pointerEvents = 'none';
+    elData.dom.style.transform = 'translate(-50%, -50%) scale(0.5)';
+    var self = this;
+    setTimeout(function() {
+      if (!elData.visible && elData.dom.parentNode) {
+        elData.dom.style.display = 'none';
+      }
+    }, 400);
+  },
+
+  _resetElement: function(elData) {
+    elData.x = elData.originalX;
+    elData.y = elData.originalY;
+    elData.dom.style.left = elData.x + 'px';
+    elData.dom.style.top = elData.y + 'px';
+    elData.dom.style.transition = 'left 0.35s ease-out, top 0.35s ease-out';
+    var self = this;
+    setTimeout(function() { elData.dom.style.transition = ''; }, 350);
+  },
+
+  _createResultElement: function(rule, x, y) {
+    var gs = this.gameState;
+    var result = rule.result;
+
+    // Reuse existing
+    if (gs.elements.has(result.newId)) {
+      var existing = gs.elements.get(result.newId);
+      existing.visible = true;
+      existing.dom.style.display = '';
+      existing.dom.style.opacity = '1';
+      existing.dom.style.transform = 'translate(-50%, -50%) scale(1)';
+      existing.x = x; existing.y = y;
+      existing.dom.style.left = x + 'px';
+      existing.dom.style.top = y + 'px';
+      return;
+    }
+
+    var dom = document.createElement('div');
+    if (result.isButton) {
+      dom.className = 'pass-button';
+      dom.textContent = result.text;
+      dom.style.left = x + 'px';
+      dom.style.top = y + 'px';
+      dom.style.fontSize = '2rem';
+      dom.setAttribute('data-id', result.newId);
+      this.viewport.appendChild(dom);
+      this.viewport.addEventListener('click', this._boundPassClick);
+      // Darken viewport
+      this.darkenOverlay.classList.add('on');
+    } else {
+      dom.className = 'scene-element';
+      dom.textContent = result.text;
+      dom.style.left = x + 'px';
+      dom.style.top = y + 'px';
+      dom.style.fontSize = '52px';
+      dom.setAttribute('data-id', result.newId);
+      if (rule.goldenResult) {
+        dom.style.color = '#e8c84a';
+        dom.style.textShadow = '0 0 24px rgba(232,200,74,0.6)';
+      }
+      this.viewport.appendChild(dom);
+    }
+
+    dom.style.opacity = '0';
+    dom.style.transform = 'translate(-50%, -50%) scale(0.3)';
+    requestAnimationFrame(function() {
+      dom.style.transition = 'opacity 0.4s, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      dom.style.opacity = '1';
+      dom.style.transform = 'translate(-50%, -50%) scale(1)';
+    });
+
+    gs.elements.set(result.newId, {
+      id: result.newId, text: result.text, x: x, y: y,
+      fontSize: result.isButton ? 32 : 52, dom: dom,
+      visible: true, draggable: false,
+      originalX: x, originalY: y
+    });
+  },
+
+  _onPassClick: function(e) {
+    var target = e.target;
+    if (target.classList.contains('pass-button') && App.gameState) {
+      App.gameState.flags.set('passClicked', true);
+      if (App.gameState.level.checkWin(App.gameState)) {
+        App._onWin();
+      }
+    }
+  },
+
+  // ---- SPECIAL PROP HANDLERS ----
+  _handlePropClick: function(el) {
+    if (this.gameState.completed) return;
+    var elData = this.gameState.elements.get(el.id);
+    if (!elData || !elData.visible) return;
+
+    switch (el.onClick) {
+      case 'autoMove': this._autoMoveRabbit(elData); break;
+      case 'grow': this._growPerson(elData); break;
+    }
+  },
+
+  _autoMoveRabbit: function(elData) {
+    if (this.animFrameId) return;
+    var gs = this.gameState;
+    var stumpEl = gs.elements.get('env_stump');
+    if (!stumpEl) return;
+    var self = this;
+    var speed = 2.5;
+
+    function step() {
+      elData.x += speed;
+      elData.dom.style.left = elData.x + 'px';
+
+      var rabbitRect = elData.dom.getBoundingClientRect();
+      var stumpRect = stumpEl.dom.getBoundingClientRect();
+      var overlapX = Math.max(0, Math.min(rabbitRect.right, stumpRect.right) - Math.max(rabbitRect.left, stumpRect.left));
+      var overlapY = Math.max(0, Math.min(rabbitRect.bottom, stumpRect.bottom) - Math.max(rabbitRect.top, stumpRect.top));
+      var rabbitArea = rabbitRect.width * rabbitRect.height;
+
+      if (rabbitArea > 0 && (overlapX * overlapY) / rabbitArea > 0.25) {
+        elData.dom.textContent = '倒';
+        elData.dom.style.transform = 'translate(-50%, -50%) rotate(90deg)';
+        elData.dom.style.opacity = '0.6';
+        elData.visible = false;
+        gs.flags.set('rabbitDown', true);
+        self._spawnParticles(elData.x, elData.y);
+        self.animFrameId = null;
+        if (gs.level.checkWin(gs)) self._onWin();
+        return;
+      }
+      if (elData.x > 780) { self.animFrameId = null; return; }
+      self.animFrameId = requestAnimationFrame(step);
+    }
+    this.animFrameId = requestAnimationFrame(step);
+  },
+
+  _growPerson: function(elData) {
+    var gs = this.gameState;
+    var newSize = elData.fontSize * 1.5;
+    elData.fontSize = Math.min(newSize, 360);
+    elData.dom.style.fontSize = elData.fontSize + 'px';
+
+    var skyEl = gs.elements.get('env_sky');
+    var earthEl = gs.elements.get('env_earth');
+    if (!skyEl || !earthEl) return;
+
+    var personRect = elData.dom.getBoundingClientRect();
+    var skyRect = skyEl.dom.getBoundingClientRect();
+    var earthRect = earthEl.dom.getBoundingClientRect();
+
+    if (personRect.top <= skyRect.bottom && personRect.bottom >= earthRect.top) {
+      gs.flags.set('touchingBoth', true);
+      this._spawnParticles(elData.x, elData.y);
+      if (gs.level.checkWin(gs)) this._onWin();
+    }
+  },
+
+  // ---- COUNTDOWN ----
+  _startCountdown: function(rule, targetEl) {
+    var gs = this.gameState;
+    var self = this;
+    var count = 3;
+
+    function showCount() {
+      if (count <= 0) {
+        clearInterval(self.countdownTimer);
+        self.countdownTimer = null;
+        var cd = self.viewport.querySelector('.countdown');
+        if (cd) cd.remove();
+        self._hideElement(targetEl);
+        self._createResultElement(rule, targetEl.x, targetEl.y);
+        self.butterflyFlyTimer = setTimeout(function() {
+          var butterfly = gs.elements.get('env_butterfly');
+          if (butterfly && butterfly.visible) {
+            butterfly.dom.style.transition = 'top 1.5s ease-in, opacity 0.8s';
+            butterfly.dom.style.top = '-60px';
+            butterfly.dom.style.opacity = '0.6';
+            butterfly.y = -60;
+            self.butterflyLandTimer = setTimeout(function() {
+              gs.flags.set('butterflyFlew', true);
+              if (gs.level.checkWin(gs)) self._onWin();
+            }, 1600);
+          }
+        }, 300);
+        return;
+      }
+      var existing = self.viewport.querySelector('.countdown');
+      if (existing) existing.remove();
+      var cdDom = document.createElement('div');
+      cdDom.className = 'countdown';
+      cdDom.textContent = count;
+      cdDom.style.left = targetEl.x + 'px';
+      cdDom.style.top = (targetEl.y - 30) + 'px';
+      self.viewport.appendChild(cdDom);
+      count--;
+    }
+    showCount();
+    this.countdownTimer = setInterval(showCount, 1000);
+  },
+
+  // ---- PARTICLES ----
+  _spawnParticles: function(x, y) {
+    var chars = ['✦', '·', '○', '◆'];
+    for (var i = 0; i < 8; i++) {
+      var p = document.createElement('div');
+      p.className = 'particle';
+      p.textContent = chars[Math.floor(Math.random() * chars.length)];
+      p.style.left = x + 'px';
+      p.style.top = y + 'px';
+      var angle = Math.random() * Math.PI * 2;
+      var dist = 30 + Math.random() * 50;
+      p.style.setProperty('--px', Math.cos(angle) * dist + 'px');
+      p.style.setProperty('--py', Math.sin(angle) * dist + 'px');
+      this.viewport.appendChild(p);
+      setTimeout(function() { p.remove(); }, 700);
+    }
+  },
+
+  // ---- MESSAGE ----
+  _showMessage: function(msg, x, y) {
+    var dom = document.createElement('div');
+    dom.className = 'floating-msg';
+    dom.textContent = msg;
+    dom.style.left = x + 'px';
+    dom.style.top = y + 'px';
+    this.viewport.appendChild(dom);
+    setTimeout(function() { dom.remove(); }, 2000);
+  },
+
+  // ---- WIN ----
+  _onWin: function() {
+    this.gameState.completed = true;
+    var level = this.gameState.level;
+    var self = this;
+
+    // Tutorial: return to menu
+    if (this.isTutorial) {
+      this.isTutorial = false;
+      this.modalTitle.textContent = '🎉 教学完成！';
+      this.modalMsg.textContent = '你已经掌握了基本操作，现在可以开始正式挑战了！';
+      this.modalNext.style.display = 'none';
+      this.modalRetry.style.display = 'none';
+      this.modalMenu.style.display = '';
+      this.modalOverlay.classList.add('active');
+      return;
+    }
+
+    // Track completion
+    if (this.completedLevels.indexOf(level.id) === -1) {
+      this.completedLevels.push(level.id);
+    }
+
+    // Unlock next in linear mode
+    if (this.mode === 'linear' && level.id >= this.maxUnlocked && level.id < 20) {
+      this.maxUnlocked = level.id + 1;
+    }
+    this._save();
+
+    // Modal
+    this.modalTitle.textContent = '🎉 通关！';
+    this.modalMsg.textContent = '你成功通过了「' + level.title + '」！';
+    this.modalRetry.style.display = '';
+    this.modalMenu.style.display = '';
+
+    if (level.id >= 20) {
+      this.modalNext.textContent = '🎊 全关卡达成！';
+      this.modalNext.style.display = '';
+    } else {
+      this.modalNext.textContent = '下一关 →';
+      this.modalNext.style.display = '';
+    }
+    this.modalOverlay.classList.add('active');
+  },
+
+  _onNextLevel: function() {
+    var nextIdx = this.currentLevelIndex + 1;
+    if (nextIdx < levels.length) {
+      this.isTutorial = false;
+      this._loadLevel(nextIdx);
+    } else {
+      this._cleanup();
+      this._showScene('menu');
+    }
+  },
+
+  _closeModal: function() {
+    this.modalOverlay.classList.remove('active');
+  },
+
+  // ---- AUTO SOLVE ----
+  _autoSolve: function() {
+    if (this.gameState.completed || this.autoSolving) return;
+    var level = this.gameState.level;
+    if (!level.rules.length) {
+      this._autoSolveSpecial();
+      return;
+    }
+
+    this.autoSolving = true;
+    var self = this;
+    var ruleIndex = 0;
+
+    function executeNextRule() {
+      if (self.gameState.completed) {
+        self.autoSolving = false;
+        return;
+      }
+      if (ruleIndex >= level.rules.length) {
+        // All rules executed — handle post-rule win conditions
+        self._autoSolvePostRules();
+        return;
+      }
+
+      var rule = level.rules[ruleIndex];
+      var triggerEl = self.gameState.elements.get(rule.trigger);
+      var targetEl = self.gameState.elements.get(rule.target);
+
+      if (!triggerEl || !triggerEl.visible) {
+        ruleIndex++;
+        executeNextRule();
+        return;
+      }
+      if (!targetEl || !targetEl.visible) {
+        if (rule.type === 'TRANSFORM' && !targetEl) {
+          ruleIndex++;
+          executeNextRule();
+          return;
+        }
+        ruleIndex++;
+        executeNextRule();
+        return;
+      }
+
+      self._animateToTarget(triggerEl, targetEl, rule, function() {
+        self._executeRule(rule, triggerEl, targetEl);
+        if (!self.gameState.completed && level.checkWin(self.gameState)) {
+          self._onWin();
+          self.autoSolving = false;
+          return;
+        }
+        ruleIndex++;
+        self.solveTimeoutId = setTimeout(executeNextRule, 600);
+      });
+    }
+
+    executeNextRule();
+  },
+
+  // Handle win conditions that require extra steps after rules fire
+  _autoSolvePostRules: function() {
+    var level = this.gameState.level;
+    var self = this;
+
+    // Level 2: after "木"+"几"→"机", animate "我" across the river
+    if (level.id === 2) {
+      var me = this.gameState.elements.get('prop_me');
+      if (me && me.visible) {
+        me.x = 600;
+        me.dom.style.left = '600px';
+        me.dom.style.top = me.y + 'px';
+        me.dom.style.transition = 'left 0.8s ease';
+        this.solveTimeoutId = setTimeout(function() {
+          me.dom.style.transition = '';
+          self.autoSolving = false;
+          if (level.checkWin(self.gameState)) self._onWin();
+        }, 900);
+        return;
+      }
+    }
+
+    // Level 8: after "叶" covers "目", click the "通过" button
+    if (level.id === 8) {
+      var passBtn = this.viewport.querySelector('.pass-button');
+      if (passBtn) {
+        this.solveTimeoutId = setTimeout(function() {
+          passBtn.click();
+          self.autoSolving = false;
+        }, 500);
+        return;
+      }
+    }
+
+    // Level 16: after "剪" eliminates "网", animate "我" past the net boundary
+    if (level.id === 16) {
+      var me2 = this.gameState.elements.get('prop_me2');
+      if (me2 && me2.visible) {
+        me2.x = 600;
+        me2.dom.style.left = '600px';
+        me2.dom.style.top = me2.y + 'px';
+        me2.dom.style.transition = 'left 0.8s ease';
+        this.solveTimeoutId = setTimeout(function() {
+          me2.dom.style.transition = '';
+          self.autoSolving = false;
+          if (level.checkWin(self.gameState)) self._onWin();
+        }, 900);
+        return;
+      }
+    }
+
+    this.autoSolving = false;
+  },
+
+  _autoSolveSpecial: function() {
+    var level = this.gameState.level;
+    var self = this;
+
+    // Level 14: click rabbit
+    if (level.id === 14) {
+      var rabbit = this.gameState.elements.get('prop_rabbit');
+      if (rabbit && rabbit.visible) {
+        this._handlePropClick({ id: 'prop_rabbit', onClick: 'autoMove' });
+      }
+      return;
+    }
+
+    // Level 17: drag me below sunshan
+    if (level.id === 17) {
+      var me = this.gameState.elements.get('prop_me3');
+      if (me) {
+        me.x = 400; me.y = 280;
+        me.dom.style.left = '400px';
+        me.dom.style.top = '280px';
+        me.dom.style.transition = 'left 0.8s ease, top 0.8s ease';
+        this.solveTimeoutId = setTimeout(function() {
+          me.dom.style.transition = '';
+          if (level.checkWin(self.gameState)) self._onWin();
+        }, 900);
+      }
+      return;
+    }
+
+    // Level 19: click person 5 times
+    if (level.id === 19) {
+      var person = this.gameState.elements.get('prop_person4');
+      if (!person) return;
+      var clicks = 0;
+      function clickNext() {
+        if (clicks >= 5 || self.gameState.completed) return;
+        self._handlePropClick({ id: 'prop_person4', onClick: 'grow' });
+        clicks++;
+        if (!self.gameState.completed) {
+          self.solveTimeoutId = setTimeout(clickNext, 400);
+        }
+      }
+      clickNext();
+      return;
+    }
+  },
+
+  _animateToTarget: function(triggerEl, targetEl, rule, callback) {
+    var self = this;
+    var startX = triggerEl.x, startY = triggerEl.y;
+    var endX = targetEl.x, endY = targetEl.y;
+
+    if (rule.precisionZone) {
+      endX = targetEl.x + rule.precisionZone.relX;
+      endY = targetEl.y + rule.precisionZone.relY;
+    }
+
+    var duration = 800;
+    var startTime = performance.now();
+
+    function animate(now) {
+      var elapsed = now - startTime;
+      var t = Math.min(elapsed / duration, 1);
+      // Ease-out
+      t = 1 - Math.pow(1 - t, 3);
+      triggerEl.x = startX + (endX - startX) * t;
+      triggerEl.y = startY + (endY - startY) * t;
+      triggerEl.dom.style.left = triggerEl.x + 'px';
+      triggerEl.dom.style.top = triggerEl.y + 'px';
+
+      if (t < 1) {
+        self.animFrameId = requestAnimationFrame(animate);
+      } else {
+        self.animFrameId = null;
+        callback();
+      }
+    }
+    this.animFrameId = requestAnimationFrame(animate);
+  },
+
+  // ---- RESPONSIVE SCALING ----
+  _rescale: function() {
+    var wrapper = document.getElementById('viewport-wrapper');
+    if (!wrapper) return;
+    var w = wrapper.clientWidth;
+    var h = wrapper.clientHeight;
+    if (w === 0 || h === 0) return;
+    var scale = Math.min(w / 800, h / 450);
+    this.viewport.style.transform = 'scale(' + scale + ')';
+    this.viewport.style.width = '800px';
+    this.viewport.style.height = '450px';
+    wrapper.style.height = (450 * scale) + 'px';
+  }
+};
+
+// ===== 主题切换 =====
+(function() {
+  var btn = document.getElementById('themeToggle');
+  var icon = document.getElementById('themeIcon');
+  function sunIcon() {
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>';
+  }
+  function moonIcon() {
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>';
+  }
+  function updateIcon() {
+    var t = document.documentElement.getAttribute('data-theme');
+    icon.innerHTML = (t === 'dark') ? sunIcon() : moonIcon();
+  }
+  updateIcon();
+  btn.addEventListener('click', function() {
+    var t = document.documentElement.getAttribute('data-theme');
+    t = (t === 'dark') ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem('theme', t);
+    updateIcon();
+  });
+})();
+
+// ---- BOOT ----
+document.addEventListener('DOMContentLoaded', function() {
+  App.init();
+});
+</script>
+</body>
+</html>

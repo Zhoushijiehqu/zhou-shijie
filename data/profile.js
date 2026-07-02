@@ -245,6 +245,16 @@ window.ProfileData = {
       file: 'games/mine.html',
       accent: 'accent',
       available: true
+    },
+    {
+      name: '解谜剧场',
+      slug: 'puzzle',
+      desc: '21 道汉字交互谜题，拖拽组合文字破解关卡，含看答案功能。',
+      tags: ['解谜', '汉字', '拖拽'],
+      techStack: ['HTML', 'Canvas', 'JS'],
+      file: 'games/puzzle.html',
+      accent: 'primary',
+      available: true
     }
   ],
 

@@ -1271,9 +1271,6 @@ var App = {
     document.removeEventListener('pointermove', this._boundPointerMove);
     document.removeEventListener('pointerup', this._boundPointerUp);
 
-    // 邻近吸附：如果 trigger 中心靠近某个有效 target 中心（80px 内），自动吸附
-    this._trySnapToTarget(ds.elData);
-
     // Write final position back to left/top, clear GPU transform
     ds.dom.style.left = ds.elData.x + 'px';
     ds.dom.style.top = ds.elData.y + 'px';
@@ -1282,37 +1279,17 @@ var App = {
     this.dragState = null;
   },
 
-  // 邻近吸附辅助：拖到 target 附近时自动对齐
-  _trySnapToTarget: function(triggerEl) {
-    if (!this.gameState || this.gameState.completed) return;
-    var level = this.gameState.level;
-    var bestDist = 80; // 吸附阈值 80px
-    var snapTarget = null;
-    for (var i = 0; i < level.rules.length; i++) {
-      var rule = level.rules[i];
-      if (rule.trigger !== triggerEl.id) continue;
-      var targetEl = this.gameState.elements.get(rule.target);
-      if (!targetEl || !targetEl.visible) continue;
-      var dx = triggerEl.x - targetEl.x;
-      var dy = triggerEl.y - targetEl.y;
-      var dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < bestDist) {
-        bestDist = dist;
-        snapTarget = targetEl;
-      }
-    }
-    if (snapTarget) {
-      triggerEl.x = snapTarget.x;
-      triggerEl.y = snapTarget.y;
-    }
-  },
-
   _getViewportScale: function() {
     var rect = this.viewport.getBoundingClientRect();
     return rect.width / 800;
   },
 
   // ---- COLLISION DETECTION ----
+  // 判定原则：靠近即触发，无需完全重叠
+  //   1) 边界框相交（任意重叠）→ 触发
+  //   2) 两中心距离 ≤ 两个半径之和 + 30px 余量 → 触发
+  //   3) extraTarget 同样用中心距离判定
+  //   4) precisionZone 放宽 2 倍
   _checkCollisions: function(triggerId) {
     if (this.gameState.completed) return;
     var level = this.gameState.level;
@@ -1321,10 +1298,11 @@ var App = {
 
     var triggerDom = triggerEl.dom;
     var triggerRect = triggerDom.getBoundingClientRect();
-    var triggerArea = triggerRect.width * triggerRect.height;
     // trigger 中心点（屏幕坐标）
     var tcx = triggerRect.left + triggerRect.width / 2;
     var tcy = triggerRect.top + triggerRect.height / 2;
+    // trigger 等效半径（取宽高较大值的一半，作为命中半径）
+    var triggerRadius = Math.max(triggerRect.width, triggerRect.height) / 2;
 
     for (var i = 0; i < level.rules.length; i++) {
       var rule = level.rules[i];
@@ -1335,51 +1313,50 @@ var App = {
 
       var targetDom = targetEl.dom;
       var targetRect = targetDom.getBoundingClientRect();
-
-      // 计算重叠面积
-      var overlapX = Math.max(0, Math.min(triggerRect.right, targetRect.right) - Math.max(triggerRect.left, targetRect.left));
-      var overlapY = Math.max(0, Math.min(triggerRect.bottom, targetRect.bottom) - Math.max(triggerRect.top, targetRect.top));
-      var overlapArea = overlapX * overlapY;
-      var overlapRatio = triggerArea > 0 ? overlapArea / triggerArea : 0;
-
-      // target 中心点（屏幕坐标）
+      // target 中心点
       var tcx2 = targetRect.left + targetRect.width / 2;
       var tcy2 = targetRect.top + targetRect.height / 2;
-      // 中心点距离
+      var targetRadius = Math.max(targetRect.width, targetRect.height) / 2;
+
+      // 条件 1：边界框是否相交（任意重叠）
+      var overlapX = Math.max(0, Math.min(triggerRect.right, targetRect.right) - Math.max(triggerRect.left, targetRect.left));
+      var overlapY = Math.max(0, Math.min(triggerRect.bottom, targetRect.bottom) - Math.max(triggerRect.top, targetRect.top));
+      var intersect = overlapX > 0 && overlapY > 0;
+
+      // 条件 2：中心距离 ≤ 两半径之和 + 30px 余量（靠近即触发）
       var centerDist = Math.sqrt((tcx - tcx2) * (tcx - tcx2) + (tcy - tcy2) * (tcy - tcy2));
-      // 命中容差：target 尺寸的一半 + 25px 余量（宽松判定）
-      var hitTolerance = targetRect.width / 2 + 25;
+      var proximityThreshold = triggerRadius + targetRadius + 30;
+      var near = centerDist <= proximityThreshold;
 
-      // 命中条件：1) 重叠比例 ≥ 10%（降低阈值）或 2) 中心点距离在容差内
-      var hit = (overlapRatio >= 0.1) || (centerDist <= hitTolerance);
-      if (!hit) continue;
+      if (!intersect && !near) continue;
 
-      // Extra target（三人成众等）
+      // Extra target（三人成众等）：同样靠近即触发
       if (rule.extraTarget) {
         var extraEl = this.gameState.elements.get(rule.extraTarget);
         if (!extraEl || !extraEl.visible) continue;
         var extraDom = extraEl.dom;
         var extraRect = extraDom.getBoundingClientRect();
-        var exOverlapX = Math.max(0, Math.min(triggerRect.right, extraRect.right) - Math.max(triggerRect.left, extraRect.left));
-        var exOverlapY = Math.max(0, Math.min(triggerRect.bottom, extraRect.bottom) - Math.max(triggerRect.top, extraRect.top));
-        var exOverlapRatio = triggerArea > 0 ? (exOverlapX * exOverlapY) / triggerArea : 0;
-        // extra target 用更宽松的中心点判定
         var ecx = extraRect.left + extraRect.width / 2;
         var ecy = extraRect.top + extraRect.height / 2;
+        var extraRadius = Math.max(extraRect.width, extraRect.height) / 2;
+        // extra 用更宽松的余量（+40px）
         var exCenterDist = Math.sqrt((tcx - ecx) * (tcx - ecx) + (tcy - ecy) * (tcy - ecy));
-        var exTolerance = extraRect.width / 2 + 30;
-        if (exOverlapRatio < 0.1 && exCenterDist > exTolerance) continue;
+        var exThreshold = triggerRadius + extraRadius + 40;
+        // extra 也检查边界框相交
+        var exOX = Math.max(0, Math.min(triggerRect.right, extraRect.right) - Math.max(triggerRect.left, extraRect.left));
+        var exOY = Math.max(0, Math.min(triggerRect.bottom, extraRect.bottom) - Math.max(triggerRect.top, extraRect.top));
+        var exIntersect = exOX > 0 && exOY > 0;
+        if (!exIntersect && exCenterDist > exThreshold) continue;
       }
 
-      // Precision zone（画龙点睛等需要精确放置的）
+      // Precision zone（画龙点睛等需要精确放置的）：半径放宽 2 倍
       if (rule.precisionZone) {
         var pz = rule.precisionZone;
         var dist = Math.sqrt(
           Math.pow(triggerEl.x - (targetEl.x + pz.relX), 2) +
           Math.pow(triggerEl.y - (targetEl.y + pz.relY), 2)
         );
-        // 精确区域判定半径扩大 1.5 倍
-        if (dist > pz.radius * 1.5) continue;
+        if (dist > pz.radius * 2) continue;
       }
 
       this._executeRule(rule, triggerEl, targetEl);

@@ -148,11 +148,13 @@ const Components = {
     // 桌面端导航链接点击事件（修复：之前只绑定了移动端菜单内的链接）
     const allNavLinks = document.querySelectorAll('.navbar-link');
     allNavLinks.forEach(link => {
+      // 外部链接（如游戏入口）走默认跳转，不拦截
+      if (link.classList.contains('navbar-link-external')) return;
       link.addEventListener('click', (e) => {
         e.preventDefault();
         const targetId = link.getAttribute('href').substring(1);
         this.scrollToSection(targetId);
-        
+
         // 如果是移动端，关闭菜单
         if (toggle && menu) {
           toggle.classList.remove('open');

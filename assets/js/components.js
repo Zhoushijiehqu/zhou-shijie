@@ -565,6 +565,55 @@ const Components = {
   },
 
   /**
+   * 渲染游戏入口卡片（首页精选区第 3 张）
+   * 整张卡可点击跳转 games.html
+   */
+  renderGamesHubCard(hub) {
+    const initial = (hub.title || '').trim().charAt(0) || '◈';
+
+    return `
+      <a href="${hub.link || 'games.html'}" class="card project-card card-featured game-hub-card reveal" data-category="游戏">
+        <div class="project-card-cover">
+          <div class="project-cover-mark game-cover-mark" aria-hidden="true">
+            <span class="game-cover-icon">${this.getIcon('gamepad-2', 'icon-lg')}</span>
+            <span class="project-cover-initial">${initial}</span>
+            <span class="project-cover-label">${hub.category || 'GAME'}</span>
+          </div>
+        </div>
+
+        <div class="project-card-body">
+          <div class="project-card-header">
+            <h3 class="project-card-title">${hub.title}</h3>
+            <div class="project-card-meta">
+              <span>${hub.role}</span>
+              <span class="meta-divider">·</span>
+              <span>${hub.period}</span>
+            </div>
+          </div>
+
+          <p class="project-card-desc">${hub.description}</p>
+
+          ${hub.techStack && hub.techStack.length > 0 ? `
+            <div class="project-tech-stack">
+              ${hub.techStack.map(tech => `<span class="tech-tag">${tech}</span>`).join('')}
+            </div>
+          ` : ''}
+
+          <div class="project-card-footer">
+            <div class="project-tags">
+              ${hub.tags.slice(0, 3).map(tag => `<span class="tag tag-primary">${tag}</span>`).join('')}
+            </div>
+            <div class="game-hub-enter">
+              <span>进入小屋</span>
+              <span class="enter-arrow">→</span>
+            </div>
+          </div>
+        </div>
+      </a>
+    `;
+  },
+
+  /**
    * 初始化项目分类筛选
    */
   initProjectFilter() {

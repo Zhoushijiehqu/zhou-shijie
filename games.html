@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="游戏小屋 - 周世杰用原生 HTML/CSS/JS 编写的小游戏集合，轻量、即开即玩">
+  <meta name="keywords" content="周世杰, 游戏小屋, 小游戏, 贪吃蛇, HTML5 游戏, Canvas">
+  <title>游戏小屋 · 周世杰</title>
+
+  <!-- 主题预载：读取 localStorage.theme（无则 dark），避免刷新闪烁 -->
+  <script>
+    (function () {
+      var saved = localStorage.getItem('theme');
+      document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+    })();
+  </script>
+
+  <!-- 字体：Fraunces 编辑体衬线 + Manrope 几何无衬线（与主页面一致） -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,400..700&family=Manrope:wght@300..800&display=swap" rel="stylesheet">
+
+  <!-- 主页面样式 -->
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/layout.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/animations.css">
+
+  <!-- 网站图标 -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+
+  <style>
+    /* ========== 顶部 sticky 导航条 - 毛玻璃（与主站 navbar 风格一致） ========== */
+    .sub-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(251, 247, 240, 0.72);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-bottom: 1px solid rgba(176, 130, 62, 0.12);
+    }
+
+    [data-theme="dark"] .sub-header {
+      background: rgba(26, 21, 16, 0.72);
+      border-bottom-color: rgba(212, 171, 106, 0.1);
+    }
+
+    .sub-header-inner {
+      max-width: var(--container-width);
+      margin: 0 auto;
+      padding: 0 var(--spacing-lg);
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--spacing-md);
+    }
+
+    /* 返回按钮 - 复用 .theme-toggle 圆形图标按钮风格 */
+    .back-btn {
+      flex-shrink: 0;
+      text-decoration: none;
+    }
+
+    .back-btn:hover {
+      transform: translateX(-3px);
+      background: var(--color-accent-lighter);
+      color: var(--color-accent);
+      border-color: var(--color-accent-light);
+    }
+
+    /* 中间紧凑标题区 */
+    .sub-header-center {
+      flex: 1;
+      text-align: center;
+      min-width: 0;
+    }
+
+    .sub-header-title {
+      font-family: var(--font-family-display);
+      font-size: var(--font-size-base);
+      font-weight: 500;
+      font-variation-settings: 'opsz' 24;
+      color: var(--color-text-primary);
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+
+    #themeToggle {
+      flex-shrink: 0;
+    }
+
+    /* ========== 标题区 - 编辑体大刊头 ========== */
+    .sub-hero {
+      position: relative;
+      padding: var(--spacing-4xl) 0 var(--spacing-3xl);
+      text-align: center;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 50% 0%, var(--color-accent-lighter) 0%, transparent 60%),
+        var(--color-bg-secondary);
+    }
+
+    /* 编辑体小帽 — 01 — 金色 */
+    .sub-eyebrow {
+      display: block;
+      font-family: var(--font-family-base);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.34em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      margin-bottom: var(--spacing-md);
+    }
+
+    /* 大标题 - Fraunces，clamp 40-60px */
+    .sub-hero-title {
+      font-family: var(--font-family-display);
+      font-size: clamp(40px, 6vw, 60px);
+      font-weight: 500;
+      font-variation-settings: 'opsz' 96, 'SOFT' 50;
+      color: var(--color-text-primary);
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      margin-bottom: var(--spacing-md);
+      background: linear-gradient(135deg,
+        var(--color-text-primary) 0%,
+        var(--color-primary) 60%,
+        var(--color-accent) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .sub-hero-subtitle {
+      font-family: var(--font-family-base);
+      font-size: var(--font-size-lg);
+      color: var(--color-text-secondary);
+      letter-spacing: 0.04em;
+    }
+
+    /* ========== 游戏卡片网格 ========== */
+    .games-section {
+      padding: var(--spacing-2xl) 0 var(--spacing-4xl);
+    }
+
+    /* 2 列桌面 / 手机 1 列，gap 32px */
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 32px;
+    }
+
+    /* ========== 游戏卡片 - 编辑体 + 游乐感 ========== */
+    /* 在 .card 基础上调整：圆角稍大、padding 归零、整体可点击 */
+    .game-card {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+      padding: 0;
+      position: relative;
+      text-decoration: none;
+      color: inherit;
+      border-radius: var(--radius-xl);
+    }
+
+    /* 渐变边框 hover 显现（复用 project-card 模式） */
+    .game-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius-xl);
+      padding: 1px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity var(--transition-base);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .game-card:hover::before {
+      opacity: 1;
+    }
+
+    /* 游乐感：hover 时轻微弹跳 + 微旋转 */
+    .game-card:hover {
+      transform: translateY(-8px) scale(1.012) rotate(-0.6deg);
+      box-shadow: var(--shadow-hover);
+      border-color: var(--color-accent-light);
+      color: inherit;
+    }
+
+    /* 游戏封面 - 高度 200px，Plum 渐变背景 */
+    .game-card-cover {
+      position: relative;
+      width: 100%;
+      height: 200px;
+      overflow: hidden;
+      background: linear-gradient(135deg, var(--color-primary-lighter), var(--color-accent-lighter));
+    }
+
+    .game-card-cover::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent 55%, rgba(0, 0, 0, 0.18));
+      pointer-events: none;
+    }
+
+    /* 封面字标容器 - 参考 .project-cover-mark */
+    .game-cover-mark {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background:
+        radial-gradient(circle at 30% 20%, var(--color-accent-lighter), transparent 55%),
+        radial-gradient(circle at 80% 85%, var(--color-primary-lighter), transparent 60%),
+        linear-gradient(135deg, var(--color-bg-tertiary), var(--color-bg-secondary));
+      transition: transform var(--transition-slow);
+    }
+
+    /* 卡片 hover 时封面字标微缩放 */
+    .game-card:hover .game-cover-mark {
+      transform: scale(1.04);
+    }
+
+    /* 游戏图标（gamepad）- 顶部小装饰 */
+    .game-cover-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-accent);
+      opacity: 0.75;
+      transition: transform var(--transition-base);
+    }
+
+    .game-cover-icon svg {
+      width: 30px;
+      height: 30px;
+    }
+
+    .game-card:hover .game-cover-icon {
+      transform: scale(1.12) rotate(-8deg);
+      opacity: 1;
+    }
+
+    /* 首字母字标 - Fraunces 大字 + Plum→金渐变文字 */
+    .game-cover-initial {
+      font-family: var(--font-family-display);
+      font-size: 76px;
+      font-weight: 400;
+      font-variation-settings: 'opsz' 144, 'SOFT' 80;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 2px 12px var(--color-primary-glow);
+      transition: transform var(--transition-slow);
+    }
+
+    .game-card:hover .game-cover-initial {
+      transform: scale(1.05);
+    }
+
+    /* GAME 01 金色边框标签 */
+    .game-cover-label {
+      font-family: var(--font-family-base);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.36em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      padding: 3px 12px;
+      border: 1px solid var(--color-accent-light);
+      border-radius: var(--radius-full);
+      background: var(--color-accent-lighter);
+    }
+
+    /* 卡片正文 */
+    .game-card-body {
+      padding: var(--spacing-xl);
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .game-card-title {
+      font-family: var(--font-family-display);
+      font-size: var(--font-size-xl);
+      font-weight: 500;
+      margin-bottom: var(--spacing-sm);
+      color: var(--color-text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .game-card-desc {
+      font-size: var(--font-size-base);
+      color: var(--color-text-secondary);
+      line-height: var(--line-height-relaxed);
+      margin-bottom: var(--spacing-lg);
+      flex-grow: 1;
+    }
+
+    /* 标签组 */
+    .game-card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-xs);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .game-card-tags .tag {
+      cursor: default;
+    }
+
+    /* 卡片底部：技术栈 + 进入游戏 */
+    .game-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--spacing-md);
+      padding-top: var(--spacing-lg);
+      border-top: 1px solid var(--color-border-light);
+    }
+
+    .game-card-tech {
+      font-family: var(--font-family-base);
+      font-size: 11px;
+      color: var(--color-text-tertiary);
+      letter-spacing: 0.04em;
+      font-weight: 600;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .game-card-play {
+      font-family: var(--font-family-base);
+      font-size: 12px;
+      color: var(--color-accent);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      transition: transform var(--transition-base);
+    }
+
+    .game-card:hover .game-card-play {
+      transform: translateX(4px);
+    }
+
+    /* 禁用态（available: false 的游戏） */
+    .game-card.is-disabled {
+      cursor: not-allowed;
+      opacity: 0.68;
+    }
+
+    .game-card.is-disabled:hover {
+      transform: translateY(-4px) scale(1) rotate(0);
+      box-shadow: var(--shadow-md);
+    }
+
+    .game-card.is-disabled .game-cover-icon,
+    .game-card.is-disabled .game-cover-initial {
+      filter: grayscale(0.4);
+    }
+
+    /* ========== 空状态 ========== */
+    .games-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: var(--spacing-4xl) var(--spacing-lg);
+      color: var(--color-text-tertiary);
+    }
+
+    .games-empty-icon {
+      display: flex;
+      justify-content: center;
+      margin-bottom: var(--spacing-lg);
+      color: var(--color-accent);
+      opacity: 0.6;
+    }
+
+    .games-empty-icon svg {
+      width: 48px;
+      height: 48px;
+    }
+
+    .games-empty-title {
+      font-family: var(--font-family-display);
+      font-size: var(--font-size-xl);
+      font-style: italic;
+      color: var(--color-text-secondary);
+      margin-bottom: var(--spacing-sm);
+      letter-spacing: -0.01em;
+    }
+
+    .games-empty-desc {
+      font-family: var(--font-family-base);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-tertiary);
+    }
+
+    /* ========== 页脚 ========== */
+    .sub-footer {
+      background: var(--color-bg-primary);
+      border-top: 1px solid var(--color-border-light);
+      padding: var(--spacing-2xl) 0;
+      position: relative;
+    }
+
+    .sub-footer::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+    }
+
+    .sub-footer .container {
+      text-align: center;
+    }
+
+    .sub-footer-info {
+      color: var(--color-text-tertiary);
+      font-family: var(--font-family-base);
+      font-size: var(--font-size-sm);
+      letter-spacing: 0.02em;
+    }
+
+    /* ========== 响应式 ========== */
+    @media (max-width: 768px) {
+      .sub-header-inner {
+        height: 56px;
+        padding: 0 var(--spacing-md);
+        gap: var(--spacing-sm);
+      }
+
+      .sub-header-title {
+        font-size: var(--font-size-sm);
+      }
+
+      .sub-hero {
+        padding: var(--spacing-3xl) 0 var(--spacing-2xl);
+      }
+
+      /* 手机单列 */
+      .games-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-lg);
+      }
+
+      .game-card-cover {
+        height: 170px;
+      }
+
+      .game-cover-initial {
+        font-size: 64px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 顶部 sticky 导航条：返回主页 + 中间标题 + 主题切换 -->
+  <header class="sub-header">
+    <div class="sub-header-inner">
+      <a href="index.html" class="theme-toggle back-btn" aria-label="返回主页" title="返回主页">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+      </a>
+      <div class="sub-header-center">
+        <span class="sub-header-title">游戏小屋</span>
+      </div>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换主题" title="切换深色/浅色模式">
+        <!-- 图标由 JS 注入 -->
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 标题区：编辑体小帽 + 大标题 + 副标题 -->
+    <section class="sub-hero">
+      <div class="container">
+        <span class="sub-eyebrow reveal">— 01 —</span>
+        <h1 class="sub-hero-title reveal delay-100">游戏小屋</h1>
+        <p class="sub-hero-subtitle reveal delay-200">用原生 HTML 编写的小游戏，即开即玩</p>
+      </div>
+    </section>
+
+    <!-- 游戏卡片网格 -->
+    <section class="games-section">
+      <div class="container">
+        <!-- 卡片由 JS 渲染；空数组时显示占位 -->
+        <div class="games-grid" id="gamesGrid"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 简单页脚 -->
+  <footer class="sub-footer">
+    <div class="container">
+      <p class="sub-footer-info" id="footerInfo"></p>
+    </div>
+  </footer>
+
+  <!-- 数据层（普通 script，挂载 window.ProfileData） -->
+  <script src="data/profile.js"></script>
+
+  <script>
+    /* ============================================================
+     * 游戏小屋页逻辑
+     * - 从 window.ProfileData.games 读取游戏列表渲染卡片
+     * - 入场动画 / 主题切换 / 返回主页 全部内联实现
+     * ============================================================ */
+    (function () {
+      var data = window.ProfileData || {};
+      var games = data.games || [];
+
+      // Lucide 风格图标 SVG
+      // 游戏手柄图标（gamepad-2）- 用于卡片封面装饰与空状态
+      var GAMEPAD_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="10" y1="11" y2="11"></line><line x1="8" x2="8" y1="9" y2="13"></line><line x1="15" x2="15.01" y1="12" y2="12"></line><line x1="18" x2="18.01" y1="10" y2="10"></line><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"></path></svg>';
+
+      // 主题切换图标
+      var SUN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>';
+      var MOON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>';
+
+      // HTML 转义，避免描述里的特殊字符破坏结构
+      function esc(str) {
+        if (str == null) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      /* ---------- 渲染单张游戏卡片 ---------- */
+      function renderCard(g, index) {
+        // 取游戏名首字符作为封面字标
+        var initial = ((g.name || '').trim().charAt(0)) || '·';
+        // 编号 GAME 01、GAME 02 ...
+        var num = String(index + 1).padStart(2, '0');
+        var available = g.available !== false;
+
+        // 标签
+        var tagsHtml = (g.tags || []).map(function (t) {
+          return '<span class="tag tag-primary">' + esc(t) + '</span>';
+        }).join('');
+
+        // 技术栈（用 · 分隔）
+        var techHtml = (g.techStack || []).join(' · ');
+
+        // 进入游戏文案
+        var playText = available ? '进入游戏 →' : '敬请期待';
+
+        // 可玩：渲染为可点击链接；不可玩：渲染为禁用容器
+        var openTag = available
+          ? '<a href="' + esc(g.file) + '" class="card game-card reveal" target="_self">'
+          : '<div class="card game-card reveal is-disabled" aria-disabled="true">';
+        var closeTag = available ? '</a>' : '</div>';
+
+        return openTag +
+          '<div class="game-card-cover">' +
+            '<div class="game-cover-mark">' +
+              '<span class="game-cover-icon" aria-hidden="true">' + GAMEPAD_SVG + '</span>' +
+              '<span class="game-cover-initial">' + esc(initial) + '</span>' +
+              '<span class="game-cover-label">GAME ' + num + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="game-card-body">' +
+            '<h3 class="game-card-title">' + esc(g.name) + '</h3>' +
+            '<p class="game-card-desc">' + esc(g.desc) + '</p>' +
+            '<div class="game-card-tags">' + tagsHtml + '</div>' +
+            '<div class="game-card-footer">' +
+              '<span class="game-card-tech">' + esc(techHtml) + '</span>' +
+              '<span class="game-card-play">' + playText + '</span>' +
+            '</div>' +
+          '</div>' +
+        closeTag;
+      }
+
+      /* ---------- 渲染空状态 ---------- */
+      function renderEmpty() {
+        return '<div class="games-empty">' +
+          '<div class="games-empty-icon" aria-hidden="true">' + GAMEPAD_SVG + '</div>' +
+          '<p class="games-empty-title">游戏开发中...</p>' +
+          '<p class="games-empty-desc">新的小游戏正在来的路上，敬请期待</p>' +
+        '</div>';
+      }
+
+      /* ---------- 渲染游戏网格 ---------- */
+      function renderGames() {
+        var grid = document.getElementById('gamesGrid');
+        if (!games.length) {
+          grid.innerHTML = renderEmpty();
+          return;
+        }
+        grid.innerHTML = games.map(renderCard).join('');
+      }
+
+      /* ---------- 入场动画（IntersectionObserver 添加 .revealed） ---------- */
+      function initReveal() {
+        var els = document.querySelectorAll('.reveal');
+        if (!els.length) return;
+
+        // 不支持 IntersectionObserver 时直接显示
+        if (!('IntersectionObserver' in window)) {
+          els.forEach(function (el) { el.classList.add('revealed'); });
+          return;
+        }
+
+        var observer = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('revealed');
+              observer.unobserve(entry.target);
+            }
+          });
+        }, {
+          threshold: 0.1,
+          rootMargin: '0px 0px -50px 0px'
+        });
+
+        els.forEach(function (el) { observer.observe(el); });
+      }
+
+      /* ---------- 主题切换（localStorage key='theme'，默认 dark） ---------- */
+      function initThemeToggle() {
+        var toggle = document.getElementById('themeToggle');
+
+        function applyIcon() {
+          var theme = document.documentElement.getAttribute('data-theme');
+          toggle.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
+        }
+
+        applyIcon();
+
+        toggle.addEventListener('click', function () {
+          var current = document.documentElement.getAttribute('data-theme') || 'dark';
+          var next = current === 'dark' ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', next);
+          localStorage.setItem('theme', next);
+          applyIcon();
+        });
+      }
+
+      /* ---------- 页脚版权 ---------- */
+      function renderFooter() {
+        var year = new Date().getFullYear();
+        var name = (data.basic && data.basic.name) || '周世杰';
+        document.getElementById('footerInfo').textContent =
+          '© ' + year + ' ' + name + ' · 游戏小屋 · 用原生 HTML 编写';
+      }
+
+      /* ---------- 初始化 ---------- */
+      renderGames();
+      renderFooter();
+      initThemeToggle();
+      initReveal();
+    })();
+  </script>
+</body>
+</html>

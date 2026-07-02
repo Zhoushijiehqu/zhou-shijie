@@ -154,22 +154,46 @@ const App = {
   },
 
   /**
-   * 初始化项目作品模块
+   * 初始化项目作品模块（首页精选区）
+   * V7：只展示精选仓库卡片 + 游戏入口 + 查看更多按钮
    */
   initProjectsSection(data) {
-    // 项目分类
+    // 精选区不需要分类筛选，隐藏容器
     const categoriesContainer = document.getElementById('projectCategoriesContainer');
-    if (categoriesContainer && data.projectCategories) {
-      categoriesContainer.innerHTML = Components.renderProjectCategories(data.projectCategories);
+    if (categoriesContainer) {
+      categoriesContainer.style.display = 'none';
     }
 
-    // 项目卡片
+    // 项目卡片：仅渲染精选仓库 + 游戏入口
     const projectsContainer = document.getElementById('projectsContainer');
     if (projectsContainer && data.projects) {
-      projectsContainer.innerHTML = data.projects.map(project =>
+      const featuredTitles = data.featuredProjectTitles || [];
+      const featuredProjects = data.projects.filter(p => featuredTitles.includes(p.title));
+
+      // 精选仓库卡片 + 游戏入口卡片
+      let html = featuredProjects.map(project =>
         Components.renderProjectCard(project)
       ).join('');
+
+      // 游戏入口卡片
+      if (data.gamesHub) {
+        html += Components.renderGamesHubCard(data.gamesHub);
+      }
+
+      // 查看更多按钮
+      html += `
+        <div class="view-more-wrapper reveal delay-300">
+          <a href="projects.html" class="btn-view-more">
+            <span class="view-more-text">查看全部作品</span>
+            <span class="view-more-arrow">→</span>
+          </a>
+        </div>
+      `;
+
+      projectsContainer.innerHTML = html;
     }
+
+    // 精选区不需要筛选交互，跳过 initProjectFilter
   },
 
   /**

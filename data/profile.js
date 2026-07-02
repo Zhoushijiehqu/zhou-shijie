@@ -100,7 +100,7 @@ window.ProfileData = {
   // 项目分类
   projectCategories: ['全部', '网站开发', '数据分析', '学术资料'],
 
-  // 项目作品（精选展示）- 同步自 GitHub 真实仓库
+  // 项目作品全集 - 同步自 GitHub 真实仓库（用于 projects.html 全展示页）
   projects: [
     {
       title: '个人数字名片',
@@ -116,19 +116,6 @@ window.ProfileData = {
       featured: true
     },
     {
-      title: '学术论文字体合并 · Times + 宋体',
-      category: '学术资料',
-      role: '字体工程',
-      period: '2026.06',
-      description: '将 Times New Roman 与 SimSun 合并为单一字体文件，用于学术论文排版时统一中英文字符的视觉风格与字距。',
-      tags: ['字体', '学术', '工具'],
-      techStack: ['FontForge', 'TTF'],
-      github: 'https://github.com/Zhoushijiehqu/Academic-Font-TimesSimSun',
-      demo: '',
-      repo: { stars: 4, language: '—', updated: '2026-06' },
-      featured: true
-    },
-    {
       title: '平狄克《微观经济学》习题详解（第9版）',
       category: '学术资料',
       role: '学术写作',
@@ -139,6 +126,19 @@ window.ProfileData = {
       github: 'https://github.com/Zhoushijiehqu/Pindyck-Microeconomics-Solutions-9th',
       demo: '',
       repo: { stars: 2, language: 'TeX', updated: '2026-06' },
+      featured: true
+    },
+    {
+      title: '学术论文字体合并 · Times + 宋体',
+      category: '学术资料',
+      role: '字体工程',
+      period: '2026.06',
+      description: '将 Times New Roman 与 SimSun 合并为单一字体文件，用于学术论文排版时统一中英文字符的视觉风格与字距。',
+      tags: ['字体', '学术', '工具'],
+      techStack: ['FontForge', 'TTF'],
+      github: 'https://github.com/Zhoushijiehqu/Academic-Font-TimesSimSun',
+      demo: '',
+      repo: { stars: 4, language: '—', updated: '2026-06' },
       featured: false
     },
     {
@@ -146,9 +146,9 @@ window.ProfileData = {
       category: '数据分析',
       role: '机器学习',
       period: '2026.02',
-      description: '基于集成学习的 publication-ready 机器学习管线，对微观经济指标进行预测建模与误差分析。',
-      tags: ['机器学习', 'Python', '预测建模'],
-      techStack: ['Python', 'scikit-learn'],
+      description: '基于 Stacking 集成（XGBoost + LightGBM + 随机森林）的 publication-ready 机器学习管线，对微观经济连续指标进行预测建模与统计诊断。',
+      tags: ['机器学习', 'Stacking', '预测建模'],
+      techStack: ['Python', 'XGBoost', 'Optuna'],
       github: 'https://github.com/Zhoushijiehqu/Predictive-Modeling-of-Microeconomic-Indicators-via-Ensemble-Learning',
       demo: '',
       repo: { stars: 0, language: 'Python', updated: '2026-02' },
@@ -159,9 +159,9 @@ window.ProfileData = {
       category: '数据分析',
       role: '统计建模',
       period: '2026.02',
-      description: '使用主成分分析（PCA）方法构建高管团队质量评价指标体系，完成多指标降维与综合评分。',
-      tags: ['PCA', '降维', '统计'],
-      techStack: ['Python', 'pandas'],
+      description: '严谨的 PCA 管线，从多维标准化人口与背景变量中提取不可观测的潜在构念（如高管团队质量 Qual），输出含 85% 累计方差阈值的 Scree 图与向量载荷图。',
+      tags: ['PCA', '降维', '潜变量'],
+      techStack: ['Python', 'scikit-learn', 'Matplotlib'],
       github: 'https://github.com/Zhoushijiehqu/Executive-Team-Quality-Qual-Index-Construction-via-PCA',
       demo: '',
       repo: { stars: 0, language: 'Python', updated: '2026-02' },
@@ -172,9 +172,9 @@ window.ProfileData = {
       category: '数据分析',
       role: '学术可视化',
       period: '2026.02',
-      description: '学术可视化脚本，使用非线性缩放技术呈现实体属性的分布特征，适用于论文级图表输出。',
-      tags: ['可视化', 'Matplotlib', '学术'],
-      techStack: ['Python', 'Matplotlib'],
+      description: '面向高度偏态横截面数据的学术可视化脚本，采用分段非线性缩放优雅压缩极端值，同时保留多数分布的线性可读性，输出论文级 SVG/PNG 图表。',
+      tags: ['可视化', '非线性', '学术'],
+      techStack: ['Python', 'Matplotlib', 'Pandas'],
       github: 'https://github.com/Zhoushijiehqu/Entity-Attribute-Distribution-Visualization-with-Non-linear-Scaling',
       demo: '',
       repo: { stars: 0, language: 'Python', updated: '2026-02' },
@@ -205,6 +205,36 @@ window.ProfileData = {
       demo: '',
       repo: { stars: 1, language: '—', updated: '2026-02' },
       featured: false
+    }
+  ],
+
+  // 精选作品 - 首页只展示这两张仓库卡片 + 游戏入口
+  featuredProjectTitles: ['个人数字名片', '平狄克《微观经济学》习题详解（第9版）'],
+
+  // 游戏小屋入口（首页精选区第 3 张卡片）
+  gamesHub: {
+    title: '游戏小屋',
+    category: '游戏',
+    role: 'HTML 原生小游戏',
+    period: '持续更新',
+    description: '用原生 HTML/CSS/JS 编写的小游戏集合，轻量、即开即玩。在这里放松一下，也给自己的代码留一块游乐场。',
+    tags: ['游戏', '原生', '即开即玩'],
+    techStack: ['HTML', 'CSS', 'JavaScript'],
+    link: 'games.html',
+    featured: true
+  },
+
+  // 游戏列表（games.html 用）
+  games: [
+    {
+      name: '贪吃蛇',
+      slug: 'snake',
+      desc: '经典贪吃蛇，键盘方向键操控，越吃越长。',
+      tags: ['经典', '键盘', 'Canvas'],
+      techStack: ['HTML', 'Canvas', 'JS'],
+      file: 'games/snake.html',
+      accent: 'primary',
+      available: true
     }
   ],
 

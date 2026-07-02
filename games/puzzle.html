@@ -333,7 +333,7 @@ body { overflow-wrap: break-word; }
   padding: 8px 14px; border: 2px solid var(--gold); border-radius: 8px;
   background: rgba(212,165,116,0.08); color: var(--gold);
   text-shadow: 0 0 12px rgba(212,165,116,0.3);
-  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s, color 0.3s, opacity 0.4s, transform 0.15s;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s, color 0.3s, opacity 0.4s;
   letter-spacing: 0.04em;
 }
 .prop-element:hover {
@@ -342,9 +342,10 @@ body { overflow-wrap: break-word; }
   background: rgba(212,165,116,0.15);
 }
 .prop-element.dragging {
-  cursor: grabbing; transform: translate(-50%, -50%) scale(1.12);
+  cursor: grabbing;
   box-shadow: 0 0 28px rgba(212,165,116,0.5), 0 8px 24px rgba(0,0,0,0.4);
   border-color: var(--gold-bright); background: rgba(212,165,116,0.2); z-index: 20;
+  transition: none;
 }
 .prop-element.clickable { cursor: pointer; }
 .prop-element.clickable:hover {
@@ -1254,10 +1255,10 @@ var App = {
     var newY = (e.clientY - ds.viewportTop) / scale - ds.offsetY;
     ds.elData.x = Math.max(20, Math.min(780, newX));
     ds.elData.y = Math.max(20, Math.min(430, newY));
-    // GPU-accelerated: use translate3d offset from initial position
+    // GPU 加速移动，无 scale 放大（保持原大小，丝滑无变形）
     var dx = ds.elData.x - ds.initialX;
     var dy = ds.elData.y - ds.initialY;
-    ds.dom.style.transform = 'translate(-50%, -50%) translate3d(' + dx + 'px, ' + dy + 'px, 0) scale(1.12)';
+    ds.dom.style.transform = 'translate(-50%, -50%) translate3d(' + dx + 'px, ' + dy + 'px, 0)';
   },
 
   _onPointerUp: function(e) {
@@ -1267,14 +1268,18 @@ var App = {
     if (ds.dom && ds.dom.releasePointerCapture) {
       ds.dom.releasePointerCapture(e.pointerId);
     }
-    ds.dom.classList.remove('dragging');
     document.removeEventListener('pointermove', this._boundPointerMove);
     document.removeEventListener('pointerup', this._boundPointerUp);
 
-    // Write final position back to left/top, clear GPU transform
+    // 立即写入最终位置（无 transition，无延迟）
+    ds.dom.style.transition = 'none';
+    ds.dom.classList.remove('dragging');
     ds.dom.style.left = ds.elData.x + 'px';
     ds.dom.style.top = ds.elData.y + 'px';
     ds.dom.style.transform = '';
+    // 强制重排，确保位置立即生效
+    void ds.dom.offsetWidth;
+    // 立即判定（0 延迟）
     this._checkCollisions(ds.id);
     this.dragState = null;
   },
@@ -1323,9 +1328,9 @@ var App = {
       var overlapY = Math.max(0, Math.min(triggerRect.bottom, targetRect.bottom) - Math.max(triggerRect.top, targetRect.top));
       var intersect = overlapX > 0 && overlapY > 0;
 
-      // 条件 2：中心距离 ≤ 两半径之和 + 30px 余量（靠近即触发）
+      // 条件 2：中心距离 ≤ 两半径之和 + 80px 余量（靠近即触发，大范围）
       var centerDist = Math.sqrt((tcx - tcx2) * (tcx - tcx2) + (tcy - tcy2) * (tcy - tcy2));
-      var proximityThreshold = triggerRadius + targetRadius + 30;
+      var proximityThreshold = triggerRadius + targetRadius + 80;
       var near = centerDist <= proximityThreshold;
 
       if (!intersect && !near) continue;
@@ -1339,9 +1344,9 @@ var App = {
         var ecx = extraRect.left + extraRect.width / 2;
         var ecy = extraRect.top + extraRect.height / 2;
         var extraRadius = Math.max(extraRect.width, extraRect.height) / 2;
-        // extra 用更宽松的余量（+40px）
+        // extra 用更宽松的余量（+100px）
         var exCenterDist = Math.sqrt((tcx - ecx) * (tcx - ecx) + (tcy - ecy) * (tcy - ecy));
-        var exThreshold = triggerRadius + extraRadius + 40;
+        var exThreshold = triggerRadius + extraRadius + 100;
         // extra 也检查边界框相交
         var exOX = Math.max(0, Math.min(triggerRect.right, extraRect.right) - Math.max(triggerRect.left, extraRect.left));
         var exOY = Math.max(0, Math.min(triggerRect.bottom, extraRect.bottom) - Math.max(triggerRect.top, extraRect.top));

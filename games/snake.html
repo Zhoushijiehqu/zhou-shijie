@@ -352,6 +352,10 @@
           <span class="info-value" id="highScore">0</span>
         </div>
         <div class="info-item">
+          <span class="info-label">奖励球</span>
+          <span class="info-value" id="bonus">0</span>
+        </div>
+        <div class="info-item">
           <span class="info-label">状态</span>
           <span class="info-value status-text" id="status">就绪</span>
         </div>
@@ -440,12 +444,21 @@
       var statusEl = document.getElementById('status');
       var startBtn = document.getElementById('startBtn');
       var restartBtn = document.getElementById('restartBtn');
+      var bonusEl = document.getElementById('bonus');
 
       // ----- 速度参数：初始 140ms，每吃 5 个食物加速 8ms，最快 70ms -----
       var INITIAL_SPEED = 140;
       var MIN_SPEED = 70;
       var SPEED_STEP = 8;
       var SPEED_UP_EVERY = 5;
+
+      // ----- 奖励球（大球）参数 -----
+      var BONUS_INTERVAL = 10000;       // 上一个消失后 10 秒生成下一个
+      var BONUS_TTL = 5000;             // 大球存活 5 秒，期间持续缩小
+      var BONUS_SCORE = 5;              // 吃到 +5 分（普通食物 +1）
+      var BONUS_MAX_SIZE = CELL * 1.6;  // 大球最大直径，比普通食物明显更大
+      var BONUS_POP_IN_MS = 300;        // 出现时 0.3 秒弹出动画
+      var BONUS_BLINK_MS = 1500;        // 剩余 1.5 秒开始闪烁
 
       // ----- 游戏状态 -----
       // state: 'ready' | 'playing' | 'paused' | 'over'
@@ -458,6 +471,16 @@
       var foodEaten = 0;       // 累计吃到食物数（用于加速判定）
       var currentSpeed = INITIAL_SPEED;
       var timer = null;        // 游戏循环定时器
+
+      // ----- 奖励球状态 -----
+      // bonusBall: null 或 { x, y, maxSize, remaining, maxRemaining }
+      //   remaining 用毫秒计数，仅在 state==='playing' 时递减，暂停 / 结束自动冻结
+      var bonusBall = null;
+      var bonusCountdown = BONUS_INTERVAL;  // 下次生成倒计时（毫秒）
+      var bonusEaten = 0;                    // 已吃大球计数
+      var floatTexts = [];                   // 飘字动画队列 { x, y, text, color, bornTime, ttl }
+      var lastFrameTs = 0;                   // 上一帧时间戳，用于计算 dt
+      var rafId = null;                      // requestAnimationFrame 句柄
 
       // ----- 读取最高分 -----
       var HIGH_SCORE_KEY = 'snakeHighScore';
@@ -474,8 +497,12 @@
       function cssVar(name) {
         return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
       }
+      // 颜色缓存：rAF 每帧都会调用 draw → colors()，缓存避免每秒数百次 getComputedStyle
+      // 主题切换时由 MutationObserver 置空重建
+      var _colorCache = null;
       function colors() {
-        return {
+        if (_colorCache) return _colorCache;
+        _colorCache = {
           bg: cssVar('--color-bg-secondary'),
           primary: cssVar('--color-primary'),
           primaryLight: cssVar('--color-primary-light'),
@@ -485,6 +512,7 @@
           text: cssVar('--color-text-primary'),
           textSecondary: cssVar('--color-text-secondary')
         };
+        return _colorCache;
       }
 
       // ----- 初始化一局新游戏 -----
@@ -501,6 +529,11 @@
         score = 0;
         foodEaten = 0;
         currentSpeed = INITIAL_SPEED;
+        // 清空奖励球状态，防止上一局残留
+        bonusBall = null;
+        bonusCountdown = BONUS_INTERVAL;
+        bonusEaten = 0;
+        floatTexts = [];
         placeFood();
         updateHUD();
         state = 'ready';
@@ -509,11 +542,15 @@
         draw();
       }
 
-      // ----- 随机生成食物（不能落在蛇身上） -----
+      // ----- 随机生成食物（不能落在蛇身或大球上） -----
       function placeFood() {
         var occupied = {};
         for (var i = 0; i < snake.length; i++) {
           occupied[snake[i].x + ',' + snake[i].y] = true;
+        }
+        // 大球存活时，食物也不生成在大球位置
+        if (bonusBall) {
+          occupied[bonusBall.x + ',' + bonusBall.y] = true;
         }
         var candidates = [];
         for (var x = 0; x < GRID; x++) {
@@ -533,6 +570,7 @@
       function updateHUD() {
         scoreEl.textContent = score;
         highScoreEl.textContent = highScore;
+        bonusEl.textContent = bonusEaten;
       }
 
       function setStatus(text, isOver) {
@@ -542,7 +580,8 @@
 
       // ----- 设置方向（支持 WASD 与方向键，禁止反向掉头） -----
       function setDirection(nx, ny) {
-        // 不能直接掉头：新方向与当前方向相反则忽略
+        // 关键：与"当前已应用方向"dir 比较，而非 nextDir。
+        // 这样连按两键（如向右时快速按上再按左）也不会因第二键覆盖 nextDir 而掉头。
         if (nx === -dir.x && ny === -dir.y) return;
         nextDir = { x: nx, y: ny };
       }
@@ -569,8 +608,9 @@
 
         snake.unshift(head);
 
-        // 吃到食物
-        if (head.x === food.x && head.y === food.y) {
+        // 吃到普通食物
+        var ateFood = (head.x === food.x && head.y === food.y);
+        if (ateFood) {
           score += 1;
           foodEaten += 1;
           // 每吃 5 个食物加速 8ms，最快 70ms
@@ -579,10 +619,138 @@
           }
           updateHUD();
           placeFood();
-        } else {
-          // 没吃到，去掉尾巴保持长度
+        }
+
+        // 吃到奖励球（大球）：+5 分，不增长蛇身，立即消失并重置倒计时
+        if (bonusBall && head.x === bonusBall.x && head.y === bonusBall.y) {
+          score += BONUS_SCORE;
+          bonusEaten += 1;
+          spawnFloatText(
+            bonusBall.x * CELL + CELL / 2,
+            bonusBall.y * CELL + CELL / 2,
+            '+' + BONUS_SCORE,
+            cssVar('--color-accent')
+          );
+          bonusBall = null;
+          bonusCountdown = BONUS_INTERVAL;
+          updateHUD();
+        }
+
+        if (!ateFood) {
+          // 没吃到普通食物，去掉尾巴保持长度（奖励球不影响身长）
           snake.pop();
         }
+      }
+
+      // ----- 奖励球（大球）相关函数 -----
+
+      // 随机生成大球位置（不能落在蛇身或普通食物上）
+      function spawnBonusBall() {
+        var occupied = {};
+        for (var i = 0; i < snake.length; i++) {
+          occupied[snake[i].x + ',' + snake[i].y] = true;
+        }
+        occupied[food.x + ',' + food.y] = true;
+        var candidates = [];
+        for (var x = 0; x < GRID; x++) {
+          for (var y = 0; y < GRID; y++) {
+            if (!occupied[x + ',' + y]) candidates.push({ x: x, y: y });
+          }
+        }
+        if (candidates.length === 0) return;  // 空间不足就不生成
+        var pos = candidates[Math.floor(Math.random() * candidates.length)];
+        bonusBall = {
+          x: pos.x,
+          y: pos.y,
+          maxSize: BONUS_MAX_SIZE,
+          maxRemaining: BONUS_TTL,
+          remaining: BONUS_TTL
+        };
+      }
+
+      // 绘制大球：金色 + 光晕 + 呼吸脉动 + 弹出 + 末期闪烁
+      function drawBonusBall() {
+        if (!bonusBall) return;
+        var c = colors();
+        var elapsed = bonusBall.maxRemaining - bonusBall.remaining;  // 已存在时长(ms)
+        var cx = bonusBall.x * CELL + CELL / 2;
+        var cy = bonusBall.y * CELL + CELL / 2;
+
+        // 线性缩小：remaining/maxRemaining 从 1 → 0
+        var shrink = bonusBall.remaining / bonusBall.maxRemaining;
+
+        // 弹出动画（0~300ms，easeOutCubic 从小到完整大小）
+        var popP = Math.min(1, elapsed / BONUS_POP_IN_MS);
+        var popIn = 1 - Math.pow(1 - popP, 3);
+
+        // 呼吸脉动（基于已存在时长，±8%）
+        var pulse = 1 + 0.08 * Math.sin(elapsed / 150);
+
+        // 末期闪烁（剩余 < 1.5s，越接近消失频率越快）
+        var visible = true;
+        if (bonusBall.remaining < BONUS_BLINK_MS) {
+          var urgency = 1 - bonusBall.remaining / BONUS_BLINK_MS;  // 0→1
+          var freq = 0.015 + urgency * 0.025;
+          visible = Math.sin(elapsed * freq) > -0.3;
+        }
+        if (!visible) return;
+
+        var size = bonusBall.maxSize * shrink * popIn * pulse;
+        if (size < 2) return;
+
+        // 外层光晕 + 金色主体
+        ctx.save();
+        ctx.shadowColor = c.accent;
+        ctx.shadowBlur = 24;
+        ctx.fillStyle = c.accent;
+        ctx.beginPath();
+        ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 内部高光，增加立体感
+        ctx.save();
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.beginPath();
+        ctx.arc(cx - size / 6, cy - size / 6, Math.max(1, size / 9), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 飘字动画（吃到大球时显示 "+5"）
+      function spawnFloatText(x, y, text, color) {
+        floatTexts.push({
+          x: x, y: y, text: text, color: color,
+          bornTime: performance.now(), ttl: 1000
+        });
+      }
+
+      // 清理过期飘字
+      function updateFloatTexts() {
+        var now = performance.now();
+        floatTexts = floatTexts.filter(function (ft) {
+          return (now - ft.bornTime) < ft.ttl;
+        });
+      }
+
+      // 绘制飘字（向上飘 30px 并淡出）
+      function drawFloatTexts() {
+        if (floatTexts.length === 0) return;
+        var now = performance.now();
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '700 22px ' + getComputedStyle(document.body).fontFamily;
+        for (var i = 0; i < floatTexts.length; i++) {
+          var ft = floatTexts[i];
+          var p = (now - ft.bornTime) / ft.ttl;  // 进度 0→1
+          var alpha = Math.max(0, 1 - p);
+          var yOffset = -30 * p;
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = ft.color;
+          ctx.fillText(ft.text, ft.x, ft.y + yOffset);
+        }
+        ctx.restore();
       }
 
       // ----- 绘制 -----
@@ -624,6 +792,9 @@
           ctx.fill();
         }
 
+        // 奖励球（大球）
+        drawBonusBall();
+
         // 蛇身（梅紫圆角方块，头部稍亮）
         for (var s = 0; s < snake.length; s++) {
           var seg = snake[s];
@@ -662,6 +833,9 @@
             : '按 Space 继续';
           ctx.fillText(hint, canvas.width / 2, canvas.height / 2 + 16);
         }
+
+        // 飘字动画（始终绘制于覆盖层之上）
+        drawFloatTexts();
       }
 
       // 圆角矩形辅助函数（兼容老 API）
@@ -795,14 +969,57 @@
       startBtn.addEventListener('click', startOrToggle);
       restartBtn.addEventListener('click', restart);
 
+      // ----- 动画循环（requestAnimationFrame）：负责奖励球计时与平滑绘制 -----
+      // 蛇身位移仍由 setTimeout(loop) 驱动；rAF 只负责大球动画、飘字、每帧重绘
+      function animLoop(ts) {
+        if (!lastFrameTs) lastFrameTs = ts;
+        var dt = ts - lastFrameTs;
+        lastFrameTs = ts;
+        // 防止标签页隐藏后恢复时 dt 过大导致大球瞬间消失
+        if (dt > 200) dt = 200;
+
+        // 仅在游戏中推进大球时间（暂停 / 结束时自动冻结）
+        if (state === 'playing') {
+          if (!bonusBall) {
+            // 倒计时生成下一个大球
+            bonusCountdown -= dt;
+            if (bonusCountdown <= 0) {
+              spawnBonusBall();
+              if (!bonusBall) {
+                // 空间不足未生成，延后重试
+                bonusCountdown = BONUS_INTERVAL;
+              }
+            }
+          } else {
+            // 大球存活计时
+            bonusBall.remaining -= dt;
+            if (bonusBall.remaining <= 0) {
+              // 自然消失，重置倒计时
+              bonusBall = null;
+              bonusCountdown = BONUS_INTERVAL;
+            }
+          }
+        }
+
+        // 飘字按真实时间清理（不受暂停影响）
+        updateFloatTexts();
+
+        // 每帧重绘，保证大球呼吸 / 闪烁 / 缩小动画流畅
+        draw();
+
+        rafId = requestAnimationFrame(animLoop);
+      }
+
       // ----- 主题切换后重绘（覆盖层 / 颜色随变量更新） -----
       var themeObserver = new MutationObserver(function () {
+        _colorCache = null;  // 主题变更，重建颜色缓存
         draw();
       });
       themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
       // ----- 启动 -----
       resetGame();
+      rafId = requestAnimationFrame(animLoop);
     })();
   </script>
 </body>

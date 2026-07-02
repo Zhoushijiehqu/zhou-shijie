@@ -229,11 +229,21 @@ window.ProfileData = {
     {
       name: '贪吃蛇',
       slug: 'snake',
-      desc: '经典贪吃蛇，键盘方向键操控，越吃越长。',
+      desc: '经典贪吃蛇，方向键操控。每 10 秒出现金色奖励球，5 秒内吃到可加 5 分。',
       tags: ['经典', '键盘', 'Canvas'],
       techStack: ['HTML', 'Canvas', 'JS'],
       file: 'games/snake.html',
       accent: 'primary',
+      available: true
+    },
+    {
+      name: '扫雷',
+      slug: 'mine',
+      desc: '经典扫雷，含初级、中级、高级与自定义难度，首点安全保证可展开。',
+      tags: ['经典', '策略', '鼠标'],
+      techStack: ['HTML', 'CSS Grid', 'JS'],
+      file: 'games/mine.html',
+      accent: 'accent',
       available: true
     }
   ],

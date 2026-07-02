@@ -363,11 +363,25 @@ main {
   border: 1px solid var(--color-border-light);
 }
 
+/* 修复图标垂直居中：SVG 默认基线导致偏上 */
+.theme-toggle .icon,
+.theme-toggle svg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(2px);
+}
+
 .theme-toggle:hover {
   background: var(--color-accent-lighter);
   color: var(--color-accent);
   border-color: var(--color-accent-light);
   transform: rotate(15deg);
+}
+
+.theme-toggle:hover .icon,
+.theme-toggle:hover svg {
+  transform: translateY(2px);
 }
 
 /* ========== 响应式基础 ========== */

@@ -68,11 +68,13 @@ const Components = {
           
           <div class="navbar-right">
             <div class="navbar-menu" id="navbarMenu">
-              ${data.nav.map(item => `
-                <a href="#${item.href}" class="navbar-link" data-nav="${item.href}">
-                  ${item.label}
-                </a>
-              `).join('')}
+              ${data.nav.map(item => {
+                // external 项为外部页面链接，非单页锚点
+                if (item.external) {
+                  return `<a href="${item.href}" class="navbar-link navbar-link-external" target="_self">${item.label}</a>`;
+                }
+                return `<a href="#${item.href}" class="navbar-link" data-nav="${item.href}">${item.label}</a>`;
+              }).join('')}
             </div>
             
             <button class="theme-toggle" id="themeToggle" aria-label="切换主题" title="切换深色/浅色模式">

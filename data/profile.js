@@ -274,12 +274,13 @@ window.ProfileData = {
     { icon: 'gamepad-2', name: '游戏', desc: 'Switch 策略游戏玩家' }
   ],
 
-  // 导航菜单（单页锚点，按页面顺序）
+  // 导航菜单（单页锚点，按页面顺序；external 项为外部页面链接）
   nav: [
     { label: '首页', href: 'home' },
     { label: '作品', href: 'projects' },
     { label: '关于', href: 'about' },
     { label: '成长', href: 'timeline' },
-    { label: '联系', href: 'contact' }
+    { label: '联系', href: 'contact' },
+    { label: '游戏', href: 'games.html', external: true }
   ]
 };

@@ -162,6 +162,30 @@
   width: 100%;
 }
 
+/* 外部链接（游戏入口等）用金色区分 */
+.navbar-link-external {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+.navbar-link-external::after {
+  background: var(--color-accent);
+  width: 100%;
+  height: 2px;
+  bottom: 0;
+}
+
+.navbar-link-external::before {
+  content: '◆';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 6px;
+  color: var(--color-accent);
+  opacity: 0.7;
+}
+
 /* 移动端菜单按钮 */
 .navbar-toggle {
   display: none;

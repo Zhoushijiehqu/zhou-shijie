@@ -240,6 +240,54 @@
   pointer-events: none;
 }
 
+/* 占位封面字标 - 编辑体首字母字标 */
+.project-cover-mark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background:
+    radial-gradient(circle at 30% 20%, var(--color-accent-lighter), transparent 55%),
+    radial-gradient(circle at 80% 85%, var(--color-primary-lighter), transparent 60%),
+    linear-gradient(135deg, var(--color-bg-tertiary), var(--color-bg-secondary));
+  transition: transform var(--transition-slow);
+}
+
+.project-card:hover .project-cover-mark {
+  transform: scale(1.04);
+}
+
+.project-cover-initial {
+  font-family: var(--font-family-display);
+  font-size: 84px;
+  font-weight: 400;
+  font-variation-settings: 'opsz' 144, 'SOFT' 80;
+  line-height: 1;
+  color: var(--color-text-primary);
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 12px var(--color-primary-glow);
+}
+
+.project-cover-label {
+  font-family: var(--font-family-base);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  padding: 3px 12px;
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-full);
+  background: var(--color-accent-lighter);
+}
+
 .project-card-body {
   padding: var(--spacing-xl);
   flex-grow: 1;
@@ -262,7 +310,8 @@
 
 .project-card-meta {
   display: flex;
-  gap: var(--spacing-md);
+  align-items: center;
+  gap: var(--spacing-sm);
   font-family: var(--font-family-base);
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
@@ -270,6 +319,12 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-weight: 600;
+}
+
+.project-card-meta .meta-divider {
+  color: var(--color-accent);
+  opacity: 0.6;
+  font-weight: 700;
 }
 
 .project-card-desc {
@@ -355,6 +410,81 @@
 .project-link-btn .icon svg {
   width: 15px;
   height: 15px;
+}
+
+/* 图标尺寸工具 */
+.icon-xs .icon svg,
+.icon-xs svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2.2;
+}
+
+/* ========== 仓库元数据行（编辑体字框） ========== */
+.project-repo-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border-light);
+  font-family: var(--font-family-base);
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.04em;
+}
+
+.repo-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+
+.repo-meta-item .icon {
+  display: inline-flex;
+  color: var(--color-accent);
+}
+
+.repo-meta-value {
+  font-family: var(--font-family-display);
+  font-weight: 500;
+  font-variation-settings: 'opsz' 14;
+  color: var(--color-text-secondary);
+  letter-spacing: 0;
+}
+
+.repo-meta-label {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+}
+
+.repo-lang-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-lighter);
+}
+
+.repo-meta-divider {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--color-border-medium);
+}
+
+.repo-meta-updated {
+  margin-left: auto;
+}
+
+.repo-meta-updated .repo-meta-value {
+  color: var(--color-text-tertiary);
+  font-family: var(--font-family-base);
+  font-weight: 500;
 }
 
 /* ========== 项目分类筛选 ========== */

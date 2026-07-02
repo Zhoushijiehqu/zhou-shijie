@@ -485,47 +485,43 @@ const Components = {
 
   /**
    * 渲染项目卡片（重构版 - GitHub + Demo 入口）
+   * V7 编辑体：占位封面改用首字母字标 + Plum 渐变，新增仓库元数据
    */
   renderProjectCard(project) {
+    // 取标题首字符（中英文兼容）作为占位封面字标
+    const initial = (project.title || '').trim().charAt(0) || '·';
+
     return `
       <div class="card project-card ${project.featured ? 'card-featured' : ''} reveal" data-category="${project.category || '全部'}">
         <div class="project-card-cover">
           ${project.cover ? `
             <img src="${project.cover}" alt="${project.title}" loading="lazy">
           ` : `
-            <svg viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="grad-${project.title.hashCode()}" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style="stop-color:#E8E4F5;stop-opacity:1" />
-                  <stop offset="100%" style="stop-color:#D0C8E8;stop-opacity:1" />
-                </linearGradient>
-              </defs>
-              <rect width="400" height="180" fill="url(#grad-${project.title.hashCode()})"/>
-              <text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" 
-                    fill="#8B7EC8" font-size="24" font-weight="600" font-family="sans-serif">
-                ${project.title}
-              </text>
-            </svg>
+            <div class="project-cover-mark" aria-hidden="true">
+              <span class="project-cover-initial">${initial}</span>
+              <span class="project-cover-label">${project.category || 'WORK'}</span>
+            </div>
           `}
         </div>
-        
+
         <div class="project-card-body">
           <div class="project-card-header">
             <h3 class="project-card-title">${project.title}</h3>
             <div class="project-card-meta">
               <span>${project.role}</span>
+              <span class="meta-divider">·</span>
               <span>${project.period}</span>
             </div>
           </div>
-          
+
           <p class="project-card-desc">${project.description}</p>
-          
+
           ${project.techStack && project.techStack.length > 0 ? `
             <div class="project-tech-stack">
               ${project.techStack.map(tech => `<span class="tech-tag">${tech}</span>`).join('')}
             </div>
           ` : ''}
-          
+
           <div class="project-card-footer">
             <div class="project-tags">
               ${project.tags.slice(0, 3).map(tag => `<span class="tag tag-primary">${tag}</span>`).join('')}
@@ -543,6 +539,26 @@ const Components = {
               ` : ''}
             </div>
           </div>
+
+          ${project.repo ? `
+            <div class="project-repo-meta">
+              <span class="repo-meta-item">
+                ${this.getIcon('zap', 'icon-xs')}
+                <span class="repo-meta-value">${project.repo.stars}</span>
+                <span class="repo-meta-label">stars</span>
+              </span>
+              <span class="repo-meta-divider"></span>
+              <span class="repo-meta-item">
+                <span class="repo-lang-dot"></span>
+                <span class="repo-meta-value">${project.repo.language}</span>
+              </span>
+              <span class="repo-meta-divider"></span>
+              <span class="repo-meta-item repo-meta-updated">
+                <span class="repo-meta-label">updated</span>
+                <span class="repo-meta-value">${project.repo.updated}</span>
+              </span>
+            </div>
+          ` : ''}
         </div>
       </div>
     `;

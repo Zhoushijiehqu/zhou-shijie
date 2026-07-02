@@ -98,41 +98,119 @@ window.ProfileData = {
   },
 
   // 项目分类
-  projectCategories: ['全部', '网站开发', '数据分析', 'AI工具'],
+  projectCategories: ['全部', '网站开发', '数据分析', '学术资料'],
 
-  // 项目作品（精选展示）
+  // 项目作品（精选展示）- 同步自 GitHub 真实仓库
   projects: [
-    {
-      title: 'GitHub 开源作品集',
-      category: '网站开发',
-      role: '独立开发者',
-      period: '持续更新中',
-      cover: 'assets/images/project-github.svg',
-      description: '在 GitHub 上维护多个开源项目，涵盖数据分析脚本、效率工具、前端练习与学术笔记。记录学习过程，沉淀最佳实践。',
-      tags: ['开源', '前端', 'Python', '数据分析'],
-      techStack: ['HTML', 'CSS', 'JavaScript', 'Python', 'Git'],
-      github: 'https://github.com',
-      demo: '#',
-      featured: true
-    },
     {
       title: '个人数字名片',
       category: '网站开发',
       role: '设计与开发',
-      period: '2026',
-      cover: 'assets/images/project-portfolio.svg',
-      description: '从零设计并开发的个人作品集网站，采用原生 HTML/CSS/JS 实现，支持深色模式、粒子动画、单页滚动等特性。',
+      period: '2026.07',
+      description: '从零设计并开发的个人作品集网站，采用原生 HTML/CSS/JS 实现，支持深色模式、粒子动画、单页滚动等编辑体美学特性。',
       tags: ['前端', '设计', '作品集'],
       techStack: ['HTML', 'CSS', 'JavaScript', 'Canvas'],
-      github: '#',
-      demo: '#',
+      github: 'https://github.com/Zhoushijiehqu/zhou-shijie',
+      demo: 'https://zhoushijiehqu.github.io/zhou-shijie/',
+      repo: { stars: 0, language: 'CSS', updated: '2026-07' },
       featured: true
+    },
+    {
+      title: '学术论文字体合并 · Times + 宋体',
+      category: '学术资料',
+      role: '字体工程',
+      period: '2026.06',
+      description: '将 Times New Roman 与 SimSun 合并为单一字体文件，用于学术论文排版时统一中英文字符的视觉风格与字距。',
+      tags: ['字体', '学术', '工具'],
+      techStack: ['FontForge', 'TTF'],
+      github: 'https://github.com/Zhoushijiehqu/Academic-Font-TimesSimSun',
+      demo: '',
+      repo: { stars: 4, language: '—', updated: '2026-06' },
+      featured: true
+    },
+    {
+      title: '平狄克《微观经济学》习题详解（第9版）',
+      category: '学术资料',
+      role: '学术写作',
+      period: '2026.06',
+      description: '平狄克《微观经济学》第9版课后习题完整详解，包含全部章节的数理推导、图表说明与案例分析。',
+      tags: ['经济学', '习题', 'LaTeX'],
+      techStack: ['LaTeX', 'TeX'],
+      github: 'https://github.com/Zhoushijiehqu/Pindyck-Microeconomics-Solutions-9th',
+      demo: '',
+      repo: { stars: 2, language: 'TeX', updated: '2026-06' },
+      featured: false
+    },
+    {
+      title: '微观经济指标集成学习预测',
+      category: '数据分析',
+      role: '机器学习',
+      period: '2026.02',
+      description: '基于集成学习的 publication-ready 机器学习管线，对微观经济指标进行预测建模与误差分析。',
+      tags: ['机器学习', 'Python', '预测建模'],
+      techStack: ['Python', 'scikit-learn'],
+      github: 'https://github.com/Zhoushijiehqu/Predictive-Modeling-of-Microeconomic-Indicators-via-Ensemble-Learning',
+      demo: '',
+      repo: { stars: 0, language: 'Python', updated: '2026-02' },
+      featured: false
+    },
+    {
+      title: '高管团队质量指数构建（PCA）',
+      category: '数据分析',
+      role: '统计建模',
+      period: '2026.02',
+      description: '使用主成分分析（PCA）方法构建高管团队质量评价指标体系，完成多指标降维与综合评分。',
+      tags: ['PCA', '降维', '统计'],
+      techStack: ['Python', 'pandas'],
+      github: 'https://github.com/Zhoushijiehqu/Executive-Team-Quality-Qual-Index-Construction-via-PCA',
+      demo: '',
+      repo: { stars: 0, language: 'Python', updated: '2026-02' },
+      featured: false
+    },
+    {
+      title: '实体属性分布可视化（非线性缩放）',
+      category: '数据分析',
+      role: '学术可视化',
+      period: '2026.02',
+      description: '学术可视化脚本，使用非线性缩放技术呈现实体属性的分布特征，适用于论文级图表输出。',
+      tags: ['可视化', 'Matplotlib', '学术'],
+      techStack: ['Python', 'Matplotlib'],
+      github: 'https://github.com/Zhoushijiehqu/Entity-Attribute-Distribution-Visualization-with-Non-linear-Scaling',
+      demo: '',
+      repo: { stars: 0, language: 'Python', updated: '2026-02' },
+      featured: false
+    },
+    {
+      title: '模拟成绩可视化查询',
+      category: '网站开发',
+      role: '前端开发',
+      period: '2026.02',
+      description: '轻量级前端项目，用于模拟高考成绩查询的可视化界面，包含数据图表与查询交互。',
+      tags: ['前端', '可视化', '轻量'],
+      techStack: ['HTML', 'CSS', 'JavaScript'],
+      github: 'https://github.com/Zhoushijiehqu/Mock-Score-Visualization',
+      demo: '',
+      repo: { stars: 1, language: 'HTML', updated: '2026-02' },
+      featured: false
+    },
+    {
+      title: '应用经济学学习资料库',
+      category: '学术资料',
+      role: '资料归档',
+      period: '2026.02',
+      description: '个人应用经济学学习资料归档，包含课程笔记、文献整理与相关资源索引。',
+      tags: ['经济学', '笔记', '归档'],
+      techStack: ['Markdown'],
+      github: 'https://github.com/Zhoushijiehqu/Applied-Economics-Study-Hub',
+      demo: '',
+      repo: { stars: 1, language: '—', updated: '2026-02' },
+      featured: false
     }
   ],
 
   // 社交账号
   socials: [
-    { name: 'GitHub', icon: 'github', desc: '开源项目与代码', link: 'https://github.com', copyText: null },
+    { name: 'GitHub', icon: 'github', desc: '开源项目与代码', link: 'https://github.com/Zhoushijiehqu', copyText: null },
     { name: '邮箱', icon: 'mail', desc: 'a15759219744@163.com', link: 'mailto:a15759219744@163.com', copyText: 'a15759219744@163.com' },
     { name: '小红书', icon: 'bookmark', desc: '学习笔记与生活', link: '#', copyText: null },
     { name: '微信', icon: 'message-circle', desc: 'zsj15759219744', link: '#', copyText: 'zsj15759219744' }

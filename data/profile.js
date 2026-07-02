@@ -255,6 +255,16 @@ window.ProfileData = {
       file: 'games/puzzle.html',
       accent: 'primary',
       available: true
+    },
+    {
+      name: '瞬逝记忆拼图',
+      slug: 'memory',
+      desc: '记忆图片 3 秒后碎片打乱，拖回正确格子还原。含教程、看答案、自定义图片挑战。',
+      tags: ['记忆', '拼图', '拖拽'],
+      techStack: ['HTML', 'CSS Grid', 'JS'],
+      file: 'games/memory.html',
+      accent: 'accent',
+      available: true
     }
   ],
 

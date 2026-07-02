@@ -1,0 +1,1633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>瞬逝记忆拼图 · 周世杰</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,400..700&family=Manrope:wght@300..800&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/layout.css">
+<link rel="stylesheet" href="../assets/css/components.css">
+<link rel="stylesheet" href="../assets/css/animations.css">
+<script>
+  // 主题预载（防闪烁）
+  (function() {
+    var t = localStorage.getItem('theme');
+    if (!t) t = 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<style>
+/* ===== 瞬逝记忆拼图页面特有样式 =====
+   颜色全部走主页面 CSS 变量（由 base.css 定义），
+   字体用 Fraunces（标题）+ Manrope（正文）+ Noto Serif SC（游戏内汉字，保留记忆感）
+*/
+
+/* 顶部 sticky header */
+.memory-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 28px;
+  background: rgba(var(--color-bg-primary-rgb, 26,21,16), 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--color-border-light);
+}
+.memory-header-left { display: flex; align-items: center; gap: 16px; }
+.memory-back-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  font-family: var(--font-family-base);
+  font-size: 13px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-card);
+  transition: all 0.25s;
+}
+.memory-back-btn:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent-light);
+  background: var(--color-accent-lighter);
+}
+.memory-title-area { text-align: center; flex: 1; }
+.memory-eyebrow {
+  display: block;
+  font-family: var(--font-family-base);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.34em; text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: 2px;
+}
+.memory-title-area h1 {
+  font-family: var(--font-family-display);
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 400;
+  font-variation-settings: 'opsz' 60, 'SOFT' 50;
+  color: var(--color-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+/* 主题切换按钮 */
+.memory-header .theme-toggle { flex-shrink: 0; }
+
+/* 游戏容器：居中 */
+#game-root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 70px);
+  padding: 32px 20px;
+}
+
+/* ===== 游戏内 :root 变量映射 =====
+   原游戏用 --bg-deep/--bg-surface/--gold 等变量，
+   这里映射到主页面的 CSS 变量，保持风格统一
+*/
+:root {
+  --bg-deep: var(--color-bg-primary);
+  --bg-surface: var(--color-bg-card);
+  --bg-hover: var(--color-bg-tertiary);
+  --text: var(--color-text-primary);
+  --text-muted: var(--color-text-secondary);
+  --gold: var(--color-accent);
+  --gold-dim: var(--color-accent-light);
+  --gold-glow: var(--color-accent-glow);
+  --blue: #6b9bd2;
+  --blue-dim: #3a5a7a;
+  --red: #c4554d;
+  --green: #5a9e6f;
+  --border: var(--color-border-medium);
+  --radius: var(--radius-md);
+  --font-display: 'Fraunces', 'Noto Serif SC', serif;
+  --font-ui: 'Manrope', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* body 用主页面字体 + 纸张纹理（base.css 提供） */
+body {
+  margin: 0; padding: 0;
+  background: var(--color-bg-primary);
+  font-family: 'Manrope', 'Noto Serif SC', 'STSong', serif, sans-serif;
+  color: var(--color-text-primary);
+  min-height: 100vh;
+  overflow-x: hidden; overflow-y: auto;
+  user-select: none; -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+/* 游戏内汉字用 Noto Serif SC 保持记忆感 */
+#scene-menu .title,
+#scene-settings h2,
+#scene-level-select h2,
+.hud-level,
+.memory-countdown,
+.complete-title,
+.auto-text {
+  font-family: 'Noto Serif SC', 'Fraunces', serif !important;
+}
+
+/* 菜单标题加渐变文字 */
+#scene-menu .title {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+/* 按钮风格统一为编辑体 */
+.menu-btn, .setting-option, .setting-back, .level-back,
+.custom-upload-btn, .hud-btn, .complete-btn {
+  font-family: 'Manrope', sans-serif;
+  border-radius: var(--radius-full);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.menu-btn:hover, .setting-option:hover, .level-back:hover,
+.custom-upload-btn:hover, .hud-btn:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+/* 关卡卡片编辑体化 */
+.level-cell {
+  border-radius: var(--radius-md) !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.level-cell:hover:not(.locked) {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* 游戏视口编辑体化 */
+#game-viewport {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg), inset 0 0 60px rgba(0,0,0,0.2) !important;
+}
+
+/* 通关覆盖层编辑体化 */
+#complete-overlay .complete-title {
+  font-variation-settings: 'opsz' 96;
+}
+
+/* 响应式 */
+@media (max-width: 840px) {
+  .memory-header { padding: 10px 16px; }
+  #game-root { padding: 16px 12px; }
+}
+
+/* ===== 以下为原游戏样式（保留功能，变量已上方映射） ===== */
+*, *::before, *::after { box-sizing: border-box; }
+img, video { max-width: 100%; height: auto; display: block; }
+body { overflow-wrap: break-word; }
+
+#viewport-wrapper {
+  position: relative;
+  width: 800px;
+  height: 450px;
+  flex-shrink: 0;
+}
+
+#game-viewport {
+  width: 800px;
+  height: 450px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+  background: var(--bg-deep);
+  overflow: hidden;
+}
+
+.scene { display: none; position: absolute; inset: 0; }
+.scene.active { display: flex; }
+
+/* ===== 主菜单 ===== */
+#scene-menu {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: radial-gradient(ellipse at 50% 30%, var(--color-accent-lighter) 0%, var(--bg-deep) 70%);
+}
+#scene-menu .title {
+  font-size: 42px;
+  font-weight: bold;
+  color: var(--gold);
+  letter-spacing: 4px;
+  text-shadow: 0 0 40px rgba(212,165,116,0.3);
+  margin-bottom: 4px;
+}
+#scene-menu .subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  letter-spacing: 6px;
+  margin-bottom: 16px;
+}
+.menu-btn {
+  width: 220px;
+  padding: 12px 0;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+  letter-spacing: 2px;
+  font-family: var(--font-ui);
+}
+.menu-btn:hover { background: var(--bg-hover); border-color: var(--gold-dim); color: var(--gold); }
+.menu-btn.primary { background: var(--gold); color: var(--color-bg-primary); border-color: var(--gold); font-weight: bold; }
+.menu-btn.primary:hover { background: var(--color-accent); filter: brightness(1.08); }
+.menu-btn.tutorial { border-color: var(--blue-dim); }
+.menu-btn.tutorial:hover { border-color: var(--blue); color: var(--blue); }
+
+/* ===== 设置面板 ===== */
+#scene-settings {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  background: var(--bg-deep);
+}
+#scene-settings h2 {
+  font-size: 28px;
+  color: var(--gold);
+  margin: 0;
+  letter-spacing: 2px;
+}
+.setting-row { display: flex; gap: 12px; align-items: center; }
+.setting-option {
+  padding: 10px 24px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.setting-option:hover { border-color: var(--text-muted); color: var(--text); }
+.setting-option.selected { border-color: var(--gold); color: var(--gold); background: var(--color-accent-lighter); }
+.setting-back {
+  margin-top: 8px;
+  padding: 8px 28px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.setting-back:hover { color: var(--text); border-color: var(--text-muted); }
+
+/* ===== 选关界面 ===== */
+#scene-level-select {
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 40px;
+  gap: 16px;
+  background: var(--bg-deep);
+  overflow-y: auto;
+}
+#scene-level-select h2 {
+  font-size: 24px;
+  color: var(--gold);
+  margin: 0 0 4px;
+  letter-spacing: 2px;
+}
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 600px;
+}
+.level-cell {
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.level-cell:hover:not(.locked) { border-color: var(--gold-dim); color: var(--gold); }
+.level-cell.locked { opacity: 0.35; cursor: not-allowed; }
+.level-cell .lock-icon { font-size: 18px; margin-bottom: 2px; }
+.level-cell .level-num { font-weight: bold; font-size: 16px; color: var(--text); }
+.level-cell.locked .level-num { color: var(--text-muted); }
+.level-cell .level-name { font-size: 10px; margin-top: 2px; }
+.level-cell.completed { border-color: var(--green); }
+.level-cell.completed::after {
+  content: '✓';
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 11px;
+  color: var(--green);
+}
+.level-back {
+  padding: 8px 28px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  margin-top: 8px;
+}
+.level-back:hover { color: var(--text); border-color: var(--text-muted); }
+.custom-upload-btn {
+  padding: 10px 24px;
+  border: 1px dashed var(--blue-dim);
+  background: transparent;
+  color: var(--blue);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  letter-spacing: 1px;
+}
+.custom-upload-btn:hover { border-color: var(--blue); background: rgba(107,155,210,0.08); }
+
+/* ===== 游戏界面 ===== */
+#scene-playing {
+  flex-direction: column;
+  background: var(--bg-deep);
+}
+.game-hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  height: 44px;
+  flex-shrink: 0;
+}
+.game-hud .hud-left { display: flex; align-items: center; gap: 12px; }
+.game-hud .hud-level { font-size: 15px; color: var(--gold); letter-spacing: 1px; }
+.game-hud .hud-timer { font-size: 14px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.game-hud .hud-timer.urgent { color: var(--red); animation: pulse 0.5s ease-in-out infinite; }
+.game-hud .hud-progress { font-size: 13px; color: var(--text-muted); }
+.game-hud .hud-btns { display: flex; gap: 8px; }
+.hud-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.hud-btn:hover { color: var(--text); border-color: var(--text-muted); }
+.hud-btn.auto-btn { border-color: var(--blue-dim); color: var(--blue); }
+.hud-btn.auto-btn:hover { border-color: var(--blue); }
+
+.game-main {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 拼图容器 */
+#puzzle-container {
+  position: absolute;
+  inset: 0;
+}
+
+/* 网格底座 */
+#slots-area {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--border);
+}
+#slots-grid {
+  display: grid;
+  gap: 2px;
+}
+.slot-cell {
+  border: 1px dashed var(--color-border-medium);
+  background: rgba(0,0,0,0.18);
+  transition: border-color 0.3s, background 0.3s;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+.slot-cell.filled { border-color: var(--green); border-style: solid; background: transparent; }
+
+/* 拼图碎片 */
+.piece {
+  position: absolute;
+  border-radius: 3px;
+  cursor: grab;
+  z-index: 1;
+  perspective: 600px;
+  will-change: transform, left, top;
+}
+.piece.dragging {
+  cursor: grabbing;
+  z-index: 100 !important;
+}
+.piece.snapped {
+  cursor: default;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 自动通关飞行过渡 */
+.piece.flying {
+  transition: left 0.5s cubic-bezier(0.25, 1, 0.5, 1), top 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* 3D 卡片内部 */
+.piece-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  transform: rotateY(180deg);
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.piece.flipped .piece-inner {
+  transform: rotateY(0deg);
+}
+
+.piece-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 3px;
+}
+
+/* 正面：图片切片 */
+.piece-front {
+  background-size: cover;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+/* 背面：暗金纹理 */
+.piece-back {
+  background-color: var(--bg-surface);
+  background-image:
+    linear-gradient(45deg, rgba(212,165,116,0.12) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(212,165,116,0.12) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(212,165,116,0.12) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(212,165,116,0.12) 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+  border: 1.5px solid var(--gold-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotateY(180deg);
+}
+.piece-back::after {
+  content: '?';
+  font-family: var(--font-display);
+  font-size: 28px;
+  color: var(--gold);
+  opacity: 0.7;
+  text-shadow: 0 0 12px var(--gold-glow);
+}
+.piece.small-back .piece-back::after { font-size: 18px; }
+
+/* 拖拽时的高亮 */
+.piece.dragging .piece-inner { filter: brightness(1.15); }
+.piece.dragging .piece-back {
+  border-color: var(--gold);
+  box-shadow: 0 0 16px var(--gold-glow);
+}
+
+/* 吸附后翻转完成 */
+.piece.snapped .piece-back { border-color: var(--green); }
+.piece.snapped .piece-front {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+
+/* 记忆阶段覆盖层 */
+#memory-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  transition: opacity 0.4s;
+}
+#memory-overlay.hidden { opacity: 0; pointer-events: none; }
+#memory-overlay .memory-img {
+  width: 280px;
+  height: 280px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  box-shadow: 0 0 30px rgba(0,0,0,0.5);
+}
+#memory-overlay .memory-countdown {
+  font-size: 48px;
+  color: var(--gold);
+  margin-top: 12px;
+  text-shadow: 0 0 20px rgba(212,165,116,0.4);
+}
+#memory-overlay .memory-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  letter-spacing: 1px;
+  max-width: 320px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* 自动通关覆盖层 */
+#auto-solve-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 40;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+#auto-solve-overlay.active { display: flex; }
+#auto-solve-overlay .auto-text {
+  font-size: 20px;
+  color: var(--blue);
+  letter-spacing: 2px;
+}
+
+/* 通关覆盖层 */
+#complete-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.78);
+  z-index: 60;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+#complete-overlay.active { display: flex; }
+#complete-overlay .complete-title {
+  font-size: 36px;
+  color: var(--gold);
+  letter-spacing: 3px;
+  text-shadow: 0 0 30px rgba(212,165,116,0.4);
+}
+#complete-overlay .complete-time { font-size: 16px; color: var(--text); }
+#complete-overlay .complete-best { font-size: 13px; color: var(--text-muted); }
+.complete-btn {
+  padding: 10px 28px;
+  border: 1px solid var(--gold);
+  background: transparent;
+  color: var(--gold);
+  font-size: 14px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  letter-spacing: 1px;
+}
+.complete-btn:hover { background: var(--gold); color: var(--color-bg-primary); }
+.complete-btn.secondary { border-color: var(--border); color: var(--text-muted); }
+.complete-btn.secondary:hover { border-color: var(--text-muted); color: var(--text); background: transparent; }
+
+/* 粒子 */
+.particle {
+  position: absolute;
+  pointer-events: none;
+  z-index: 70;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: particle-fly 0.7s ease-out forwards;
+}
+@keyframes particle-fly {
+  0% { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--px), var(--py)) scale(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.upload-toast {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  border-radius: 20px;
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 13px;
+  border: 1px solid var(--border);
+  z-index: 80;
+  animation: fadeInUp 0.3s ease-out;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<!-- 顶部 sticky header：返回 + 标题 + 主题切换 -->
+<header class="memory-header">
+  <div class="memory-header-left">
+    <a href="../games.html" class="memory-back-btn" aria-label="返回游戏小屋" title="返回游戏小屋">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+      游戏小屋
+    </a>
+  </div>
+  <div class="memory-title-area">
+    <span class="memory-eyebrow">— 04 —</span>
+    <h1>瞬逝记忆拼图</h1>
+  </div>
+  <button class="theme-toggle" id="themeToggle" aria-label="切换主题" title="切换深色/浅色模式">
+    <span id="themeIcon"></span>
+  </button>
+</header>
+
+<!-- 游戏根容器 -->
+<div id="game-root">
+  <div id="viewport-wrapper">
+  <div id="game-viewport">
+
+    <!-- 主菜单 -->
+    <div id="scene-menu" class="scene active">
+      <div class="title">瞬逝记忆拼图</div>
+      <div class="subtitle">F L E E T I N G &nbsp; M E M O R Y</div>
+      <button class="menu-btn primary" id="btn-start">开 始 游 戏</button>
+      <button class="menu-btn tutorial" id="btn-tutorial">教 程 关 卡</button>
+      <button class="menu-btn" id="btn-settings">游 戏 设 置</button>
+    </div>
+
+    <!-- 设置面板 -->
+    <div id="scene-settings" class="scene">
+      <h2>游戏设置</h2>
+      <div class="setting-row" id="mode-selector">
+        <button class="setting-option selected" data-mode="linear">线性挑战</button>
+        <button class="setting-option" data-mode="free">自由探索</button>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0;" id="mode-desc">通关后解锁下一关，不可跳关</p>
+      <button class="setting-back" id="btn-settings-back">返 回</button>
+    </div>
+
+    <!-- 选关界面 -->
+    <div id="scene-level-select" class="scene">
+      <h2>选择关卡</h2>
+      <div class="level-grid" id="level-grid"></div>
+      <input type="file" id="custom-file" accept="image/*" style="display:none;">
+      <button class="custom-upload-btn" id="btn-custom-upload">📷 上传本地图片挑战</button>
+      <button class="level-back" id="btn-level-back">返 回</button>
+    </div>
+
+    <!-- 游戏界面 -->
+    <div id="scene-playing" class="scene">
+      <div class="game-hud">
+        <div class="hud-left">
+          <span class="hud-level" id="hud-level">Level 0</span>
+          <span class="hud-timer" id="hud-timer">⏱ 00:00</span>
+          <span class="hud-progress" id="hud-progress">0/0</span>
+        </div>
+        <div class="hud-btns">
+          <button class="hud-btn auto-btn" id="btn-auto-solve">看答案</button>
+          <button class="hud-btn" id="btn-reset">重置</button>
+          <button class="hud-btn" id="btn-quit">退出</button>
+        </div>
+      </div>
+      <div class="game-main" id="game-main">
+        <div id="memory-overlay">
+          <img class="memory-img" id="memory-img" src="" alt="记忆图片预览" />
+          <div class="memory-countdown" id="memory-countdown">3</div>
+          <div class="memory-hint" id="memory-hint"></div>
+        </div>
+        <div id="puzzle-container">
+          <div id="slots-area">
+            <div id="slots-grid"></div>
+          </div>
+        </div>
+        <div id="auto-solve-overlay">
+          <span class="auto-text">🔍 演示模式 · 自动还原中...</span>
+        </div>
+        <div id="complete-overlay">
+          <div class="complete-title">✨ 通关成功</div>
+          <div class="complete-time" id="complete-time">用时 00:00</div>
+          <div class="complete-best" id="complete-best"></div>
+          <button class="complete-btn" id="btn-next-level">下一关</button>
+          <button class="complete-btn secondary" id="btn-back-menu">返回菜单</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ==================== 关卡配置 ====================
+  var LEVELS = [
+    { id: 0,  name: '新手教学',     cols: 2, rows: 2, picsumId: 10,  hint: '图形将展示3秒，随后打乱。请将右侧碎片拖回左侧正确格子', category: '风景' },
+    { id: 1,  name: '初窥门径',     cols: 2, rows: 2, picsumId: 20,  hint: '', category: '风景' },
+    { id: 2,  name: '略有小成',     cols: 3, rows: 3, picsumId: 30,  hint: '', category: '建筑' },
+    { id: 3,  name: '渐入佳境',     cols: 3, rows: 3, picsumId: 40,  hint: '', category: '动物' },
+    { id: 4,  name: '更上层楼',     cols: 3, rows: 3, picsumId: 50,  hint: '', category: '星空' },
+    { id: 5,  name: '心明眼亮',     cols: 4, rows: 4, picsumId: 60,  hint: '', category: '极简几何' },
+    { id: 6,  name: '耳聪目明',     cols: 4, rows: 4, picsumId: 70,  hint: '', category: '自然风景' },
+    { id: 7,  name: '脑力全开',     cols: 4, rows: 4, picsumId: 80,  hint: '', category: '城市夜景' },
+    { id: 8,  name: '过目不忘',     cols: 5, rows: 5, picsumId: 90,  hint: '', category: '艺术图案' },
+    { id: 9,  name: '超凡入圣',     cols: 5, rows: 5, picsumId: 100, hint: '', category: '抽象画' },
+    { id: 10, name: '记忆之神',     cols: 6, rows: 6, picsumId: 110, hint: '', category: '复杂纹理' }
+  ];
+
+  // ==================== DOM 引用 ====================
+  var gameViewport = document.getElementById('game-viewport');
+  var puzzleContainer = document.getElementById('puzzle-container');
+  var scenes = {
+    menu:        document.getElementById('scene-menu'),
+    settings:    document.getElementById('scene-settings'),
+    levelSelect: document.getElementById('scene-level-select'),
+    playing:     document.getElementById('scene-playing')
+  };
+  var memoryOverlay   = document.getElementById('memory-overlay');
+  var memoryImg       = document.getElementById('memory-img');
+  var memoryCountdown = document.getElementById('memory-countdown');
+  var memoryHint      = document.getElementById('memory-hint');
+  var slotsGrid       = document.getElementById('slots-grid');
+  var autoSolveOverlay = document.getElementById('auto-solve-overlay');
+  var completeOverlay = document.getElementById('complete-overlay');
+  var hudLevel    = document.getElementById('hud-level');
+  var hudTimer    = document.getElementById('hud-timer');
+  var hudProgress = document.getElementById('hud-progress');
+  var levelGrid   = document.getElementById('level-grid');
+  var modeSelector = document.getElementById('mode-selector');
+  var modeDesc     = document.getElementById('mode-desc');
+  var customFile   = document.getElementById('custom-file');
+
+  // ==================== 全局状态 ====================
+  var gameMode = 'linear';
+  var currentLevel = null;
+  var isCustomImage = false;
+  var customImageData = null;
+  var pieces = [];
+  var slots = [];
+  var cellSize = 0;
+  var totalGridSize = 0;
+  var cols = 0, rows = 0;
+  var totalPieces = 0;
+  var snappedCount = 0;
+  var gameStartTime = 0;
+  var timerInterval = null;
+  var memoryTimer = null;
+  var isPlaying = false;
+  var isAutoSolving = false;
+  var dragInfo = null;
+  var allTimers = [];
+  var allAnimFrames = [];
+  var cleanupFns = [];
+
+  // ==================== 持久化 ====================
+  function safeLSGet(key, fallback) {
+    try { var v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : fallback; }
+    catch(e) { return fallback; }
+  }
+  function safeLSSet(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+  }
+  function getLinearProgress() { return safeLSGet('mp_linearProgress', 1); }
+  function setLinearProgress(v) { safeLSSet('mp_linearProgress', v); }
+  function getBestScores() { return safeLSGet('mp_bestScores', {}); }
+  function setBestScore(levelId, time) {
+    var scores = getBestScores();
+    if (!scores[levelId] || time < scores[levelId]) {
+      scores[levelId] = time;
+      safeLSSet('mp_bestScores', scores);
+    }
+  }
+  function getBestScore(levelId) {
+    var scores = getBestScores();
+    return scores[levelId] || null;
+  }
+  function getSavedMode() { return safeLSGet('mp_mode', 'linear'); }
+
+  // ==================== 场景切换 ====================
+  function showScene(name) {
+    Object.values(scenes).forEach(function(s) { s.classList.remove('active'); });
+    if (scenes[name]) scenes[name].classList.add('active');
+  }
+
+  // ==================== 视口缩放 ====================
+  function updateViewportScale() {
+    var ww = window.innerWidth;
+    var wh = window.innerHeight - 70; // 减去 header 高度
+    var scale = Math.min(ww / 820, wh / 470, 1.5);
+    gameViewport.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+  }
+
+  // 获取当前视口缩放比例
+  function getCurrentScale() {
+    return gameViewport.getBoundingClientRect().width / 800;
+  }
+
+  // ==================== 清理函数 ====================
+  function registerTimer(id) { allTimers.push(id); return id; }
+  function registerAnimFrame(id) { allAnimFrames.push(id); return id; }
+  function registerCleanup(fn) { cleanupFns.push(fn); }
+
+  function _cleanup() {
+    // 清除所有定时器
+    allTimers.forEach(function(id) { clearTimeout(id); clearInterval(id); });
+    allTimers = [];
+    // 清除所有动画帧
+    allAnimFrames.forEach(function(id) { cancelAnimationFrame(id); });
+    allAnimFrames = [];
+    // 执行清理回调
+    cleanupFns.forEach(function(fn) { try { fn(); } catch(e) {} });
+    cleanupFns = [];
+    // 清除计时器
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    if (memoryTimer) { clearInterval(memoryTimer); memoryTimer = null; }
+    // 清除残留粒子 DOM
+    var allParticles = document.querySelectorAll('.particle');
+    for (var i = 0; i < allParticles.length; i++) { allParticles[i].remove(); }
+    // 清除碎片 DOM
+    var allPieces = puzzleContainer.querySelectorAll('.piece');
+    for (var j = 0; j < allPieces.length; j++) { allPieces[j].remove(); }
+    // 解绑 document 上的拖拽事件
+    document.removeEventListener('pointermove', onDocPointerMove);
+    document.removeEventListener('pointerup', onDocPointerUp);
+    document.removeEventListener('pointercancel', onDocPointerUp);
+    // 重置状态
+    dragInfo = null;
+    isPlaying = false;
+    isAutoSolving = false;
+    pieces = [];
+    slots = [];
+    snappedCount = 0;
+  }
+
+  // ==================== 粒子特效 ====================
+  function spawnParticles(x, y, count) {
+    for (var i = 0; i < count; i++) {
+      var p = document.createElement('div');
+      p.className = 'particle';
+      var angle = Math.random() * Math.PI * 2;
+      var dist = 20 + Math.random() * 40;
+      p.style.cssText =
+        'left:' + x + 'px;' +
+        'top:' + y + 'px;' +
+        '--px:' + (Math.cos(angle) * dist) + 'px;' +
+        '--py:' + (Math.sin(angle) * dist) + 'px;' +
+        'background:hsl(' + (38 + Math.random()*20) + ',' + (80 + Math.random()*20) + '%,' + (50 + Math.random()*20) + '%);' +
+        'width:' + (3 + Math.random()*5) + 'px;' +
+        'height:' + (3 + Math.random()*5) + 'px;';
+      puzzleContainer.appendChild(p);
+      var tid = setTimeout(function() { if (p.parentNode) p.parentNode.removeChild(p); }, 700);
+      registerTimer(tid);
+    }
+  }
+
+  // ==================== 计时器 ====================
+  function startTimer() {
+    gameStartTime = Date.now();
+    updateTimerDisplay();
+    timerInterval = setInterval(updateTimerDisplay, 200);
+    allTimers.push(timerInterval);
+  }
+  function updateTimerDisplay() {
+    if (!isPlaying && !isAutoSolving) return;
+    var elapsed = Math.floor((Date.now() - gameStartTime) / 1000);
+    var m = Math.floor(elapsed / 60);
+    var s = elapsed % 60;
+    hudTimer.textContent = '\u23F1 ' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  }
+  function stopTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  }
+  function getElapsed() {
+    return Math.floor((Date.now() - gameStartTime) / 1000);
+  }
+
+  // ==================== 图片 URL ====================
+  function getLevelImageUrl(level) {
+    return 'https://picsum.photos/id/' + level.picsumId + '/600/600';
+  }
+
+  // ==================== 自定义图片中心裁剪 ====================
+  function centerCropImage(dataUrl, callback) {
+    var img = new Image();
+    img.onload = function() {
+      var size = Math.min(img.width, img.height);
+      var ox = (img.width - size) / 2;
+      var oy = (img.height - size) / 2;
+      var canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, ox, oy, size, size, 0, 0, size, size);
+      callback(canvas.toDataURL('image/jpeg', 0.92));
+    };
+    img.src = dataUrl;
+  }
+
+  // ==================== 构建选关界面 ====================
+  function buildLevelGrid() {
+    levelGrid.innerHTML = '';
+    var progress = getLinearProgress();
+    LEVELS.forEach(function(lv) {
+      var cell = document.createElement('div');
+      cell.className = 'level-cell';
+      var unlocked = gameMode === 'free' || lv.id <= progress;
+      if (!unlocked) cell.classList.add('locked');
+      var best = getBestScore(lv.id);
+      if (best !== null) cell.classList.add('completed');
+
+      var iconHtml = unlocked ? '' : '<span class="lock-icon">\uD83D\uDD12</span>';
+      var numText = lv.id === 0 ? '\u6559' : String(lv.id);
+      cell.innerHTML = iconHtml + '<span class="level-num">' + numText + '</span><span class="level-name">' + lv.name + '</span>';
+
+      if (unlocked) {
+        cell.addEventListener('click', (function(lvId) {
+          return function() { startLevel(lvId, false); };
+        })(lv.id));
+      }
+      levelGrid.appendChild(cell);
+    });
+  }
+
+  // ==================== 开始关卡 ====================
+  function startLevel(levelId, isCustom) {
+    _cleanup();
+
+    if (!isCustom) {
+      for (var i = 0; i < LEVELS.length; i++) {
+        if (LEVELS[i].id === levelId) { currentLevel = LEVELS[i]; break; }
+      }
+      isCustomImage = false;
+      customImageData = null;
+    }
+
+    cols = currentLevel.cols;
+    rows = currentLevel.rows;
+    totalPieces = cols * rows;
+    cellSize = Math.floor(320 / Math.max(cols, rows));
+    totalGridSize = cellSize * Math.max(cols, rows);
+    snappedCount = 0;
+
+    showScene('playing');
+    hudLevel.textContent = 'Level ' + (currentLevel.id === 0 ? '\u6559\u7A0B' : currentLevel.id);
+    hudTimer.textContent = '\u23F1 00:00';
+    hudProgress.textContent = '0/' + totalPieces;
+    hudTimer.classList.remove('urgent');
+    autoSolveOverlay.classList.remove('active');
+    completeOverlay.classList.remove('active');
+    memoryOverlay.classList.remove('hidden');
+
+    // 构建 slots 网格
+    slotsGrid.innerHTML = '';
+    slotsGrid.style.gridTemplateColumns = 'repeat(' + cols + ', ' + cellSize + 'px)';
+    slotsGrid.style.gridTemplateRows = 'repeat(' + rows + ', ' + cellSize + 'px)';
+    slots = [];
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var cell = document.createElement('div');
+        cell.className = 'slot-cell';
+        cell.style.width = cellSize + 'px';
+        cell.style.height = cellSize + 'px';
+        slotsGrid.appendChild(cell);
+        slots.push({ el: cell, row: r, col: c });
+      }
+    }
+
+    // 加载图片
+    var imgUrl = isCustomImage ? customImageData : getLevelImageUrl(currentLevel);
+    memoryImg.src = imgUrl;
+
+    // 预览阶段：网格显示完整大图
+    showGridPreview(imgUrl);
+
+    // 记忆倒计时
+    var countdownSecs = currentLevel.id === 0 ? 5 : 3;
+    memoryHint.textContent = currentLevel.hint || '';
+    memoryCountdown.textContent = String(countdownSecs);
+    memoryCountdown.style.color = 'var(--gold)';
+
+    var countdown = countdownSecs;
+    memoryTimer = setInterval(function() {
+      countdown--;
+      memoryCountdown.textContent = String(countdown);
+      if (countdown <= 1) memoryCountdown.style.color = 'var(--red)';
+      if (countdown <= 0) {
+        clearInterval(memoryTimer);
+        memoryTimer = null;
+        memoryOverlay.classList.add('hidden');
+        clearGridPreview();
+        startPuzzlePhase(imgUrl);
+      }
+    }, 1000);
+    allTimers.push(memoryTimer);
+  }
+
+  function showGridPreview(imgUrl) {
+    slots.forEach(function(slot) {
+      slot.el.style.backgroundImage = 'url(' + imgUrl + ')';
+      slot.el.style.backgroundSize = totalGridSize + 'px ' + totalGridSize + 'px';
+      slot.el.style.backgroundPosition = '-' + (slot.col * cellSize) + 'px -' + (slot.row * cellSize) + 'px';
+    });
+  }
+
+  function clearGridPreview() {
+    slots.forEach(function(slot) {
+      slot.el.style.backgroundImage = '';
+      slot.el.style.backgroundSize = '';
+      slot.el.style.backgroundPosition = '';
+    });
+  }
+
+  // ==================== 拼图阶段 ====================
+  function startPuzzlePhase(imgUrl) {
+    isPlaying = true;
+    startTimer();
+    createPieces(imgUrl);
+  }
+
+  function createPieces(imgUrl) {
+    // 生成位置列表并打乱
+    var positions = [];
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        positions.push({ row: r, col: c });
+      }
+    }
+    for (var i = positions.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = positions[i]; positions[i] = positions[j]; positions[j] = tmp;
+    }
+
+    // 计算右侧放置区域
+    var containerW = puzzleContainer.clientWidth || 800;
+    var containerH = puzzleContainer.clientHeight || 406;
+    var rightX = 430;
+    var rightW = containerW - rightX - 8;
+    var rightH = containerH - 8;
+    var pieceW = cellSize;
+    var pieceH = cellSize;
+
+    var placeCols = Math.max(2, Math.floor(rightW / (pieceW + 14)));
+    var placeRows = Math.ceil(totalPieces / placeCols);
+    var placeCellW = rightW / placeCols;
+    var placeCellH = Math.min(rightH / placeRows, pieceH + 30);
+
+    var isSmall = cellSize < 70;
+
+    positions.forEach(function(pos, idx) {
+      var gCol = idx % placeCols;
+      var gRow = Math.floor(idx / placeCols);
+      var baseX = rightX + gCol * placeCellW + 4;
+      var baseY = gRow * placeCellH + 4;
+      var jitterX = (Math.random() - 0.5) * (placeCellW - pieceW - 6);
+      var jitterY = (Math.random() - 0.5) * (placeCellH - pieceH - 6);
+      var left = Math.max(rightX, baseX + jitterX);
+      var top = Math.max(0, Math.min(containerH - pieceH - 2, baseY + jitterY));
+
+      // 创建碎片 DOM
+      var el = document.createElement('div');
+      el.className = 'piece';
+      if (isSmall) el.classList.add('small-back');
+      el.style.width = pieceW + 'px';
+      el.style.height = pieceH + 'px';
+      el.style.left = left + 'px';
+      el.style.top = top + 'px';
+
+      // 内部 3D 结构
+      var inner = document.createElement('div');
+      inner.className = 'piece-inner';
+
+      var front = document.createElement('div');
+      front.className = 'piece-face piece-front';
+      front.style.backgroundImage = 'url(' + imgUrl + ')';
+      front.style.backgroundSize = totalGridSize + 'px ' + totalGridSize + 'px';
+      front.style.backgroundPosition = '-' + (pos.col * cellSize) + 'px -' + (pos.row * cellSize) + 'px';
+
+      var back = document.createElement('div');
+      back.className = 'piece-face piece-back';
+
+      inner.appendChild(front);
+      inner.appendChild(back);
+      el.appendChild(inner);
+
+      el.addEventListener('pointerdown', onPiecePointerDown);
+      puzzleContainer.appendChild(el);
+
+      pieces.push({
+        el: el,
+        inner: inner,
+        row: pos.row,
+        col: pos.col,
+        correctRow: pos.row,
+        correctCol: pos.col,
+        snapped: false
+      });
+    });
+
+    updateProgress();
+  }
+
+  // ==================== 坐标工具 ====================
+  function getPuzzleContainerRect() {
+    return puzzleContainer.getBoundingClientRect();
+  }
+
+  // 将 slot 中心转为 puzzle-container 内的虚拟坐标（已除以 currentScale）
+  function getSlotCenterInContainer(slot) {
+    var currentScale = getCurrentScale();
+    var slotRect = slot.el.getBoundingClientRect();
+    var containerRect = getPuzzleContainerRect();
+    return {
+      x: (slotRect.left + slotRect.width / 2 - containerRect.left) / currentScale,
+      y: (slotRect.top + slotRect.height / 2 - containerRect.top) / currentScale
+    };
+  }
+
+  // ==================== 拖拽逻辑（事件绑定到 document） ====================
+  function onPiecePointerDown(e) {
+    if (dragInfo) return;
+    if (!isPlaying || isAutoSolving) return;
+    e.preventDefault();
+
+    var el = e.currentTarget;
+    var pieceData = null;
+    for (var i = 0; i < pieces.length; i++) {
+      if (pieces[i].el === el) { pieceData = pieces[i]; break; }
+    }
+    if (!pieceData || pieceData.snapped) return;
+
+    try { el.setPointerCapture(e.pointerId); } catch(ex) {}
+
+    el.classList.add('dragging');
+
+    var currentScale = getCurrentScale();
+    var containerRect = getPuzzleContainerRect();
+    var pieceLeft = parseFloat(el.style.left);
+    var pieceTop = parseFloat(el.style.top);
+
+    // 物理坐标 → 虚拟坐标
+    var clientXInContainer = (e.clientX - containerRect.left) / currentScale;
+    var clientYInContainer = (e.clientY - containerRect.top) / currentScale;
+
+    dragInfo = {
+      el: el,
+      pieceData: pieceData,
+      pointerId: e.pointerId,
+      offsetX: clientXInContainer - pieceLeft,
+      offsetY: clientYInContainer - pieceTop,
+      startLeft: pieceLeft,
+      startTop: pieceTop
+    };
+
+    document.addEventListener('pointermove', onDocPointerMove);
+    document.addEventListener('pointerup', onDocPointerUp);
+    document.addEventListener('pointercancel', onDocPointerUp);
+  }
+
+  function onDocPointerMove(e) {
+    if (!dragInfo || dragInfo.pointerId !== e.pointerId) return;
+    e.preventDefault();
+
+    var currentScale = getCurrentScale();
+    var containerRect = getPuzzleContainerRect();
+    var clientXInContainer = (e.clientX - containerRect.left) / currentScale;
+    var clientYInContainer = (e.clientY - containerRect.top) / currentScale;
+
+    var newLeft = clientXInContainer - dragInfo.offsetX;
+    var newTop = clientYInContainer - dragInfo.offsetY;
+
+    // GPU 加速位移
+    var dx = newLeft - dragInfo.startLeft;
+    var dy = newTop - dragInfo.startTop;
+    dragInfo.el.style.transform = 'translate3d(' + dx + 'px, ' + dy + 'px, 0)';
+  }
+
+  function onDocPointerUp(e) {
+    if (!dragInfo || dragInfo.pointerId !== e.pointerId) return;
+    e.preventDefault();
+
+    var el = dragInfo.el;
+    var pieceData = dragInfo.pieceData;
+
+    document.removeEventListener('pointermove', onDocPointerMove);
+    document.removeEventListener('pointerup', onDocPointerUp);
+    document.removeEventListener('pointercancel', onDocPointerUp);
+
+    try { el.releasePointerCapture(dragInfo.pointerId); } catch(ex) {}
+
+    el.classList.remove('dragging');
+
+    var currentScale = getCurrentScale();
+    var containerRect = getPuzzleContainerRect();
+    var clientXInContainer = (e.clientX - containerRect.left) / currentScale;
+    var clientYInContainer = (e.clientY - containerRect.top) / currentScale;
+
+    var newLeft = clientXInContainer - dragInfo.offsetX;
+    var newTop = clientYInContainer - dragInfo.offsetY;
+
+    // 写回 left/top，清除 translate3d，立即提交位置
+    el.style.transition = 'none';
+    el.style.left = newLeft + 'px';
+    el.style.top = newTop + 'px';
+    el.style.transform = '';
+    void el.offsetWidth; // 强制重排，确保位置立即生效
+
+    // 吸附判定
+    checkSnap(pieceData, newLeft, newTop);
+
+    dragInfo = null;
+  }
+
+  // ==================== 吸附判定（已修复：扩大判定范围） ====================
+  function checkSnap(pieceData, pieceLeft, pieceTop) {
+    var pieceCenterX = pieceLeft + cellSize / 2;
+    var pieceCenterY = pieceTop + cellSize / 2;
+
+    var targetSlot = null;
+    for (var i = 0; i < slots.length; i++) {
+      if (slots[i].row === pieceData.correctRow && slots[i].col === pieceData.correctCol) {
+        targetSlot = slots[i];
+        break;
+      }
+    }
+    if (!targetSlot) return;
+
+    var slotCenter = getSlotCenterInContainer(targetSlot);
+    var slotLeft = slotCenter.x - cellSize / 2;
+    var slotTop = slotCenter.y - cellSize / 2;
+
+    // 中心距离
+    var dx = pieceCenterX - slotCenter.x;
+    var dy = pieceCenterY - slotCenter.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+
+    // 条件 1：边界框相交（视觉重叠即判定成功）
+    var overlapX = Math.min(pieceLeft + cellSize, slotLeft + cellSize) - Math.max(pieceLeft, slotLeft);
+    var overlapY = Math.min(pieceTop + cellSize, slotTop + cellSize) - Math.max(pieceTop, slotTop);
+    var intersect = overlapX > 0 && overlapY > 0;
+
+    // 条件 2：中心距离 ≤ 邻近阈值（随碎片尺寸放大，最小 55px）
+    //   2x2 碎片 160px → 阈值 96px；6x6 碎片 53px → 阈值 55px
+    var proximityThreshold = Math.max(cellSize * 0.6, 55);
+
+    if (intersect || dist <= proximityThreshold) {
+      snapPiece(pieceData, slotLeft, slotTop);
+    }
+  }
+
+  // ==================== 吸附执行 ====================
+  function snapPiece(pieceData, targetLeft, targetTop) {
+    if (pieceData.snapped) return;
+    pieceData.snapped = true;
+
+    var el = pieceData.el;
+
+    el.style.left = targetLeft + 'px';
+    el.style.top = targetTop + 'px';
+    el.style.transform = '';
+
+    // 标记 slot
+    var slot = null;
+    for (var i = 0; i < slots.length; i++) {
+      if (slots[i].row === pieceData.correctRow && slots[i].col === pieceData.correctCol) {
+        slot = slots[i];
+        break;
+      }
+    }
+    if (slot) slot.el.classList.add('filled');
+
+    // 通过 CSS 类触发 3D 翻面
+    el.classList.add('snapped');
+    var rafId = requestAnimationFrame(function() {
+      el.classList.add('flipped');
+    });
+    registerAnimFrame(rafId);
+
+    snappedCount++;
+    updateProgress();
+
+    spawnParticles(targetLeft + cellSize / 2, targetTop + cellSize / 2, 12);
+
+    if (snappedCount >= totalPieces) {
+      var tid = setTimeout(function() { onLevelComplete(); }, 600);
+      registerTimer(tid);
+    }
+  }
+
+  function updateProgress() {
+    hudProgress.textContent = snappedCount + '/' + totalPieces;
+  }
+
+  // ==================== 通关 ====================
+  function onLevelComplete() {
+    isPlaying = false;
+    stopTimer();
+    var elapsed = getElapsed();
+    hudTimer.textContent = '\u23F1 ' + String(Math.floor(elapsed/60)).padStart(2,'0') + ':' + String(elapsed%60).padStart(2,'0');
+
+    if (!isCustomImage && currentLevel) {
+      setBestScore(currentLevel.id, elapsed);
+      if (gameMode === 'linear') {
+        var progress = getLinearProgress();
+        if (currentLevel.id >= progress) {
+          setLinearProgress(currentLevel.id + 1);
+        }
+      }
+    }
+
+    completeOverlay.classList.add('active');
+    document.getElementById('complete-time').textContent =
+      '\u7528\u65F6 ' + String(Math.floor(elapsed/60)).padStart(2,'0') + ':' + String(elapsed%60).padStart(2,'0');
+
+    var best = isCustomImage ? null : getBestScore(currentLevel.id);
+    var bestEl = document.getElementById('complete-best');
+    if (best !== null && best === elapsed) {
+      bestEl.textContent = '\uD83C\uDFC6 \u65B0\u7EAA\u5F55\uFF01';
+      bestEl.style.color = 'var(--gold)';
+    } else if (best !== null) {
+      bestEl.textContent = '\u6700\u4F73\u6210\u7EE9 ' + String(Math.floor(best/60)).padStart(2,'0') + ':' + String(best%60).padStart(2,'0');
+      bestEl.style.color = 'var(--text-muted)';
+    } else {
+      bestEl.textContent = '';
+    }
+
+    var nextBtn = document.getElementById('btn-next-level');
+    if (isCustomImage || !currentLevel || currentLevel.id >= 10) {
+      nextBtn.style.display = 'none';
+    } else {
+      nextBtn.style.display = '';
+    }
+  }
+
+  // ==================== 自动通关 ====================
+  function autoSolve() {
+    if (!isPlaying || isAutoSolving) return;
+    isAutoSolving = true;
+    isPlaying = false;
+    autoSolveOverlay.classList.add('active');
+
+    var unsnapped = pieces.filter(function(p) { return !p.snapped; });
+    if (unsnapped.length === 0) {
+      finishAutoSolve();
+      return;
+    }
+
+    var idx = 0;
+    function flyNext() {
+      if (idx >= unsnapped.length) {
+        finishAutoSolve();
+        return;
+      }
+
+      var pieceData = unsnapped[idx];
+      var targetSlot = null;
+      for (var i = 0; i < slots.length; i++) {
+        if (slots[i].row === pieceData.correctRow && slots[i].col === pieceData.correctCol) {
+          targetSlot = slots[i];
+          break;
+        }
+      }
+      if (!targetSlot) { idx++; flyNext(); return; }
+
+      var slotCenter = getSlotCenterInContainer(targetSlot);
+      var targetLeft = slotCenter.x - cellSize / 2;
+      var targetTop = slotCenter.y - cellSize / 2;
+
+      var el = pieceData.el;
+      el.classList.add('flying');
+      el.style.left = targetLeft + 'px';
+      el.style.top = targetTop + 'px';
+      el.style.transform = '';
+
+      var tid = setTimeout(function() {
+        el.classList.remove('flying');
+        snapPieceSilent(pieceData, targetLeft, targetTop);
+        idx++;
+        flyNext();
+      }, 520);
+      registerTimer(tid);
+    }
+
+    flyNext();
+  }
+
+  function finishAutoSolve() {
+    isAutoSolving = false;
+    autoSolveOverlay.classList.remove('active');
+    if (snappedCount >= totalPieces) {
+      onLevelComplete();
+    } else {
+      isPlaying = true;
+    }
+  }
+
+  function snapPieceSilent(pieceData, targetLeft, targetTop) {
+    if (pieceData.snapped) return;
+    pieceData.snapped = true;
+
+    var el = pieceData.el;
+    el.style.left = targetLeft + 'px';
+    el.style.top = targetTop + 'px';
+    el.style.transform = '';
+
+    var slot = null;
+    for (var i = 0; i < slots.length; i++) {
+      if (slots[i].row === pieceData.correctRow && slots[i].col === pieceData.correctCol) {
+        slot = slots[i];
+        break;
+      }
+    }
+    if (slot) slot.el.classList.add('filled');
+
+    el.classList.add('snapped');
+    var rafId = requestAnimationFrame(function() {
+      el.classList.add('flipped');
+    });
+    registerAnimFrame(rafId);
+
+    snappedCount++;
+    updateProgress();
+    spawnParticles(targetLeft + cellSize / 2, targetTop + cellSize / 2, 8);
+  }
+
+  // ==================== 重置关卡 ====================
+  function resetLevel() {
+    if (isAutoSolving) return;
+    _cleanup();
+    if (currentLevel) {
+      startLevel(currentLevel.id, isCustomImage);
+    }
+  }
+
+  // ==================== 自定义图片 ====================
+  function handleCustomUpload(file) {
+    if (!file || !file.type.match(/^image\//)) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var rawData = e.target.result;
+      centerCropImage(rawData, function(croppedData) {
+        customImageData = croppedData;
+        isCustomImage = true;
+        currentLevel = { id: -1, name: '\u81EA\u5B9A\u4E49\u6311\u6218', cols: 3, rows: 3, picsumId: 0, hint: '', category: '\u81EA\u5B9A\u4E49' };
+        startLevel(-1, true);
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ==================== 事件绑定 ====================
+  document.getElementById('btn-start').addEventListener('click', function() {
+    showScene('levelSelect');
+    buildLevelGrid();
+  });
+
+  document.getElementById('btn-tutorial').addEventListener('click', function() {
+    currentLevel = LEVELS[0];
+    isCustomImage = false;
+    customImageData = null;
+    startLevel(0, false);
+  });
+
+  document.getElementById('btn-settings').addEventListener('click', function() {
+    showScene('settings');
+    gameMode = getSavedMode();
+    updateModeUI();
+  });
+
+  document.getElementById('btn-settings-back').addEventListener('click', function() {
+    safeLSSet('mp_mode', gameMode);
+    showScene('menu');
+  });
+
+  modeSelector.addEventListener('click', function(e) {
+    var btn = e.target.closest('.setting-option');
+    if (!btn) return;
+    gameMode = btn.dataset.mode;
+    updateModeUI();
+  });
+
+  function updateModeUI() {
+    var opts = modeSelector.querySelectorAll('.setting-option');
+    for (var i = 0; i < opts.length; i++) {
+      opts[i].classList.toggle('selected', opts[i].dataset.mode === gameMode);
+    }
+    modeDesc.textContent = gameMode === 'linear'
+      ? '\u901A\u5173\u540E\u89E3\u9501\u4E0B\u4E00\u5173\uFF0C\u4E0D\u53EF\u8DF3\u5173'
+      : '\u53EF\u81EA\u7531\u9009\u62E9\u4EFB\u610F\u5173\u5361\u6311\u6218';
+  }
+
+  document.getElementById('btn-level-back').addEventListener('click', function() {
+    showScene('menu');
+  });
+
+  document.getElementById('btn-custom-upload').addEventListener('click', function() {
+    customFile.click();
+  });
+
+  customFile.addEventListener('change', function(e) {
+    if (e.target.files && e.target.files[0]) {
+      handleCustomUpload(e.target.files[0]);
+    }
+    customFile.value = '';
+  });
+
+  document.getElementById('btn-auto-solve').addEventListener('click', autoSolve);
+  document.getElementById('btn-reset').addEventListener('click', resetLevel);
+  document.getElementById('btn-quit').addEventListener('click', function() {
+    _cleanup();
+    showScene('menu');
+  });
+
+  document.getElementById('btn-next-level').addEventListener('click', function() {
+    if (currentLevel && currentLevel.id < 10) {
+      var nextId = currentLevel.id + 1;
+      currentLevel = LEVELS[nextId];
+      isCustomImage = false;
+      customImageData = null;
+      startLevel(nextId, false);
+    }
+  });
+
+  document.getElementById('btn-back-menu').addEventListener('click', function() {
+    _cleanup();
+    showScene('menu');
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && scenes.playing.classList.contains('active')) {
+      _cleanup();
+      showScene('menu');
+    }
+  });
+
+  window.addEventListener('resize', updateViewportScale);
+  registerCleanup(function() { window.removeEventListener('resize', updateViewportScale); });
+
+  // ==================== 主题切换 ====================
+  function initThemeToggle() {
+    var toggle = document.getElementById('themeToggle');
+    var iconSpan = document.getElementById('themeIcon');
+    var SUN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>';
+    var MOON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>';
+
+    function applyIcon() {
+      var theme = document.documentElement.getAttribute('data-theme') || 'dark';
+      iconSpan.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
+    }
+    applyIcon();
+
+    toggle.addEventListener('click', function() {
+      var current = document.documentElement.getAttribute('data-theme') || 'dark';
+      var next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      applyIcon();
+    });
+  }
+
+  // ==================== 初始化 ====================
+  function init() {
+    gameMode = getSavedMode();
+    updateViewportScale();
+    initThemeToggle();
+    showScene('menu');
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

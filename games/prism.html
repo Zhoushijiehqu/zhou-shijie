@@ -485,7 +485,7 @@ body { overflow-wrap: break-word; }
   const MAX_RAY_DEPTH = 20;
   const TARGET_RADIUS = 14;
   const EPSILON = 0.001;
-  const DEFAULT_MIRROR_WIDTH = 95;
+  const DEFAULT_MIRROR_WIDTH = 160;
   const AUTO_SOLVE_DURATION = 1500;
 
   // ============ Settings ============
@@ -756,10 +756,10 @@ body { overflow-wrap: break-word; }
     {
       emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
       components: [
-        { id: 'm0', type: 'MIRROR', x: 220, y: 225, angle: 0, targetAngle: 0.65, width: 160 },
-        { id: 'm1', type: 'MIRROR', x: 420, y: 150, angle: 0, targetAngle: 0.9, width: 35 },
-        { id: 'm2', type: 'MIRROR', x: 420, y: 300, angle: 0, targetAngle: 1.1, width: 35 },
-        { id: 'm3', type: 'MIRROR', x: 600, y: 225, angle: 0, targetAngle: 1.25, width: 160 }
+        { id: 'm0', type: 'MIRROR', x: 220, y: 225, angle: 0, targetAngle: 0.65, width: 180 },
+        { id: 'm1', type: 'MIRROR', x: 420, y: 150, angle: 0, targetAngle: 0.9, width: 90 },
+        { id: 'm2', type: 'MIRROR', x: 420, y: 300, angle: 0, targetAngle: 1.1, width: 90 },
+        { id: 'm3', type: 'MIRROR', x: 600, y: 225, angle: 0, targetAngle: 1.25, width: 180 }
       ],
       targets: [
         { x: 720, y: 100, color: '#ffffff' },
@@ -1433,7 +1433,7 @@ body { overflow-wrap: break-word; }
       const dx = pos.x - comp.x;
       const dy = pos.y - comp.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const hitRadius = comp.type === 'PRISM' ? 30 : 24;
+      const hitRadius = comp.type === 'PRISM' ? 34 : 34;
       if (dist < hitRadius) return comp;
     }
     return null;
@@ -1443,7 +1443,10 @@ body { overflow-wrap: break-word; }
     if (!dragging || gameState !== 'playing') return;
     const pos = getCanvasPos(e);
     const currentAngle = Math.atan2(pos.y - dragging.y, pos.x - dragging.x);
-    const delta = currentAngle - dragStartAngle;
+    let delta = currentAngle - dragStartAngle;
+    // 角度量化阈值：小于 0.5 度的微小变化忽略，避免手抖导致镜子乱转
+    const ANGLE_THRESHOLD = 0.0087; // ≈0.5°
+    if (Math.abs(delta) < ANGLE_THRESHOLD) return;
     dragging.angle = normalizeAngle(dragCompStartAngle + delta);
     e.preventDefault();
   }

@@ -265,6 +265,16 @@ window.ProfileData = {
       file: 'games/memory.html',
       accent: 'accent',
       available: true
+    },
+    {
+      name: '光影棱镜',
+      slug: 'prism',
+      desc: '30 关光学解谜，拖动反射镜、分光器、棱镜将光束导向彩色靶点。含色散与折射。',
+      tags: ['光学', '解谜', '物理'],
+      techStack: ['HTML', 'Canvas', 'JS'],
+      file: 'games/prism.html',
+      accent: 'primary',
+      available: true
     }
   ],
 

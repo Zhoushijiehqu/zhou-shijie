@@ -995,6 +995,33 @@
         updateHUD();
       }
 
+      // ----- 和弦展开（chord）：已揭开的数字格上同时按左右键 -----
+      // 若周围 8 格旗子数 == 该数字，则揭开周围所有未旗未揭的格子
+      // 旗子插错但数量相同也会揭开，此时踩雷则游戏结束
+      function chordReveal(x, y) {
+        if (state === 'won' || state === 'lost') return;
+        var c = cells[x][y];
+        // 仅已揭开的数字格可触发和弦
+        if (!c.revealed || c.adjacent <= 0) return;
+
+        // 统计周围旗子数
+        var flagCount = 0;
+        forEachNeighbor(x, y, function (nx, ny) {
+          if (cells[nx][ny].flagged) flagCount++;
+        });
+
+        // 旗子数不等于数字则失效
+        if (flagCount !== c.adjacent) return;
+
+        // 揭开周围所有未旗未揭的格子（踩雷则 gameOver 会被 reveal 内部触发）
+        forEachNeighbor(x, y, function (nx, ny) {
+          var nc = cells[nx][ny];
+          if (!nc.flagged && !nc.revealed) {
+            reveal(nx, ny);
+          }
+        });
+      }
+
       // ----- 胜利判定：所有非雷格已挖开 -----
       function checkWin() {
         if (revealedCount === rows * cols - totalMines) {
@@ -1126,6 +1153,7 @@
 
       boardEl.addEventListener('click', function (e) {
         if (longPressFired) { longPressFired = false; return; }
+        if (chordFired) { chordFired = false; return; }
         var el = e.target.closest('.mine-cell');
         if (!el) return;
         var x = parseInt(el.dataset.x, 10);
@@ -1137,12 +1165,47 @@
       // 右键标记
       boardEl.addEventListener('contextmenu', function (e) {
         e.preventDefault();
+        if (chordFired) { chordFired = false; return; }
         var el = e.target.closest('.mine-cell');
         if (!el) return;
         var x = parseInt(el.dataset.x, 10);
         var y = parseInt(el.dataset.y, 10);
         if (isNaN(x) || isNaN(y)) return;
         toggleFlag(x, y);
+      });
+
+      // ----- 和弦（chord）：同时按左右键一键展开 -----
+      // 当鼠标悬停在已揭开的数字格上，同时按下左键和右键时触发
+      var chordFired = false;
+      var leftDown = false;
+      var rightDown = false;
+
+      boardEl.addEventListener('mousedown', function (e) {
+        if (e.button === 0) leftDown = true;
+        if (e.button === 2) rightDown = true;
+
+        // 左右键同时按下 → 和弦展开
+        if (leftDown && rightDown) {
+          e.preventDefault();
+          chordFired = true;
+          var el = e.target.closest('.mine-cell');
+          if (!el) return;
+          var x = parseInt(el.dataset.x, 10);
+          var y = parseInt(el.dataset.y, 10);
+          if (isNaN(x) || isNaN(y)) return;
+          chordReveal(x, y);
+        }
+      });
+
+      boardEl.addEventListener('mouseup', function (e) {
+        if (e.button === 0) leftDown = false;
+        if (e.button === 2) rightDown = false;
+      });
+
+      // 鼠标离开棋盘时重置状态，避免跨格误判
+      boardEl.addEventListener('mouseleave', function () {
+        leftDown = false;
+        rightDown = false;
       });
 
       // 移动端长按 = 标记（约 450ms）；松开若未到时长则由合成的 click 揭开

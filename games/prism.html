@@ -1,0 +1,1689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>光影棱镜 · 周世杰</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,400..700&family=Manrope:wght@300..800&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/base.css">
+<link rel="stylesheet" href="../assets/css/layout.css">
+<link rel="stylesheet" href="../assets/css/components.css">
+<link rel="stylesheet" href="../assets/css/animations.css">
+<script>
+  // 主题预载（防闪烁，与 memory.html 一致）
+  (function() {
+    var t = localStorage.getItem('theme');
+    if (!t) t = 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<style>
+/* ===== 光影棱镜页面特有样式 =====
+   颜色走主页面 CSS 变量（由 base.css 定义），
+   字体用 Fraunces（标题）+ Manrope（正文）+ Noto Serif SC（游戏内汉字）
+   --accent 保留 #00e5ff 青色（光学游戏特色）
+*/
+
+/* 顶部 sticky header */
+.prism-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 28px;
+  background: rgba(var(--color-bg-primary-rgb, 26,21,16), 0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--color-border-light);
+}
+.prism-header-left { display: flex; align-items: center; gap: 16px; }
+.prism-back-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+  font-family: var(--font-family-base);
+  font-size: 13px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-card);
+  transition: all 0.25s;
+}
+.prism-back-btn:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent-light);
+  background: var(--color-accent-lighter);
+}
+.prism-title-area { text-align: center; flex: 1; }
+.prism-eyebrow {
+  display: block;
+  font-family: var(--font-family-base);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.34em; text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: 2px;
+}
+.prism-title-area h1 {
+  font-family: var(--font-family-display);
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 400;
+  font-variation-settings: 'opsz' 60, 'SOFT' 50;
+  color: var(--color-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+/* 主题切换按钮 */
+.prism-header .theme-toggle { flex-shrink: 0; }
+
+/* 游戏容器：居中 */
+#game-root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 70px);
+  padding: 32px 20px;
+}
+
+/* ===== 游戏内 :root 变量映射 =====
+   --accent 保留 #00e5ff（光学游戏特色，光线/分光器配色）
+*/
+:root {
+  --bg: var(--color-bg-primary);
+  --surface: var(--color-bg-card);
+  --surface2: var(--color-bg-tertiary);
+  --text: var(--color-text-primary);
+  --text-muted: var(--color-text-secondary);
+  --accent: #00e5ff;
+  --accent2: #ff4081;
+  --gold: var(--color-accent);
+  --red: #ff4444;
+  --green: #44ff44;
+  --blue: #4488ff;
+  --border: var(--color-border-medium);
+}
+
+/* body 用主页面字体 */
+body {
+  margin: 0; padding: 0;
+  background: var(--color-bg-primary);
+  font-family: 'Manrope', 'Noto Serif SC', 'STSong', serif, sans-serif;
+  color: var(--color-text-primary);
+  min-height: 100vh;
+  overflow-x: hidden; overflow-y: auto;
+  user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 游戏内汉字用 Noto Serif SC */
+#menu-screen .title, #settings-screen h2, #level-select-screen h2,
+.hud-level, .hud-hint, #win-modal h2, #auto-solve-indicator {
+  font-family: 'Noto Serif SC', 'Fraunces', serif;
+}
+
+/* 菜单标题渐变文字（var(--color-primary) 到 var(--color-accent)） */
+#menu-screen .title {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+/* 按钮统一 border-radius: var(--radius-full) */
+.menu-btn, .hud-btn, .win-btn, .settings-back, .level-select-back {
+  font-family: 'Manrope', sans-serif;
+  border-radius: var(--radius-full);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.menu-btn:hover, .hud-btn:hover, .win-btn:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+/* 关卡卡片 border-radius: var(--radius-md) */
+.level-cell {
+  border-radius: var(--radius-md) !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.level-cell:hover:not(.locked) {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* 视口 border-radius: var(--radius-lg) */
+#game-viewport {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg), 0 0 60px rgba(0,229,255,0.08), inset 0 0 60px rgba(0,0,0,0.2) !important;
+}
+
+/* win-modal 编辑体化 */
+#win-modal {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg), 0 0 60px rgba(0,229,255,0.2);
+}
+#win-modal h2 {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 响应式 */
+@media (max-width: 840px) {
+  .prism-header { padding: 10px 16px; }
+  #game-root { padding: 16px 12px; }
+}
+
+/* ===== 以下为原游戏样式（保留功能，变量已上方映射） ===== */
+*, *::before, *::after { box-sizing: border-box; }
+img, video { max-width: 100%; height: auto; display: block; }
+body { overflow-wrap: break-word; }
+
+#viewport-wrapper {
+  position: relative;
+  width: 800px;
+  height: 450px;
+  flex-shrink: 0;
+}
+
+#game-viewport {
+  width: 800px;
+  height: 450px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+#game-viewport canvas {
+  display: block; position: absolute; top: 0; left: 0;
+  width: 800px; height: 450px;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  z-index: 10; pointer-events: none; opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.overlay.active { opacity: 1; pointer-events: auto; }
+
+#menu-screen {
+  background: radial-gradient(ellipse at center, var(--color-bg-tertiary) 0%, var(--color-bg-primary) 100%);
+}
+#menu-screen .title {
+  font-size: 42px; font-weight: 700; letter-spacing: 4px;
+  margin-bottom: 6px;
+}
+#menu-screen .subtitle {
+  font-size: 13px; color: var(--text-muted); letter-spacing: 6px; margin-bottom: 40px;
+}
+.menu-btn {
+  width: 220px; padding: 13px 0; margin: 6px 0;
+  border: 1px solid var(--border);
+  background: var(--surface); color: var(--text);
+  font-size: 15px; letter-spacing: 2px; cursor: pointer;
+  transition: all 0.25s ease; font-family: inherit;
+}
+.menu-btn:hover {
+  border-color: var(--accent); background: var(--surface2);
+  box-shadow: 0 0 20px rgba(0,229,255,0.15); transform: translateY(-1px);
+}
+.menu-btn.tutorial {
+  border-color: rgba(255,215,64,0.3); color: var(--gold);
+}
+.menu-btn.tutorial:hover {
+  border-color: var(--gold); box-shadow: 0 0 20px rgba(255,215,64,0.2);
+}
+
+#settings-screen {
+  background: radial-gradient(ellipse at center, var(--color-bg-tertiary) 0%, var(--color-bg-primary) 100%);
+}
+#settings-screen h2 { font-size: 24px; color: var(--text); letter-spacing: 3px; margin-bottom: 30px; }
+.setting-row {
+  display: flex; align-items: center; gap: 16px; margin: 10px 0;
+  color: var(--text); font-size: 14px;
+}
+.setting-row label { min-width: 100px; text-align: right; color: var(--text-muted); }
+.setting-row select {
+  padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--radius-full);
+  background: var(--surface); color: var(--text); font-size: 14px;
+  cursor: pointer; font-family: inherit;
+}
+.setting-row select:focus { outline: none; border-color: var(--accent); }
+.settings-back { margin-top: 30px; }
+
+#level-select-screen {
+  background: radial-gradient(ellipse at center, var(--color-bg-tertiary) 0%, var(--color-bg-primary) 100%);
+  padding: 15px 20px; overflow-y: auto;
+}
+#level-select-screen h2 {
+  font-size: 20px; color: var(--text); letter-spacing: 3px; margin-bottom: 2px;
+}
+#level-select-screen .level-subtitle {
+  font-size: 11px; color: var(--text-muted); margin-bottom: 12px;
+}
+.level-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 8px; max-width: 620px; max-height: 280px; overflow-y: auto;
+  padding-right: 4px;
+}
+.level-grid::-webkit-scrollbar { width: 4px; }
+.level-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.level-cell {
+  width: 100%; aspect-ratio: 1;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  cursor: pointer; transition: all 0.25s ease;
+  color: var(--text); font-size: 16px; font-weight: 600; position: relative;
+}
+.level-cell:hover:not(.locked) {
+  border-color: var(--accent); box-shadow: 0 0 14px rgba(0,229,255,0.12);
+  transform: translateY(-2px);
+}
+.level-cell.locked { opacity: 0.35; cursor: not-allowed; filter: grayscale(0.6); }
+.level-cell.locked .lock-icon { font-size: 18px; }
+.level-cell .level-num { font-size: 18px; font-weight: 700; }
+.level-cell .level-name { font-size: 9px; color: var(--text-muted); margin-top: 1px; text-align: center; line-height: 1.2; }
+.level-cell.cleared { border-color: rgba(255,215,64,0.4); }
+.level-cell.cleared::after {
+  content: '✓'; position: absolute; top: 3px; right: 5px;
+  font-size: 10px; color: var(--gold);
+}
+.level-select-back { margin-top: 12px; }
+
+#game-hud {
+  position: absolute; top: 0; left: 0; width: 100%;
+  pointer-events: none; z-index: 5; padding: 10px 16px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+#game-hud > * { pointer-events: auto; }
+.hud-left, .hud-right { display: flex; align-items: center; gap: 10px; }
+.hud-btn {
+  padding: 6px 14px; border: 1px solid var(--border);
+  background: rgba(var(--color-bg-primary-rgb, 26,26,46), 0.85); color: var(--text);
+  font-size: 12px; letter-spacing: 1px; cursor: pointer;
+  transition: all 0.2s ease; font-family: inherit; backdrop-filter: blur(8px);
+}
+.hud-btn:hover { border-color: var(--accent); background: rgba(var(--color-bg-primary-rgb, 34,34,64), 0.9); }
+.hud-level {
+  font-size: 13px; color: var(--text); letter-spacing: 2px;
+  padding: 6px 12px; background: rgba(var(--color-bg-primary-rgb, 26,26,46), 0.85);
+  border: 1px solid var(--border); border-radius: var(--radius-full); backdrop-filter: blur(8px);
+}
+.hud-hint {
+  position: absolute; top: 50px; left: 50%; transform: translateX(-50%);
+  padding: 8px 18px; background: rgba(0,229,255,0.1);
+  border: 1px solid rgba(0,229,255,0.25); border-radius: var(--radius-full);
+  color: var(--accent); font-size: 12px; letter-spacing: 1px;
+  pointer-events: none; transition: opacity 0.3s ease; white-space: nowrap;
+  z-index: 6;
+}
+
+#win-modal {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  z-index: 20; background: var(--surface);
+  border: 1px solid var(--accent); 
+  padding: 30px 40px; text-align: center;
+  opacity: 0; pointer-events: none;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+#win-modal.active {
+  opacity: 1; pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+#win-modal h2 {
+  font-size: 28px; margin: 0 0 8px;
+}
+#win-modal p { color: var(--text-muted); font-size: 13px; margin: 0 0 20px; }
+.win-btns { display: flex; gap: 10px; justify-content: center; }
+.win-btn {
+  padding: 10px 22px; border: 1px solid var(--border);
+  background: var(--surface2); color: var(--text);
+  font-size: 13px; letter-spacing: 1px; cursor: pointer;
+  transition: all 0.2s ease; font-family: inherit;
+}
+.win-btn:hover { border-color: var(--accent); box-shadow: 0 0 16px rgba(0,229,255,0.15); }
+.win-btn.next { border-color: var(--accent); background: rgba(0,229,255,0.1); }
+
+#auto-solve-indicator {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  padding: 6px 16px; background: rgba(255,64,129,0.15);
+  border: 1px solid rgba(255,64,129,0.3); border-radius: var(--radius-full);
+  color: var(--accent2); font-size: 11px; letter-spacing: 2px;
+  z-index: 6; pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
+}
+#auto-solve-indicator.active { opacity: 1; }
+
+@media (max-width: 850px) {
+  #game-viewport { border-radius: var(--radius-md) !important; }
+  .menu-btn { width: 180px; padding: 11px 0; font-size: 13px; }
+  #menu-screen .title { font-size: 30px; }
+  .level-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; max-width: 500px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 顶部 sticky header：返回 + 标题 + 主题切换 -->
+<header class="prism-header">
+  <div class="prism-header-left">
+    <a href="../games.html" class="prism-back-btn" aria-label="返回游戏小屋" title="返回游戏小屋">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+      游戏小屋
+    </a>
+  </div>
+  <div class="prism-title-area">
+    <span class="prism-eyebrow">— 05 —</span>
+    <h1>光影棱镜</h1>
+  </div>
+  <button class="theme-toggle" id="themeToggle" aria-label="切换主题" title="切换深色/浅色模式">
+    <span id="themeIcon"></span>
+  </button>
+</header>
+
+<!-- 游戏根容器 -->
+<div id="game-root">
+  <div id="viewport-wrapper">
+  <div id="game-viewport">
+    <canvas id="game-canvas" width="800" height="450"></canvas>
+
+    <div id="game-hud" style="display:none;">
+      <div class="hud-left">
+        <button class="hud-btn" id="btn-back-menu">← 菜单</button>
+        <span class="hud-level" id="hud-level-text">第 1 关</span>
+      </div>
+      <div class="hud-right">
+        <button class="hud-btn" id="btn-auto-solve">💡 看答案</button>
+        <button class="hud-btn" id="btn-reset">↺ 重置</button>
+      </div>
+    </div>
+    <div class="hud-hint" id="hud-hint" style="display:none;"></div>
+    <div id="auto-solve-indicator">演示模式 · 请勿操作</div>
+
+    <div id="win-modal">
+      <h2>✨ 通关成功</h2>
+      <p id="win-msg"></p>
+      <div class="win-btns">
+        <button class="win-btn" id="btn-win-retry">再来一次</button>
+        <button class="win-btn next" id="btn-win-next">下一关 →</button>
+      </div>
+    </div>
+
+    <div class="overlay active" id="menu-screen">
+      <div class="title">光影棱镜</div>
+      <div class="subtitle">LIGHT &amp; PRISM</div>
+      <button class="menu-btn" id="btn-start">开始游戏</button>
+      <button class="menu-btn tutorial" id="btn-tutorial">📖 教程关卡</button>
+      <button class="menu-btn" id="btn-settings">⚙ 游戏设置</button>
+    </div>
+
+    <div class="overlay" id="settings-screen">
+      <h2>游戏设置</h2>
+      <div class="setting-row">
+        <label>关卡模式</label>
+        <select id="setting-mode">
+          <option value="linear">线性挑战（不可跳关）</option>
+          <option value="free">自由探索（可跳关）</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <label>通关进度</label>
+        <button class="menu-btn" id="btn-reset-progress" style="width:auto;padding:8px 18px;font-size:13px;">重置进度</button>
+      </div>
+      <button class="menu-btn settings-back" id="btn-settings-back">← 返回主菜单</button>
+    </div>
+
+    <div class="overlay" id="level-select-screen">
+      <h2>选择关卡</h2>
+      <div class="level-subtitle" id="level-select-mode-label">线性挑战模式</div>
+      <div class="level-grid" id="level-grid"></div>
+      <button class="menu-btn level-select-back" id="btn-level-select-back">← 返回主菜单</button>
+    </div>
+  </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============ DOM refs ============
+  const gameViewport = document.getElementById('game-viewport');
+  const canvas = document.getElementById('game-canvas');
+  const ctx = canvas.getContext('2d');
+  const menuScreen = document.getElementById('menu-screen');
+  const settingsScreen = document.getElementById('settings-screen');
+  const levelSelectScreen = document.getElementById('level-select-screen');
+  const gameHUD = document.getElementById('game-hud');
+  const hudHint = document.getElementById('hud-hint');
+  const hudLevelText = document.getElementById('hud-level-text');
+  const winModal = document.getElementById('win-modal');
+  const winMsg = document.getElementById('win-msg');
+  const autoSolveIndicator = document.getElementById('auto-solve-indicator');
+  const levelGrid = document.getElementById('level-grid');
+  const levelSelectModeLabel = document.getElementById('level-select-mode-label');
+  const settingMode = document.getElementById('setting-mode');
+
+  // ============ Constants ============
+  const VW = 800, VH = 450;
+  const MAX_RAY_DEPTH = 20;
+  const TARGET_RADIUS = 14;
+  const EPSILON = 0.001;
+  const DEFAULT_MIRROR_WIDTH = 95;
+  const AUTO_SOLVE_DURATION = 1500;
+
+  // ============ Settings ============
+  let gameMode = 'linear';
+  function loadSettings() {
+    try { const s = localStorage.getItem('prism_puzzle_mode'); if (s === 'free' || s === 'linear') gameMode = s; settingMode.value = gameMode; } catch(e) {}
+  }
+  function saveSettings() { try { localStorage.setItem('prism_puzzle_mode', gameMode); } catch(e) {} }
+  function loadProgress() {
+    try { const r = localStorage.getItem('prism_puzzle_progress'); return r ? JSON.parse(r) : { cleared: {}, highestUnlocked: 0 }; } catch(e) { return { cleared: {}, highestUnlocked: 0 }; }
+  }
+  function saveProgress(p) { try { localStorage.setItem('prism_puzzle_progress', JSON.stringify(p)); } catch(e) {} }
+  let progress = loadProgress();
+
+  // ============ Level Names ============
+  const LEVEL_NAMES = [
+    '新手教学','初试折射','光的解离','双重反射','分光试验',
+    '色彩矩阵','交叉火力','迷宫矩阵','三棱复合','精密变轨',
+    '十全十美','光波回音','红绿双生','三角星阵','多级分流',
+    '缝隙穿行','轴对称学','北斗七星','高精宽窄','色彩滤波',
+    '双重极光','光之织网','回马枪阵','逆向复合','正五边形',
+    '极长深渊','三色协奏','分流枢纽','暗物质迷宫','极光剧场'
+  ];
+
+  // ============ 30 Levels ============
+  const levels = [
+    // Level 0: 新手教学
+    {
+      emitters: [{ x: 80, y: 320, angle: 0.15, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 400, y: 240, angle: 0, targetAngle: 1.28 }
+      ],
+      targets: [{ x: 680, y: 110, color: '#ffffff' }],
+      hint: '按住中央平面镜并绕圈拖动，将白光反射至上方靶点'
+    },
+    // Level 1: 初试折射
+    {
+      emitters: [{ x: 70, y: 370, angle: 0.35, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 240, y: 290, angle: 0, targetAngle: 0.85 },
+        { id: 'm1', type: 'MIRROR', x: 520, y: 160, angle: 0, targetAngle: 1.15 }
+      ],
+      targets: [{ x: 710, y: 90, color: '#ffffff' }]
+    },
+    // Level 2: 光的解离
+    {
+      emitters: [{ x: 70, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 'p0', type: 'PRISM', x: 340, y: 225, angle: 0, targetAngle: 0.18, size: 44 }
+      ],
+      targets: [
+        { x: 600, y: 140, color: '#ff4444' },
+        { x: 630, y: 225, color: '#44ff44' },
+        { x: 600, y: 310, color: '#4444ff' }
+      ]
+    },
+    // Level 3: 双重反射
+    {
+      emitters: [{ x: 80, y: 160, angle: 0.55, color: '#ff4444' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 290, y: 290, angle: 0, targetAngle: 0.88 },
+        { id: 'm1', type: 'MIRROR', x: 540, y: 190, angle: 0, targetAngle: 1.32 }
+      ],
+      targets: [{ x: 700, y: 340, color: '#ff4444' }]
+    },
+    // Level 4: 分光试验
+    {
+      emitters: [{ x: 80, y: 225, angle: 0, color: '#44ff44' }],
+      components: [
+        { id: 's0', type: 'SPLITTER', x: 330, y: 225, angle: 0, targetAngle: 0.72 },
+        { id: 'm0', type: 'MIRROR', x: 530, y: 310, angle: 0, targetAngle: 1.05 }
+      ],
+      targets: [
+        { x: 650, y: 140, color: '#44ff44' },
+        { x: 700, y: 360, color: '#44ff44' }
+      ]
+    },
+    // Level 5: 色彩矩阵
+    {
+      emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 'p0', type: 'PRISM', x: 260, y: 225, angle: 0, targetAngle: 0.12, size: 44 },
+        { id: 'm0', type: 'MIRROR', x: 490, y: 120, angle: 0, targetAngle: 0.88 },
+        { id: 'm1', type: 'MIRROR', x: 490, y: 330, angle: 0, targetAngle: 1.25 }
+      ],
+      targets: [
+        { x: 700, y: 75, color: '#ff4444' },
+        { x: 720, y: 225, color: '#44ff44' },
+        { x: 700, y: 375, color: '#4444ff' }
+      ]
+    },
+    // Level 6: 交叉火力
+    {
+      emitters: [
+        { x: 60, y: 150, angle: 0.3, color: '#ff4444' },
+        { x: 740, y: 300, angle: 2.85, color: '#4444ff' }
+      ],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 280, y: 220, angle: 0, targetAngle: 0.78 },
+        { id: 'm1', type: 'MIRROR', x: 520, y: 220, angle: 0, targetAngle: 0.95 },
+        { id: 'm2', type: 'MIRROR', x: 400, y: 320, angle: 0, targetAngle: 1.42 }
+      ],
+      targets: [
+        { x: 700, y: 100, color: '#ff4444' },
+        { x: 100, y: 350, color: '#4444ff' }
+      ]
+    },
+    // Level 7: 迷宫矩阵
+    {
+      emitters: [{ x: 60, y: 380, angle: 0.42, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 180, y: 290, angle: 0, targetAngle: 0.65 },
+        { id: 'm1', type: 'MIRROR', x: 340, y: 180, angle: 0, targetAngle: 0.95 },
+        { id: 'm2', type: 'MIRROR', x: 500, y: 290, angle: 0, targetAngle: 1.1 },
+        { id: 'm3', type: 'MIRROR', x: 640, y: 170, angle: 0, targetAngle: 1.35 }
+      ],
+      targets: [{ x: 720, y: 80, color: '#ffffff' }]
+    },
+    // Level 8: 三棱复合
+    {
+      emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 'p0', type: 'PRISM', x: 220, y: 225, angle: 0, targetAngle: 0.1, size: 40 },
+        { id: 's0', type: 'SPLITTER', x: 400, y: 225, angle: 0, targetAngle: 0.78 },
+        { id: 'm0', type: 'MIRROR', x: 560, y: 120, angle: 0, targetAngle: 0.92 },
+        { id: 'm1', type: 'MIRROR', x: 560, y: 330, angle: 0, targetAngle: 1.18 }
+      ],
+      targets: [
+        { x: 720, y: 225, color: '#ffffff' },
+        { x: 680, y: 70, color: '#ff4444' },
+        { x: 720, y: 225, color: '#44ff44' },
+        { x: 680, y: 380, color: '#4444ff' }
+      ]
+    },
+    // Level 9: 精密变轨
+    {
+      emitters: [{ x: 80, y: 225, angle: 0, color: '#4444ff' }],
+      components: [
+        { id: 's0', type: 'SPLITTER', x: 240, y: 225, angle: 0, targetAngle: 0.68 },
+        { id: 's1', type: 'SPLITTER', x: 440, y: 140, angle: 0, targetAngle: 0.85 },
+        { id: 'm0', type: 'MIRROR', x: 340, y: 330, angle: 0, targetAngle: 1.1 },
+        { id: 'm1', type: 'MIRROR', x: 600, y: 220, angle: 0, targetAngle: 1.25 },
+        { id: 'm2', type: 'MIRROR', x: 560, y: 340, angle: 0, targetAngle: 0.95 }
+      ],
+      targets: [
+        { x: 700, y: 80, color: '#4444ff' },
+        { x: 720, y: 225, color: '#4444ff' },
+        { x: 680, y: 370, color: '#4444ff' }
+      ]
+    },
+    // Level 10: 十全十美
+    {
+      emitters: [{ x: 100, y: 100, angle: 0.5, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 280, y: 200, angle: 0, targetAngle: 0.75 },
+        { id: 's0', type: 'SPLITTER', x: 450, y: 280, angle: 0, targetAngle: 0.9 },
+        { id: 'm1', type: 'MIRROR', x: 600, y: 150, angle: 0, targetAngle: 1.1 }
+      ],
+      targets: [
+        { x: 720, y: 80, color: '#ffffff' },
+        { x: 700, y: 360, color: '#ffffff' }
+      ]
+    },
+    // Level 11: 光波回音
+    {
+      emitters: [{ x: 80, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 300, y: 150, angle: 0, targetAngle: 0.6, width: 130 },
+        { id: 'm1', type: 'MIRROR', x: 500, y: 300, angle: 0, targetAngle: 1.0, width: 130 },
+        { id: 'm2', type: 'MIRROR', x: 200, y: 340, angle: 0, targetAngle: 1.3 }
+      ],
+      targets: [{ x: 80, y: 380, color: '#ffffff' }]
+    },
+    // Level 12: 红绿双生
+    {
+      emitters: [
+        { x: 60, y: 120, angle: 0.2, color: '#ff4444' },
+        { x: 60, y: 330, angle: -0.2, color: '#44ff44' }
+      ],
+      components: [
+        { id: 's0', type: 'SPLITTER', x: 260, y: 225, angle: 0, targetAngle: 0.75 },
+        { id: 's1', type: 'SPLITTER', x: 500, y: 225, angle: 0, targetAngle: 0.85 },
+        { id: 'm0', type: 'MIRROR', x: 380, y: 100, angle: 0, targetAngle: 1.0 },
+        { id: 'm1', type: 'MIRROR', x: 380, y: 350, angle: 0, targetAngle: 1.2 }
+      ],
+      targets: [
+        { x: 720, y: 100, color: '#44ff44' },
+        { x: 720, y: 350, color: '#ff4444' }
+      ]
+    },
+    // Level 13: 三角星阵
+    {
+      emitters: [{ x: 400, y: 400, angle: -1.57, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 400, y: 280, angle: 0, targetAngle: 0.52 },
+        { id: 'm1', type: 'MIRROR', x: 280, y: 160, angle: 0, targetAngle: 1.57 },
+        { id: 'm2', type: 'MIRROR', x: 520, y: 160, angle: 0, targetAngle: -1.57 }
+      ],
+      targets: [
+        { x: 400, y: 60, color: '#ffffff' },
+        { x: 160, y: 280, color: '#ffffff' },
+        { x: 640, y: 280, color: '#ffffff' }
+      ]
+    },
+    // Level 14: 多级分流
+    {
+      emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 's0', type: 'SPLITTER', x: 200, y: 225, angle: 0, targetAngle: 0.78 },
+        { id: 'p0', type: 'PRISM', x: 360, y: 130, angle: 0, targetAngle: 0.15, size: 36 },
+        { id: 'p1', type: 'PRISM', x: 360, y: 320, angle: 0, targetAngle: -0.15, size: 36 },
+        { id: 'm0', type: 'MIRROR', x: 540, y: 80, angle: 0, targetAngle: 0.9 },
+        { id: 'm1', type: 'MIRROR', x: 540, y: 370, angle: 0, targetAngle: 1.1 }
+      ],
+      targets: [
+        { x: 700, y: 50, color: '#ff4444' },
+        { x: 720, y: 130, color: '#44ff44' },
+        { x: 700, y: 210, color: '#4444ff' },
+        { x: 700, y: 240, color: '#ff4444' },
+        { x: 720, y: 320, color: '#44ff44' },
+        { x: 700, y: 400, color: '#4444ff' }
+      ]
+    },
+    // Level 15: 缝隙穿行
+    {
+      emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 'obstacle0', type: 'PRISM', x: 350, y: 150, angle: 0, static: true, size: 50 },
+        { id: 'obstacle1', type: 'PRISM', x: 350, y: 300, angle: 0, static: true, size: 50 },
+        { id: 'm0', type: 'MIRROR', x: 200, y: 225, angle: 0, targetAngle: 0.35 },
+        { id: 'm1', type: 'MIRROR', x: 550, y: 225, angle: 0, targetAngle: 1.2 }
+      ],
+      targets: [{ x: 720, y: 225, color: '#ffffff' }]
+    },
+    // Level 16: 轴对称学
+    {
+      emitters: [{ x: 80, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 220, y: 150, angle: 0, targetAngle: 0.7 },
+        { id: 'm1', type: 'MIRROR', x: 220, y: 300, angle: 0, targetAngle: 1.1 },
+        { id: 'm2', type: 'MIRROR', x: 450, y: 100, angle: 0, targetAngle: 0.85 },
+        { id: 'm3', type: 'MIRROR', x: 450, y: 350, angle: 0, targetAngle: 1.28 }
+      ],
+      targets: [
+        { x: 680, y: 60, color: '#ffffff' },
+        { x: 680, y: 390, color: '#ffffff' }
+      ]
+    },
+    // Level 17: 北斗七星
+    {
+      emitters: [{ x: 60, y: 400, angle: -0.5, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 160, y: 320, angle: 0, targetAngle: 0.4 },
+        { id: 'm1', type: 'MIRROR', x: 280, y: 240, angle: 0, targetAngle: 0.7 },
+        { id: 'm2', type: 'MIRROR', x: 400, y: 180, angle: 0, targetAngle: 0.95 },
+        { id: 'm3', type: 'MIRROR', x: 520, y: 130, angle: 0, targetAngle: 1.15 },
+        { id: 'm4', type: 'MIRROR', x: 640, y: 90, angle: 0, targetAngle: 1.35 }
+      ],
+      targets: [
+        { x: 120, y: 360, color: '#ffffff' },
+        { x: 240, y: 280, color: '#ffffff' },
+        { x: 360, y: 210, color: '#ffffff' },
+        { x: 480, y: 150, color: '#ffffff' },
+        { x: 720, y: 60, color: '#ffffff' }
+      ]
+    },
+    // Level 18: 高精宽窄
+    {
+      emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 220, y: 225, angle: 0, targetAngle: 0.65, width: 160 },
+        { id: 'm1', type: 'MIRROR', x: 420, y: 150, angle: 0, targetAngle: 0.9, width: 35 },
+        { id: 'm2', type: 'MIRROR', x: 420, y: 300, angle: 0, targetAngle: 1.1, width: 35 },
+        { id: 'm3', type: 'MIRROR', x: 600, y: 225, angle: 0, targetAngle: 1.25, width: 160 }
+      ],
+      targets: [
+        { x: 720, y: 100, color: '#ffffff' },
+        { x: 720, y: 350, color: '#ffffff' }
+      ]
+    },
+    // Level 19: 色彩滤波
+    {
+      emitters: [
+        { x: 60, y: 150, angle: 0.25, color: '#4444ff' },
+        { x: 60, y: 300, angle: -0.25, color: '#ff4444' }
+      ],
+      components: [
+        { id: 's0', type: 'SPLITTER', x: 260, y: 225, angle: 0, targetAngle: 0.8 },
+        { id: 's1', type: 'SPLITTER', x: 500, y: 225, angle: 0, targetAngle: 0.7 },
+        { id: 'm0', type: 'MIRROR', x: 380, y: 100, angle: 0, targetAngle: 1.0 },
+        { id: 'm1', type: 'MIRROR', x: 380, y: 350, angle: 0, targetAngle: 1.15 }
+      ],
+      targets: [
+        { x: 720, y: 120, color: '#4444ff' },
+        { x: 720, y: 330, color: '#ff4444' }
+      ]
+    },
+    // Level 20: 双重极光
+    {
+      emitters: [
+        { x: 60, y: 150, angle: 0.1, color: 'white' },
+        { x: 60, y: 300, angle: -0.1, color: 'white' }
+      ],
+      components: [
+        { id: 'p0', type: 'PRISM', x: 220, y: 150, angle: 0, targetAngle: 0.12, size: 38 },
+        { id: 'p1', type: 'PRISM', x: 220, y: 300, angle: 0, targetAngle: -0.12, size: 38 },
+        { id: 'm0', type: 'MIRROR', x: 400, y: 80, angle: 0, targetAngle: 0.85 },
+        { id: 'm1', type: 'MIRROR', x: 400, y: 225, angle: 0, targetAngle: 1.0 },
+        { id: 'm2', type: 'MIRROR', x: 400, y: 370, angle: 0, targetAngle: 1.15 },
+        { id: 'm3', type: 'MIRROR', x: 580, y: 225, angle: 0, targetAngle: 0.95 }
+      ],
+      targets: [
+        { x: 700, y: 50, color: '#ff4444' },
+        { x: 720, y: 130, color: '#44ff44' },
+        { x: 700, y: 200, color: '#4444ff' },
+        { x: 700, y: 250, color: '#ff4444' },
+        { x: 720, y: 330, color: '#44ff44' },
+        { x: 700, y: 400, color: '#4444ff' }
+      ]
+    },
+    // Level 21: 光之织网
+    {
+      emitters: [{ x: 80, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 's0', type: 'SPLITTER', x: 220, y: 225, angle: 0, targetAngle: 0.7 },
+        { id: 's1', type: 'SPLITTER', x: 400, y: 150, angle: 0, targetAngle: 0.85 },
+        { id: 's2', type: 'SPLITTER', x: 400, y: 300, angle: 0, targetAngle: 1.0 },
+        { id: 'm0', type: 'MIRROR', x: 580, y: 225, angle: 0, targetAngle: 0.9 },
+        { id: 'm1', type: 'MIRROR', x: 300, y: 80, angle: 0, targetAngle: 1.2 }
+      ],
+      targets: [
+        { x: 700, y: 100, color: '#ffffff' },
+        { x: 720, y: 225, color: '#ffffff' },
+        { x: 700, y: 350, color: '#ffffff' },
+        { x: 150, y: 60, color: '#ffffff' }
+      ]
+    },
+    // Level 22: 回马枪阵
+    {
+      emitters: [{ x: 80, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 280, y: 225, angle: 0, targetAngle: 0.785 },
+        { id: 'm1', type: 'MIRROR', x: 280, y: 100, angle: 0, targetAngle: 2.356 },
+        { id: 'm2', type: 'MIRROR', x: 500, y: 100, angle: 0, targetAngle: 0.785 },
+        { id: 'm3', type: 'MIRROR', x: 500, y: 300, angle: 0, targetAngle: 2.356 }
+      ],
+      targets: [{ x: 80, y: 350, color: '#ffffff' }]
+    },
+    // Level 23: 逆向复合
+    {
+      emitters: [
+        { x: 60, y: 150, angle: 0.4, color: '#ff4444' },
+        { x: 60, y: 300, angle: -0.4, color: '#4444ff' }
+      ],
+      components: [
+        { id: 'p0', type: 'PRISM', x: 350, y: 225, angle: 0, targetAngle: 0.08, size: 44 },
+        { id: 'm0', type: 'MIRROR', x: 200, y: 225, angle: 0, targetAngle: 1.0 },
+        { id: 'm1', type: 'MIRROR', x: 500, y: 225, angle: 0, targetAngle: 0.8 }
+      ],
+      targets: [{ x: 720, y: 225, color: '#ffffff' }]
+    },
+    // Level 24: 正五边形
+    {
+      emitters: [{ x: 400, y: 400, angle: -1.2, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 400, y: 100, angle: 0, targetAngle: 0 },
+        { id: 'm1', type: 'MIRROR', x: 570, y: 190, angle: 0, targetAngle: 0.628 },
+        { id: 'm2', type: 'MIRROR', x: 510, y: 350, angle: 0, targetAngle: 1.257 },
+        { id: 'm3', type: 'MIRROR', x: 290, y: 350, angle: 0, targetAngle: 1.885 },
+        { id: 'm4', type: 'MIRROR', x: 230, y: 190, angle: 0, targetAngle: 2.513 }
+      ],
+      targets: [{ x: 400, y: 225, color: '#ffffff' }]
+    },
+    // Level 25: 极长深渊
+    {
+      emitters: [{ x: 60, y: 80, angle: 0.3, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 200, y: 180, angle: 0, targetAngle: 0.5, width: 120 },
+        { id: 'm1', type: 'MIRROR', x: 380, y: 100, angle: 0, targetAngle: 0.8, width: 120 },
+        { id: 'm2', type: 'MIRROR', x: 560, y: 180, angle: 0, targetAngle: 1.0 },
+        { id: 'm3', type: 'MIRROR', x: 650, y: 300, angle: 0, targetAngle: 1.2 },
+        { id: 'm4', type: 'MIRROR', x: 500, y: 380, angle: 0, targetAngle: 1.4 },
+        { id: 'm5', type: 'MIRROR', x: 280, y: 340, angle: 0, targetAngle: 1.1 }
+      ],
+      targets: [{ x: 80, y: 380, color: '#ffffff' }]
+    },
+    // Level 26: 三色协奏
+    {
+      emitters: [
+        { x: 200, y: 420, angle: -1.57, color: '#ff4444' },
+        { x: 400, y: 420, angle: -1.57, color: '#44ff44' },
+        { x: 600, y: 420, angle: -1.57, color: '#4444ff' }
+      ],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 200, y: 280, angle: 0, targetAngle: 0.785 },
+        { id: 'm1', type: 'MIRROR', x: 400, y: 200, angle: 0, targetAngle: 1.0 },
+        { id: 'm2', type: 'MIRROR', x: 600, y: 280, angle: 0, targetAngle: 0.85 },
+        { id: 's0', type: 'SPLITTER', x: 300, y: 120, angle: 0, targetAngle: 0.9 },
+        { id: 's1', type: 'SPLITTER', x: 500, y: 120, angle: 0, targetAngle: 1.1 }
+      ],
+      targets: [
+        { x: 100, y: 50, color: '#ff4444' },
+        { x: 400, y: 40, color: '#44ff44' },
+        { x: 700, y: 50, color: '#4444ff' }
+      ]
+    },
+    // Level 27: 分流枢纽
+    {
+      emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 's0', type: 'SPLITTER', x: 180, y: 225, angle: 0, targetAngle: 0.75 },
+        { id: 's1', type: 'SPLITTER', x: 320, y: 130, angle: 0, targetAngle: 0.85 },
+        { id: 's2', type: 'SPLITTER', x: 320, y: 320, angle: 0, targetAngle: 1.0 },
+        { id: 'p0', type: 'PRISM', x: 480, y: 80, angle: 0, targetAngle: 0.1, size: 32 },
+        { id: 'p1', type: 'PRISM', x: 480, y: 370, angle: 0, targetAngle: -0.1, size: 32 },
+        { id: 'm0', type: 'MIRROR', x: 600, y: 180, angle: 0, targetAngle: 0.95 },
+        { id: 'm1', type: 'MIRROR', x: 600, y: 270, angle: 0, targetAngle: 1.1 }
+      ],
+      targets: [
+        { x: 720, y: 100, color: '#ffffff' },
+        { x: 720, y: 350, color: '#ffffff' },
+        { x: 680, y: 40, color: '#ff4444' },
+        { x: 720, y: 80, color: '#44ff44' },
+        { x: 680, y: 120, color: '#4444ff' },
+        { x: 680, y: 330, color: '#ff4444' },
+        { x: 720, y: 370, color: '#44ff44' },
+        { x: 680, y: 410, color: '#4444ff' }
+      ]
+    },
+    // Level 28: 暗物质迷宫
+    {
+      emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
+      components: [
+        { id: 'm0', type: 'MIRROR', x: 200, y: 150, angle: 0, targetAngle: 0.65 },
+        { id: 'm1', type: 'MIRROR', x: 400, y: 100, angle: 0, targetAngle: 0.9 },
+        { id: 'm2', type: 'MIRROR', x: 550, y: 200, angle: 0, targetAngle: 1.15 },
+        { id: 'm3', type: 'MIRROR', x: 600, y: 350, angle: 0, targetAngle: 1.3 },
+        { id: 'decoy0', type: 'MIRROR', x: 200, y: 320, angle: 0, static: true, width: 80 },
+        { id: 'decoy1', type: 'MIRROR', x: 350, y: 280, angle: 0, static: true, width: 80 },
+        { id: 'decoy2', type: 'PRISM', x: 450, y: 350, angle: 0, static: true, size: 36 },
+        { id: 'decoy3', type: 'SPLITTER', x: 300, y: 225, angle: 0, static: true, width: 70 }
+      ],
+      targets: [{ x: 720, y: 380, color: '#ffffff' }]
+    },
+    // Level 29: 极光剧场
+    {
+      emitters: [
+        { x: 40, y: 225, angle: 0, color: 'white' },
+        { x: 760, y: 225, angle: 3.14159, color: 'white' }
+      ],
+      components: [
+        { id: 'p0', type: 'PRISM', x: 200, y: 225, angle: 0, targetAngle: 0.1, size: 40 },
+        { id: 'p1', type: 'PRISM', x: 600, y: 225, angle: 0, targetAngle: -0.1, size: 40 },
+        { id: 'm0', type: 'MIRROR', x: 350, y: 100, angle: 0, targetAngle: 0.85 },
+        { id: 'm1', type: 'MIRROR', x: 350, y: 350, angle: 0, targetAngle: 1.15 },
+        { id: 'm2', type: 'MIRROR', x: 450, y: 100, angle: 0, targetAngle: 1.0 },
+        { id: 'm3', type: 'MIRROR', x: 450, y: 350, angle: 0, targetAngle: 1.0 },
+        { id: 's0', type: 'SPLITTER', x: 280, y: 225, angle: 0, targetAngle: 0.75 },
+        { id: 's1', type: 'SPLITTER', x: 520, y: 225, angle: 0, targetAngle: 0.9 }
+      ],
+      targets: [
+        { x: 100, y: 60, color: '#ff4444' },
+        { x: 60, y: 225, color: '#44ff44' },
+        { x: 100, y: 390, color: '#4444ff' },
+        { x: 700, y: 60, color: '#ff4444' },
+        { x: 740, y: 225, color: '#44ff44' },
+        { x: 700, y: 390, color: '#4444ff' }
+      ]
+    }
+  ];
+
+  // ============ Game State ============
+  let currentLevel = 0;
+  let gameState = 'menu';
+  let components = [];
+  let animationId = null;
+  let dragging = null;
+  let dragStartAngle = 0;
+  let dragCompStartAngle = 0;
+  let autoSolveStartTime = 0;
+  let autoSolveStartAngles = [];
+  let autoSolveDeltas = [];
+
+  // ============ Math Helpers ============
+  function vec2(x, y) { return { x, y }; }
+  function vadd(a, b) { return { x: a.x + b.x, y: a.y + b.y }; }
+  function vsub(a, b) { return { x: a.x - b.x, y: a.y - b.y }; }
+  function vscale(v, s) { return { x: v.x * s, y: v.y * s }; }
+  function vlen(v) { return Math.sqrt(v.x * v.x + v.y * v.y); }
+  function vnorm(v) { const l = vlen(v); return l > EPSILON ? { x: v.x / l, y: v.y / l } : { x: 0, y: 0 }; }
+  function vdot(a, b) { return a.x * b.x + a.y * b.y; }
+  function vperp(v) { return { x: -v.y, y: v.x }; }
+  function vangle(v) { return Math.atan2(v.y, v.x); }
+
+  function normalizeAngle(a) {
+    while (a > Math.PI) a -= Math.PI * 2;
+    while (a < -Math.PI) a += Math.PI * 2;
+    return a;
+  }
+
+  function shortestAngularDelta(target, start) {
+    let delta = target - start;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    return delta;
+  }
+
+  // ============ Ray-Segment Intersection ============
+  function raySegmentIntersect(origin, dir, a, b) {
+    const d = vsub(b, a);
+    const oa = vsub(origin, a);
+    const denom = vperp(d);
+    const denomDot = vdot(dir, denom);
+    if (Math.abs(denomDot) < EPSILON) return null;
+    const t = -vdot(oa, denom) / denomDot;
+    if (t < EPSILON) return null;
+    const u = (dir.x * (origin.y - a.y) - dir.y * (origin.x - a.x)) / (d.x * dir.y - d.y * dir.x);
+    if (u < -EPSILON || u > 1 + EPSILON) return null;
+    const point = vadd(origin, vscale(dir, t));
+    const normal = vnorm(vperp(d));
+    if (vdot(normal, dir) > 0) { normal.x = -normal.x; normal.y = -normal.y; }
+    return { point, dist: t, normal, u };
+  }
+
+  // ============ Component Geometry ============
+  function getPrismVerts(comp) {
+    const cx = comp.x, cy = comp.y;
+    const size = comp.size || 44;
+    const R = size / Math.sqrt(3);
+    const verts = [];
+    for (let i = 0; i < 3; i++) {
+      const a = comp.angle + i * Math.PI * 2 / 3;
+      verts.push({ x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) });
+    }
+    return verts;
+  }
+
+  function getMirrorEndpoints(comp) {
+    const hw = (comp.width || DEFAULT_MIRROR_WIDTH) / 2;
+    const dx = Math.cos(comp.angle) * hw;
+    const dy = Math.sin(comp.angle) * hw;
+    return {
+      a: { x: comp.x - dx, y: comp.y - dy },
+      b: { x: comp.x + dx, y: comp.y + dy }
+    };
+  }
+
+  function reflect(dir, normal) {
+    const d = vdot(dir, normal);
+    return { x: dir.x - 2 * d * normal.x, y: dir.y - 2 * d * normal.y };
+  }
+
+  function refractSimple(dir, normal, n) {
+    const cosI = -vdot(dir, normal);
+    const sinT2 = (1 / (n * n)) * (1 - cosI * cosI);
+    if (sinT2 > 1) return reflect(dir, normal);
+    const cosT = Math.sqrt(1 - sinT2);
+    return vnorm(vadd(vscale(dir, 1 / n), vscale(normal, cosI / n - cosT)));
+  }
+
+  // ============ Ray Tracing (NO visitedIds — allows repeated hits) ============
+  function castRay(origin, direction, color, depth, segments) {
+    if (depth > MAX_RAY_DEPTH) return;
+
+    let closestHit = null;
+    let closestDist = Infinity;
+    let hitComp = null;
+    let hitNormal = null;
+    let hitPoint = null;
+    let hitEdgeIdx = -1;
+
+    for (const comp of components) {
+      if (comp.type === 'MIRROR' || comp.type === 'SPLITTER') {
+        const ep = getMirrorEndpoints(comp);
+        const hit = raySegmentIntersect(origin, direction, ep.a, ep.b);
+        if (hit && hit.dist < closestDist && hit.dist > EPSILON) {
+          closestDist = hit.dist;
+          closestHit = hit;
+          hitComp = comp;
+          hitNormal = hit.normal;
+          hitPoint = hit.point;
+        }
+      } else if (comp.type === 'PRISM') {
+        const verts = getPrismVerts(comp);
+        for (let i = 0; i < 3; i++) {
+          const a = verts[i], b = verts[(i + 1) % 3];
+          const hit = raySegmentIntersect(origin, direction, a, b);
+          if (hit && hit.dist < closestDist && hit.dist > EPSILON) {
+            closestDist = hit.dist;
+            closestHit = hit;
+            hitComp = comp;
+            hitNormal = hit.normal;
+            hitPoint = hit.point;
+            hitEdgeIdx = i;
+          }
+        }
+      }
+    }
+
+    const boundsChecks = [
+      { a: vec2(0, 0), b: vec2(VW, 0) },
+      { a: vec2(VW, 0), b: vec2(VW, VH) },
+      { a: vec2(VW, VH), b: vec2(0, VH) },
+      { a: vec2(0, VH), b: vec2(0, 0) }
+    ];
+    for (const bc of boundsChecks) {
+      const hit = raySegmentIntersect(origin, direction, bc.a, bc.b);
+      if (hit && hit.dist < closestDist && hit.dist > EPSILON) {
+        closestDist = hit.dist;
+        closestHit = hit;
+        hitComp = null;
+        hitPoint = hit.point;
+      }
+    }
+
+    if (!closestHit) return;
+
+    segments.push({
+      from: { x: origin.x, y: origin.y },
+      to: { x: hitPoint.x, y: hitPoint.y },
+      color: color
+    });
+
+    if (!hitComp) return;
+
+    const offsetDist = 2.5;
+
+    switch (hitComp.type) {
+      case 'MIRROR': {
+        const refl = reflect(direction, hitNormal);
+        const reflOrigin = { x: hitPoint.x + refl.x * offsetDist, y: hitPoint.y + refl.y * offsetDist };
+        castRay(reflOrigin, refl, color, depth + 1, segments);
+        break;
+      }
+      case 'SPLITTER': {
+        const transOrigin = { x: hitPoint.x + direction.x * offsetDist, y: hitPoint.y + direction.y * offsetDist };
+        castRay(transOrigin, direction, color, depth + 1, segments);
+        const refl = reflect(direction, hitNormal);
+        const reflOrigin = { x: hitPoint.x + refl.x * offsetDist, y: hitPoint.y + refl.y * offsetDist };
+        castRay(reflOrigin, refl, color, depth + 1, segments);
+        break;
+      }
+      case 'PRISM': {
+        const verts = getPrismVerts(hitComp);
+        const internalDir = refractSimple(direction, hitNormal, 1.5);
+        let exitPoint = null;
+        let exitNormal = null;
+        let exitDist = Infinity;
+        for (let i = 0; i < 3; i++) {
+          if (i === hitEdgeIdx) continue;
+          const a = verts[i], b = verts[(i + 1) % 3];
+          const exitHit = raySegmentIntersect(hitPoint, internalDir, a, b);
+          if (exitHit && exitHit.dist > EPSILON && exitHit.dist < exitDist) {
+            exitDist = exitHit.dist;
+            exitPoint = exitHit.point;
+            exitNormal = exitHit.normal;
+          }
+        }
+        if (!exitPoint) {
+          const size = hitComp.size || 44;
+          exitPoint = { x: hitPoint.x + direction.x * size * 0.7, y: hitPoint.y + direction.y * size * 0.7 };
+          exitNormal = { x: -direction.x, y: -direction.y };
+        }
+        const exitDir = refractSimple(internalDir, exitNormal, 1 / 1.5);
+        const exitOrigin = { x: exitPoint.x + exitDir.x * offsetDist, y: exitPoint.y + exitDir.y * offsetDist };
+
+        if (color === 'white') {
+          const baseAngle = vangle(exitDir);
+          const spread = 0.04;
+          const colorDefs = [
+            { color: '#ff4444', angle: baseAngle - spread },
+            { color: '#44ff44', angle: baseAngle },
+            { color: '#4444ff', angle: baseAngle + spread }
+          ];
+          for (const c of colorDefs) {
+            const d = { x: Math.cos(c.angle), y: Math.sin(c.angle) };
+            castRay(exitOrigin, d, c.color, depth + 1, segments);
+          }
+        } else {
+          castRay(exitOrigin, exitDir, color, depth + 1, segments);
+        }
+        break;
+      }
+    }
+  }
+
+  // ============ Rendering ============
+  function drawGrid() {
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 0.5;
+    const step = 40;
+    for (let x = step; x < VW; x += step) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, VH); ctx.stroke();
+    }
+    for (let y = step; y < VH; y += step) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(VW, y); ctx.stroke();
+    }
+  }
+
+  function drawBeams(segments) {
+    if (segments.length === 0) return;
+    const groups = {};
+    for (const seg of segments) {
+      if (!groups[seg.color]) groups[seg.color] = [];
+      groups[seg.color].push(seg);
+    }
+    const colorMap = {
+      'white': 'rgba(255,255,255,0.9)',
+      '#ffffff': 'rgba(255,255,255,0.9)',
+      '#ff4444': 'rgba(255,68,68,0.9)',
+      '#44ff44': 'rgba(68,255,68,0.9)',
+      '#4444ff': 'rgba(68,68,255,0.9)'
+    };
+    const glowMap = {
+      'white': 'rgba(255,255,255,0.5)',
+      '#ffffff': 'rgba(255,255,255,0.5)',
+      '#ff4444': 'rgba(255,68,68,0.5)',
+      '#44ff44': 'rgba(68,255,68,0.5)',
+      '#4444ff': 'rgba(68,68,255,0.5)'
+    };
+    for (const [color, segs] of Object.entries(groups)) {
+      const c = colorMap[color] || 'rgba(255,255,255,0.7)';
+      const g = glowMap[color] || 'rgba(255,255,255,0.3)';
+      ctx.save();
+      ctx.shadowColor = g;
+      ctx.shadowBlur = 10;
+      ctx.strokeStyle = c;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (const seg of segs) {
+        ctx.moveTo(seg.from.x, seg.from.y);
+        ctx.lineTo(seg.to.x, seg.to.y);
+      }
+      ctx.stroke();
+      ctx.restore();
+      ctx.strokeStyle = c;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (const seg of segs) {
+        ctx.moveTo(seg.from.x, seg.from.y);
+        ctx.lineTo(seg.to.x, seg.to.y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function drawEmitter(em) {
+    const x = em.x, y = em.y;
+    const colorMap = {
+      'white': '#ffffff', '#ffffff': '#ffffff',
+      '#ff4444': '#ff4444', '#44ff44': '#44ff44', '#4444ff': '#4488ff'
+    };
+    const c = colorMap[em.color] || '#ffffff';
+    ctx.save();
+    ctx.shadowColor = c;
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = c;
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+    const dx = Math.cos(em.angle) * 16, dy = Math.sin(em.angle) * 16;
+    ctx.strokeStyle = c; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + dx, y + dy); ctx.stroke();
+  }
+
+  function drawTarget(t, lit) {
+    const x = t.x, y = t.y;
+    const colorMap = {
+      'white': '#ffffff', '#ffffff': '#ffffff',
+      '#ff4444': '#ff4444', '#44ff44': '#44ff44', '#4444ff': '#4488ff'
+    };
+    const c = colorMap[t.color] || '#ffffff';
+    ctx.strokeStyle = lit ? c : 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = lit ? 2 : 1;
+    ctx.beginPath(); ctx.arc(x, y, TARGET_RADIUS, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = lit ? c : 'rgba(255,255,255,0.15)';
+    ctx.beginPath(); ctx.arc(x, y, lit ? 5 : 3, 0, Math.PI * 2); ctx.fill();
+    if (lit) {
+      ctx.save();
+      ctx.shadowColor = c; ctx.shadowBlur = 16;
+      ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawComponent(comp) {
+    const isStatic = comp.static === true;
+    ctx.save();
+    if (comp.type === 'MIRROR' || comp.type === 'SPLITTER') {
+      const ep = getMirrorEndpoints(comp);
+      const isSplitter = comp.type === 'SPLITTER';
+      const baseColor = isStatic ? '#555555' : (isSplitter ? '#00e5ff' : '#cccccc');
+      const glowColor = isStatic ? 'rgba(85,85,85,0.3)' : (isSplitter ? 'rgba(0,229,255,0.5)' : 'rgba(255,255,255,0.4)');
+      const coreColor = isStatic ? '#666666' : (isSplitter ? '#80ffff' : '#ffffff');
+      const dotColor = isStatic ? '#555555' : (isSplitter ? '#00e5ff' : '#ffffff');
+      const labelColor = isStatic ? 'rgba(120,120,120,0.4)' : (isSplitter ? 'rgba(0,229,255,0.6)' : 'rgba(255,255,255,0.5)');
+
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = isStatic ? 3 : 8;
+      ctx.strokeStyle = baseColor;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(ep.a.x, ep.a.y); ctx.lineTo(ep.b.x, ep.b.y); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = coreColor;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(ep.a.x, ep.a.y); ctx.lineTo(ep.b.x, ep.b.y); ctx.stroke();
+      ctx.fillStyle = dotColor;
+      ctx.beginPath(); ctx.arc(comp.x, comp.y, 4, 0, Math.PI * 2); ctx.fill();
+
+      if (!isStatic) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(comp.x, comp.y, 16, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.fillStyle = labelColor;
+      ctx.font = '9px "Segoe UI","PingFang SC",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(isStatic ? '固定' : (isSplitter ? '分光' : '镜'), comp.x, comp.y - 20);
+
+    } else if (comp.type === 'PRISM') {
+      const verts = getPrismVerts(comp);
+      const isStaticPrism = isStatic;
+      const fillC = isStaticPrism ? 'rgba(60,60,60,0.2)' : 'rgba(124,77,255,0.15)';
+      const strokeC = isStaticPrism ? 'rgba(100,100,100,0.5)' : 'rgba(179,136,255,0.8)';
+      const glowC = isStaticPrism ? 'rgba(60,60,60,0.2)' : 'rgba(124,77,255,0.5)';
+      const dotC = isStaticPrism ? '#777777' : '#b388ff';
+      const labelC = isStaticPrism ? 'rgba(120,120,120,0.4)' : 'rgba(179,136,255,0.6)';
+
+      ctx.shadowColor = glowC;
+      ctx.shadowBlur = isStaticPrism ? 3 : 10;
+      ctx.fillStyle = fillC;
+      ctx.beginPath();
+      ctx.moveTo(verts[0].x, verts[0].y);
+      ctx.lineTo(verts[1].x, verts[1].y);
+      ctx.lineTo(verts[2].x, verts[2].y);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = strokeC; ctx.lineWidth = 2; ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = isStaticPrism ? 'rgba(120,120,120,0.2)' : 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(verts[0].x, verts[0].y);
+      ctx.lineTo(verts[1].x, verts[1].y);
+      ctx.lineTo(verts[2].x, verts[2].y);
+      ctx.closePath(); ctx.stroke();
+      ctx.fillStyle = dotC;
+      ctx.beginPath(); ctx.arc(comp.x, comp.y, 4, 0, Math.PI * 2); ctx.fill();
+
+      if (!isStaticPrism) {
+        ctx.strokeStyle = 'rgba(179,136,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(comp.x, comp.y, 18, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.fillStyle = labelC;
+      ctx.font = '9px "Segoe UI","PingFang SC",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(isStaticPrism ? '固定' : '棱镜', comp.x, comp.y - 28);
+    }
+    ctx.restore();
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, VW, VH);
+    ctx.fillStyle = '#121218';
+    ctx.fillRect(0, 0, VW, VH);
+    drawGrid();
+
+    const lv = levels[currentLevel];
+    const allSegments = [];
+    for (const em of lv.emitters) {
+      const dir = { x: Math.cos(em.angle), y: Math.sin(em.angle) };
+      castRay({ x: em.x, y: em.y }, dir, em.color, 0, allSegments);
+    }
+
+    drawBeams(allSegments);
+
+    const litTargets = new Set();
+    const TOLERANCE = TARGET_RADIUS + 3;
+    for (const seg of allSegments) {
+      for (let ti = 0; ti < lv.targets.length; ti++) {
+        if (litTargets.has(ti)) continue;
+        const t = lv.targets[ti];
+        if (seg.color !== t.color) continue;
+        const ax = seg.to.x - seg.from.x;
+        const ay = seg.to.y - seg.from.y;
+        const segLen2 = ax * ax + ay * ay;
+        let proj = segLen2 > 0.001 ? ((t.x - seg.from.x) * ax + (t.y - seg.from.y) * ay) / segLen2 : 0;
+        proj = Math.max(0, Math.min(1, proj));
+        const cx = seg.from.x + proj * ax;
+        const cy = seg.from.y + proj * ay;
+        const dist = Math.sqrt((t.x - cx) * (t.x - cx) + (t.y - cy) * (t.y - cy));
+        if (dist < TOLERANCE) litTargets.add(ti);
+      }
+    }
+
+    for (let ti = 0; ti < lv.targets.length; ti++) {
+      drawTarget(lv.targets[ti], litTargets.has(ti));
+    }
+    for (const em of lv.emitters) drawEmitter(em);
+    for (const comp of components) drawComponent(comp);
+
+    if (gameState === 'playing' && litTargets.size === lv.targets.length && lv.targets.length > 0) {
+      handleWin();
+    }
+    return litTargets;
+  }
+
+  // ============ Win Handling ============
+  function handleWin() {
+    gameState = 'won';
+    progress.cleared[currentLevel] = true;
+    if (currentLevel + 1 > progress.highestUnlocked) {
+      progress.highestUnlocked = currentLevel + 1;
+    }
+    saveProgress(progress);
+    winMsg.textContent = currentLevel < 29
+      ? `第 ${currentLevel + 1} 关 · ${LEVEL_NAMES[currentLevel]} 完成`
+      : '恭喜！你已完成全部 30 个关卡！';
+    winModal.classList.add('active');
+    const btnNext = document.getElementById('btn-win-next');
+    if (currentLevel >= 29) {
+      btnNext.textContent = '返回选关';
+      btnNext.onclick = () => { winModal.classList.remove('active'); showLevelSelect(); };
+    } else {
+      btnNext.textContent = '下一关 →';
+      btnNext.onclick = () => { winModal.classList.remove('active'); startLevel(currentLevel + 1); };
+    }
+  }
+
+  // ============ Input Handling (document-level for move/up/cancel) ============
+  function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const currentScale = rect.width / VW;
+    return {
+      x: (e.clientX - rect.left) / currentScale,
+      y: (e.clientY - rect.top) / currentScale
+    };
+  }
+
+  function findComponentAt(pos) {
+    for (const comp of components) {
+      if (comp.static) continue;
+      const dx = pos.x - comp.x;
+      const dy = pos.y - comp.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const hitRadius = comp.type === 'PRISM' ? 30 : 24;
+      if (dist < hitRadius) return comp;
+    }
+    return null;
+  }
+
+  function onPointerMove(e) {
+    if (!dragging || gameState !== 'playing') return;
+    const pos = getCanvasPos(e);
+    const currentAngle = Math.atan2(pos.y - dragging.y, pos.x - dragging.x);
+    const delta = currentAngle - dragStartAngle;
+    dragging.angle = normalizeAngle(dragCompStartAngle + delta);
+    e.preventDefault();
+  }
+
+  // [Bug 修复] dragging 为 null 时提前 return，避免执行无效逻辑
+  function onPointerUp(e) {
+    if (!dragging) return;
+    try { canvas.releasePointerCapture(e.pointerId); } catch(ex) {}
+    dragging = null;
+    document.removeEventListener('pointermove', onPointerMove);
+    document.removeEventListener('pointerup', onPointerUp);
+    document.removeEventListener('pointercancel', onPointerUp);
+  }
+
+  canvas.addEventListener('pointerdown', function(e) {
+    if (gameState !== 'playing') return;
+    const pos = getCanvasPos(e);
+    const comp = findComponentAt(pos);
+    if (comp) {
+      dragging = comp;
+      dragStartAngle = Math.atan2(pos.y - comp.y, pos.x - comp.x);
+      dragCompStartAngle = comp.angle;
+      canvas.setPointerCapture(e.pointerId);
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp);
+      document.addEventListener('pointercancel', onPointerUp);
+      e.preventDefault();
+    }
+  });
+
+  canvas.addEventListener('touchmove', function(e) {
+    if (dragging) e.preventDefault();
+  }, { passive: false });
+
+  // [Bug 修复] 阻止 canvas 上的右键菜单（contextmenu）
+  canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); }, false);
+
+  // [Bug 修复] 阻止 canvas 上的双击选中文字
+  canvas.addEventListener('dblclick', function(e) { e.preventDefault(); }, false);
+  canvas.addEventListener('selectstart', function(e) { e.preventDefault(); }, false);
+  canvas.addEventListener('mousedown', function(e) { if (e.detail > 1) e.preventDefault(); }, false);
+
+  // ============ Auto-Solve (shortest angular path) ============
+  function startAutoSolve() {
+    if (gameState !== 'playing') return;
+    gameState = 'autoSolving';
+    autoSolveStartTime = performance.now();
+    autoSolveStartAngles = [];
+    autoSolveDeltas = [];
+    for (const comp of components) {
+      if (comp.static || comp.targetAngle === undefined) continue;
+      const start = comp.angle;
+      const target = comp.targetAngle;
+      const delta = shortestAngularDelta(target, start);
+      autoSolveStartAngles.push({ id: comp.id, start });
+      autoSolveDeltas.push({ id: comp.id, delta });
+    }
+    autoSolveIndicator.classList.add('active');
+  }
+
+  function updateAutoSolve(now) {
+    if (gameState !== 'autoSolving') return;
+    const elapsed = now - autoSolveStartTime;
+    const progress = Math.min(elapsed / AUTO_SOLVE_DURATION, 1);
+    const t = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+
+    for (const comp of components) {
+      if (comp.static || comp.targetAngle === undefined) continue;
+      const sd = autoSolveStartAngles.find(s => s.id === comp.id);
+      const dd = autoSolveDeltas.find(d => d.id === comp.id);
+      if (sd && dd) {
+        comp.angle = normalizeAngle(sd.start + dd.delta * t);
+      }
+    }
+
+    if (progress >= 1) {
+      gameState = 'playing';
+      autoSolveIndicator.classList.remove('active');
+      render();
+    }
+  }
+
+  // ============ Level Management ============
+  function stopAutoSolve() {
+    if (gameState === 'autoSolving') {
+      gameState = 'playing';
+      autoSolveIndicator.classList.remove('active');
+    }
+  }
+
+  function startLevel(idx) {
+    stopAutoSolve();
+    currentLevel = idx;
+    const lv = levels[idx];
+    components = lv.components.map(c => {
+      const clone = { ...c };
+      if (clone.width === undefined && (clone.type === 'MIRROR' || clone.type === 'SPLITTER')) {
+        clone.width = DEFAULT_MIRROR_WIDTH;
+      }
+      return clone;
+    });
+    dragging = null;
+    menuScreen.classList.remove('active');
+    settingsScreen.classList.remove('active');
+    levelSelectScreen.classList.remove('active');
+    winModal.classList.remove('active');
+    gameHUD.style.display = 'flex';
+    hudLevelText.textContent = `第 ${idx + 1} 关 · ${LEVEL_NAMES[idx]}`;
+    if (lv.hint) {
+      hudHint.style.display = 'block';
+      hudHint.textContent = lv.hint;
+    } else {
+      hudHint.style.display = 'none';
+    }
+    autoSolveIndicator.classList.remove('active');
+    gameState = 'playing';
+    if (animationId) cancelAnimationFrame(animationId);
+    function loop(now) {
+      if (gameState === 'autoSolving') updateAutoSolve(now);
+      render();
+      animationId = requestAnimationFrame(loop);
+    }
+    animationId = requestAnimationFrame(loop);
+  }
+
+  function showMenu() {
+    stopAutoSolve();
+    gameState = 'menu';
+    if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
+    gameHUD.style.display = 'none';
+    hudHint.style.display = 'none';
+    winModal.classList.remove('active');
+    autoSolveIndicator.classList.remove('active');
+    settingsScreen.classList.remove('active');
+    levelSelectScreen.classList.remove('active');
+    menuScreen.classList.add('active');
+  }
+
+  function showSettings() {
+    gameState = 'settings';
+    settingMode.value = gameMode;
+    menuScreen.classList.remove('active');
+    settingsScreen.classList.add('active');
+  }
+
+  function showLevelSelect() {
+    stopAutoSolve();
+    gameState = 'levelSelect';
+    if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
+    gameHUD.style.display = 'none';
+    hudHint.style.display = 'none';
+    winModal.classList.remove('active');
+    autoSolveIndicator.classList.remove('active');
+    menuScreen.classList.remove('active');
+    settingsScreen.classList.remove('active');
+    levelSelectScreen.classList.add('active');
+    levelSelectModeLabel.textContent = gameMode === 'linear' ? '线性挑战模式（需按顺序解锁）' : '自由探索模式（可任意选关）';
+    levelGrid.innerHTML = '';
+    for (let i = 0; i < levels.length; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'level-cell';
+      if (progress.cleared[i]) cell.classList.add('cleared');
+      const isLocked = gameMode === 'linear' && i > progress.highestUnlocked;
+      if (isLocked) {
+        cell.classList.add('locked');
+        cell.innerHTML = `<span class="lock-icon">🔒</span><span class="level-name">${LEVEL_NAMES[i]}</span>`;
+      } else {
+        cell.innerHTML = `<span class="level-num">${i === 0 ? '教' : i}</span><span class="level-name">${LEVEL_NAMES[i]}</span>`;
+        cell.addEventListener('click', () => {
+          levelSelectScreen.classList.remove('active');
+          startLevel(i);
+        });
+      }
+      levelGrid.appendChild(cell);
+    }
+  }
+
+  // ============ Button Handlers ============
+  document.getElementById('btn-start').addEventListener('click', () => showLevelSelect());
+  document.getElementById('btn-tutorial').addEventListener('click', () => { menuScreen.classList.remove('active'); startLevel(0); });
+  document.getElementById('btn-settings').addEventListener('click', () => showSettings());
+  document.getElementById('btn-settings-back').addEventListener('click', () => showMenu());
+  document.getElementById('btn-level-select-back').addEventListener('click', () => showMenu());
+  document.getElementById('btn-back-menu').addEventListener('click', () => showMenu());
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    if (gameState === 'playing' || gameState === 'autoSolving') startLevel(currentLevel);
+  });
+  document.getElementById('btn-auto-solve').addEventListener('click', () => startAutoSolve());
+  document.getElementById('btn-win-retry').addEventListener('click', () => { winModal.classList.remove('active'); startLevel(currentLevel); });
+  document.getElementById('btn-reset-progress').addEventListener('click', function() {
+    progress = { cleared: {}, highestUnlocked: 0 };
+    saveProgress(progress);
+    const btn = this;
+    const orig = btn.textContent;
+    btn.textContent = '✓ 已重置';
+    btn.style.borderColor = 'var(--accent)';
+    setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; }, 1500);
+  });
+  settingMode.addEventListener('change', () => { gameMode = settingMode.value; saveSettings(); });
+
+  // ============ Viewport Scaling (适配顶部 sticky header) ============
+  function resizeViewport() {
+    const maxW = window.innerWidth - 40;
+    const maxH = window.innerHeight - 70 - 64; // header(70) + 上下 padding(64)
+    const scaleX = maxW / VW;
+    const scaleY = maxH / VH;
+    const scale = Math.min(scaleX, scaleY, 1.2);
+    gameViewport.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  }
+  window.addEventListener('resize', resizeViewport);
+  resizeViewport();
+
+  // ============ Init ============
+  loadSettings();
+  progress = loadProgress();
+  showMenu();
+  console.log('光影棱镜解谜 v2 · 30关 · Light & Prism Puzzle · Ready');
+})();
+
+// ===== 主题切换按钮（与 memory.html 一致，游戏运行时也可用） =====
+(function() {
+  var toggle = document.getElementById('themeToggle');
+  var iconSpan = document.getElementById('themeIcon');
+  var SUN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>';
+  var MOON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>';
+
+  function applyIcon() {
+    var theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    iconSpan.innerHTML = theme === 'dark' ? SUN_SVG : MOON_SVG;
+  }
+  applyIcon();
+
+  toggle.addEventListener('click', function() {
+    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+    var next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    applyIcon();
+  });
+})();
+</script>
+</body>
+</html>

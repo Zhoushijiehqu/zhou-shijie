@@ -1002,7 +1002,7 @@ body { overflow-wrap: break-word; }
     if (Math.abs(denomDot) < EPSILON) return null;
     const t = -vdot(oa, denom) / denomDot;
     if (t < EPSILON) return null;
-    const u = (dir.x * (origin.y - a.y) - dir.y * (origin.x - a.x)) / (d.x * dir.y - d.y * dir.x);
+    const u = (dir.y * (origin.x - a.x) - dir.x * (origin.y - a.y)) / (d.x * dir.y - d.y * dir.x);
     if (u < -EPSILON || u > 1 + EPSILON) return null;
     const point = vadd(origin, vscale(dir, t));
     const normal = vnorm(vperp(d));
@@ -1300,7 +1300,7 @@ body { overflow-wrap: break-word; }
       if (!isStatic) {
         ctx.strokeStyle = 'rgba(255,255,255,0.25)';
         ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.arc(comp.x, comp.y, 16, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(comp.x, comp.y, ((comp.width || DEFAULT_MIRROR_WIDTH) / 2 + 4), 0, Math.PI * 2); ctx.stroke();
       }
       ctx.fillStyle = labelColor;
       ctx.font = '9px "Segoe UI","PingFang SC",sans-serif';
@@ -1339,7 +1339,7 @@ body { overflow-wrap: break-word; }
       if (!isStaticPrism) {
         ctx.strokeStyle = 'rgba(179,136,255,0.3)';
         ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.arc(comp.x, comp.y, 18, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(comp.x, comp.y, ((comp.size || 44) * 0.8), 0, Math.PI * 2); ctx.stroke();
       }
       ctx.fillStyle = labelC;
       ctx.font = '9px "Segoe UI","PingFang SC",sans-serif';
@@ -1370,7 +1370,9 @@ body { overflow-wrap: break-word; }
       for (let ti = 0; ti < lv.targets.length; ti++) {
         if (litTargets.has(ti)) continue;
         const t = lv.targets[ti];
-        if (seg.color !== t.color) continue;
+        // 兼容过滤白光的不同字符串表现形式
+        const matchColor = (c1, c2) => (c1 === 'white' || c1 === '#ffffff') ? (c2 === 'white' || c2 === '#ffffff') : c1 === c2;
+        if (!matchColor(seg.color, t.color)) continue;
         const ax = seg.to.x - seg.from.x;
         const ay = seg.to.y - seg.from.y;
         const segLen2 = ax * ax + ay * ay;
@@ -1433,7 +1435,9 @@ body { overflow-wrap: break-word; }
       const dx = pos.x - comp.x;
       const dy = pos.y - comp.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const hitRadius = comp.type === 'PRISM' ? 34 : 34;
+      // 动态计算点击抓取半径：平面镜和分光片为其宽度的一半加富余，确保整面镜面任意位置均可响应点击
+      const radiusBasis = comp.type === 'PRISM' ? (comp.size || 44) : (comp.width || DEFAULT_MIRROR_WIDTH);
+      const hitRadius = comp.type === 'PRISM' ? radiusBasis * 0.9 : (radiusBasis / 2 + 12);
       if (dist < hitRadius) return comp;
     }
     return null;
@@ -1443,10 +1447,7 @@ body { overflow-wrap: break-word; }
     if (!dragging || gameState !== 'playing') return;
     const pos = getCanvasPos(e);
     const currentAngle = Math.atan2(pos.y - dragging.y, pos.x - dragging.x);
-    let delta = currentAngle - dragStartAngle;
-    // 角度量化阈值：小于 0.5 度的微小变化忽略，避免手抖导致镜子乱转
-    const ANGLE_THRESHOLD = 0.0087; // ≈0.5°
-    if (Math.abs(delta) < ANGLE_THRESHOLD) return;
+    const delta = currentAngle - dragStartAngle;
     dragging.angle = normalizeAngle(dragCompStartAngle + delta);
     e.preventDefault();
   }
@@ -1462,6 +1463,7 @@ body { overflow-wrap: break-word; }
   }
 
   canvas.addEventListener('pointerdown', function(e) {
+    if (dragging) return;
     if (gameState !== 'playing') return;
     const pos = getCanvasPos(e);
     const comp = findComponentAt(pos);

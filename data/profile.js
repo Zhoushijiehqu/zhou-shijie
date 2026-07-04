@@ -293,6 +293,16 @@ window.ProfileData = {
       file: 'games/sonic.html',
       accent: 'accent',
       available: true
+    },
+    {
+      name: '引力弹弓航天挑战',
+      slug: 'gravity',
+      desc: '深空探索物理游戏，利用行星引力场弹弓变轨，将探测器精准送达目标。20 关含黑洞与斥力星。',
+      tags: ['物理', '引力', '弹弓'],
+      techStack: ['HTML', 'Canvas', 'JS'],
+      file: 'games/gravity.html',
+      accent: 'primary',
+      available: true
     }
   ],
 

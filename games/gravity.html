@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>引力弹弓航天挑战 | Gravity Slingshot</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  img, video { max-width: 100%; height: auto; display: block; }
+  body { overflow-wrap: break-word; }
+
+  :root {
+    --bg-deep: #06060f;
+    --bg-panel: #0d0d24;
+    --cyan: #00e5ff;
+    --gold: #ffd740;
+    --magenta: #ff4081;
+    --white: #e0e0f0;
+    --muted: #6a6a8a;
+    --border: #1a1a3a;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-deep);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #game-wrapper {
+    position: relative;
+    width: 800px;
+    max-width: 100vw;
+    aspect-ratio: 4 / 3;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    box-shadow: 0 0 60px rgba(0, 229, 255, 0.12), 0 0 120px rgba(0, 229, 255, 0.04);
+    touch-action: none;
+  }
+
+  /* Overlay panels */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .overlay.active { pointer-events: auto; }
+
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px 36px;
+    text-align: center;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    animation: panelIn 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  @keyframes panelIn {
+    from { opacity: 0; transform: scale(0.92) translateY(16px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .panel h1 {
+    color: var(--cyan);
+    font-size: 28px;
+    margin: 0 0 6px;
+    letter-spacing: 2px;
+    font-weight: 700;
+  }
+  .panel h2 {
+    color: var(--white);
+    font-size: 20px;
+    margin: 0 0 16px;
+    font-weight: 600;
+  }
+  .panel p {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.7;
+    margin: 0 0 20px;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 12px 32px;
+    margin: 6px;
+    border: 1px solid var(--cyan);
+    background: transparent;
+    color: var(--cyan);
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    font-family: inherit;
+    min-width: 140px;
+    min-height: 44px;
+  }
+  .btn:hover {
+    background: var(--cyan);
+    color: var(--bg-deep);
+    box-shadow: 0 0 24px rgba(0, 229, 255, 0.4);
+  }
+  .btn.primary {
+    background: var(--cyan);
+    color: var(--bg-deep);
+  }
+  .btn.primary:hover {
+    box-shadow: 0 0 32px rgba(0, 229, 255, 0.6);
+  }
+  .btn.gold {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .btn.gold:hover {
+    background: var(--gold);
+    color: var(--bg-deep);
+    box-shadow: 0 0 24px rgba(255, 215, 64, 0.5);
+  }
+  .btn.danger {
+    border-color: var(--magenta);
+    color: var(--magenta);
+  }
+  .btn.danger:hover {
+    background: var(--magenta);
+    color: #fff;
+    box-shadow: 0 0 24px rgba(255, 64, 129, 0.5);
+  }
+
+  .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* HUD */
+  .hud {
+    position: absolute;
+    top: 12px;
+    left: 16px;
+    right: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .hud > * { pointer-events: auto; }
+  .hud-level {
+    color: var(--cyan);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(0,229,255,0.5);
+  }
+  .hud-btns {
+    display: flex;
+    gap: 8px;
+  }
+  .hud-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    background: rgba(13,13,36,0.85);
+    color: var(--muted);
+    font-size: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    font-family: inherit;
+    min-height: 36px;
+  }
+  .hud-btn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
+  /* Tutorial diagram */
+  .diagram {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+  .diagram svg { width: 200px; height: 120px; }
+
+  /* Celebration */
+  .confetti {
+    position: absolute;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  @media (max-width: 768px) {
+    .panel { padding: 28px 20px; }
+    .panel h1 { font-size: 22px; }
+    .btn { padding: 10px 20px; font-size: 13px; min-width: 110px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="game-wrapper">
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- HUD -->
+  <div class="hud" id="hud" style="display:none;">
+    <span class="hud-level" id="hudLevel">第 1 关</span>
+    <div class="hud-btns">
+      <button class="hud-btn" id="btnRetry">↻ 重试</button>
+      <button class="hud-btn" id="btnMenu">☰ 菜单</button>
+    </div>
+  </div>
+
+  <!-- Menu Overlay -->
+  <div class="overlay active" id="overlayMenu">
+    <div class="panel">
+      <h1>🌌 引力弹弓航天挑战</h1>
+      <p>利用行星引力场进行弹弓变轨，<br>将探测器精准送达目标区域。</p>
+      <div class="btn-row">
+        <button class="btn primary" id="btnStart">▶ 开始游戏</button>
+        <button class="btn" id="btnTutorial">📖 教学原理</button>
+        <button class="btn" id="btnSettings">⚙ 游戏设置</button>
+      </div>
+      <p style="margin-top:16px;font-size:12px;" id="bestInfo">最高通关：—</p>
+    </div>
+  </div>
+
+  <!-- Tutorial Overlay -->
+  <div class="overlay" id="overlayTutorial" style="display:none;">
+    <div class="panel">
+      <h2>📖 引力弹弓原理</h2>
+      <div class="diagram">
+        <svg viewBox="0 0 200 120">
+          <circle cx="100" cy="60" r="20" fill="none" stroke="#ffd740" stroke-width="1.5" stroke-dasharray="4"/>
+          <circle cx="100" cy="60" r="4" fill="#ffd740"/>
+          <text x="100" y="55" fill="#ffd740" font-size="9" text-anchor="middle">行星</text>
+          <path d="M20,90 Q60,30 180,50" fill="none" stroke="#00e5ff" stroke-width="1.5"/>
+          <polygon points="175,45 180,50 175,55" fill="#00e5ff"/>
+          <text x="100" y="20" fill="#00e5ff" font-size="9" text-anchor="middle">探测器轨迹</text>
+          <text x="100" y="105" fill="#6a6a8a" font-size="9" text-anchor="middle">引力弯曲飞行路径 → 加速弹弓效应</text>
+        </svg>
+      </div>
+      <p>探测器飞越行星时，行星引力会弯曲其轨迹并改变速度。<br>巧妙利用多颗行星的引力叠加，可实现"免费加速"——<br>这就是 NASA 旅行者号使用的引力弹弓技术。</p>
+      <p style="font-size:12px;color:var(--muted);">💡 操作：按住探测器向后拖拽蓄力，松开发射</p>
+      <button class="btn" id="btnTutorialBack">← 返回菜单</button>
+    </div>
+  </div>
+
+  <!-- Settings Overlay -->
+  <div class="overlay" id="overlaySettings" style="display:none;">
+    <div class="panel">
+      <h2>⚙ 游戏设置</h2>
+      <p style="color:var(--muted);">音效开关（预留）</p>
+      <div class="btn-row" style="margin-top:16px;">
+        <button class="btn" id="btnSettingsBack">← 返回菜单</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Win Overlay -->
+  <div class="overlay" id="overlayWin" style="display:none;">
+    <div class="panel">
+      <h2 style="color:var(--gold);">🎉 通关成功！</h2>
+      <p id="winMsg">探测器精准抵达目标！</p>
+      <div class="btn-row">
+        <button class="btn gold" id="btnNext">▶ 下一关</button>
+        <button class="btn" id="btnWinMenu">☰ 返回菜单</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div class="overlay" id="overlayGameOver" style="display:none;">
+    <div class="panel">
+      <h2 style="color:var(--magenta);">💥 任务失败</h2>
+      <p id="failMsg">探测器坠毁！</p>
+      <div class="btn-row">
+        <button class="btn danger" id="btnFailRetry">↻ 重试本关</button>
+        <button class="btn" id="btnFailMenu">☰ 返回菜单</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Celebration Overlay -->
+  <div class="overlay" id="overlayCelebrate" style="display:none;">
+    <div class="panel">
+      <h1 style="color:var(--gold);font-size:32px;">🏆 全通关！</h1>
+      <p>你已征服全部 20 个引力弹弓关卡！<br>引力大师，实至名归。</p>
+      <button class="btn gold" id="btnCelebrateMenu">☰ 返回菜单</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  引力弹弓航天挑战 (Gravity Slingshot)
+//  单文件 HTML5 Canvas 游戏
+// ============================================================
+
+// ─── DOM 引用 ───────────────────────────────────────────────
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// ─── Retina 适配 ────────────────────────────────────────────
+const CSS_W = 800;
+const CSS_H = 600;
+const dpr = Math.min(window.devicePixelRatio || 1, 2); // 上限2x防性能问题
+canvas.width = CSS_W * dpr;
+canvas.height = CSS_H * dpr;
+canvas.style.width = CSS_W + 'px';
+canvas.style.height = CSS_H + 'px';
+ctx.scale(dpr, dpr);
+
+// ─── 物理常量 ───────────────────────────────────────────────
+const G = 800;           // 引力常数（调校到游戏手感合适）
+const MAX_TAIL = 60;     // 尾迹最大点数
+const PREDICT_STEPS = 300; // 预测虚线步数
+const PREDICT_DT = 0.016;  // 预测每步时间（秒）
+const BOUNDARY_MARGIN = 200; // 飞出边界判定距离
+const MIN_DRAG_DIST = 8;    // 最小拖拽距离（像素）才算有效蓄力
+const MAX_LAUNCH_SPEED = 500; // 最大发射速度
+
+// ─── 游戏状态枚举 ───────────────────────────────────────────
+const State = {
+  MENU: 'MENU',
+  TUTORIAL: 'TUTORIAL',
+  SETTINGS: 'SETTINGS',
+  AIMING: 'AIMING',
+  FLYING: 'FLYING',
+  WIN: 'WIN',
+  GAME_OVER: 'GAME_OVER',
+  CELEBRATE: 'CELEBRATE'
+};
+
+// ─── 关卡配置（20关完整数组）─────────────────────────────────
+const LEVELS = [
+  // 第1关：单行星入门
+  {
+    id: 1, name: '初次引力',
+    planets: [
+      { x: 400, y: 300, r: 35, mass: 800, color: '#4488ff', glowColor: 'rgba(68,136,255,0.3)', name: '蓝星' }
+    ],
+    playerStart: { x: 100, y: 300 },
+    goal: { x: 700, y: 300, r: 28 },
+    walls: []
+  },
+  // 第2关：双星引力走廊
+  {
+    id: 2, name: '双星走廊',
+    planets: [
+      { x: 300, y: 220, r: 30, mass: 600, color: '#ff8844', glowColor: 'rgba(255,136,68,0.3)', name: '火星' },
+      { x: 500, y: 380, r: 30, mass: 600, color: '#44cc88', glowColor: 'rgba(68,204,136,0.3)', name: '绿星' }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: []
+  },
+  // 第3关：弹弓加速
+  {
+    id: 3, name: '弹弓加速',
+    planets: [
+      { x: 350, y: 300, r: 45, mass: 1400, color: '#ffaa00', glowColor: 'rgba(255,170,0,0.35)', name: '巨行星' }
+    ],
+    playerStart: { x: 80, y: 180 },
+    goal: { x: 720, y: 420, r: 28 },
+    walls: []
+  },
+  // 第4关：黑洞吞噬
+  {
+    id: 4, name: '黑洞吞噬',
+    planets: [
+      { x: 400, y: 300, r: 40, mass: 2000, color: '#111122', glowColor: 'rgba(100,50,200,0.25)', name: '黑洞',
+        isBlackHole: true }
+    ],
+    playerStart: { x: 80, y: 200 },
+    goal: { x: 720, y: 400, r: 28 },
+    walls: []
+  },
+  // 第5关：斥力反重力星
+  {
+    id: 5, name: '反重力星',
+    planets: [
+      { x: 400, y: 300, r: 35, mass: -900, color: '#ff44aa', glowColor: 'rgba(255,68,170,0.3)', name: '斥力星',
+        isRepulsor: true }
+    ],
+    playerStart: { x: 100, y: 300 },
+    goal: { x: 700, y: 300, r: 28 },
+    walls: []
+  },
+  // 第6关：三星环绕
+  {
+    id: 6, name: '三星环绕',
+    planets: [
+      { x: 250, y: 200, r: 25, mass: 500, color: '#ff6644', glowColor: 'rgba(255,102,68,0.25)', name: '星A' },
+      { x: 550, y: 200, r: 25, mass: 500, color: '#44aaff', glowColor: 'rgba(68,170,255,0.25)', name: '星B' },
+      { x: 400, y: 420, r: 30, mass: 700, color: '#ffcc44', glowColor: 'rgba(255,204,68,0.25)', name: '星C' }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: []
+  },
+  // 第7关：狭窄通道
+  {
+    id: 7, name: '狭窄通道',
+    planets: [
+      { x: 300, y: 200, r: 32, mass: 700, color: '#8866ff', glowColor: 'rgba(136,102,255,0.3)', name: '上星' },
+      { x: 300, y: 400, r: 32, mass: 700, color: '#8866ff', glowColor: 'rgba(136,102,255,0.3)', name: '下星' },
+      { x: 550, y: 300, r: 28, mass: 600, color: '#ff8866', glowColor: 'rgba(255,136,102,0.3)', name: '右星' }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: []
+  },
+  // 第8关：引力迷宫
+  {
+    id: 8, name: '引力迷宫',
+    planets: [
+      { x: 200, y: 150, r: 28, mass: 600, color: '#44ddcc', glowColor: 'rgba(68,221,204,0.25)', name: '星1' },
+      { x: 400, y: 250, r: 30, mass: 800, color: '#dd44aa', glowColor: 'rgba(221,68,170,0.25)', name: '星2' },
+      { x: 600, y: 150, r: 28, mass: 600, color: '#44ddcc', glowColor: 'rgba(68,221,204,0.25)', name: '星3' },
+      { x: 300, y: 450, r: 26, mass: 550, color: '#ddaa44', glowColor: 'rgba(221,170,68,0.25)', name: '星4' },
+      { x: 550, y: 420, r: 26, mass: 550, color: '#ddaa44', glowColor: 'rgba(221,170,68,0.25)', name: '星5' }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: []
+  },
+  // 第9关：弹弓连跳
+  {
+    id: 9, name: '弹弓连跳',
+    planets: [
+      { x: 250, y: 300, r: 35, mass: 1000, color: '#ff8800', glowColor: 'rgba(255,136,0,0.3)', name: '巨行星A' },
+      { x: 550, y: 300, r: 35, mass: 1000, color: '#ff8800', glowColor: 'rgba(255,136,0,0.3)', name: '巨行星B' }
+    ],
+    playerStart: { x: 80, y: 200 },
+    goal: { x: 720, y: 400, r: 28 },
+    walls: []
+  },
+  // 第10关：墙壁反弹
+  {
+    id: 10, name: '墙壁反弹',
+    planets: [
+      { x: 400, y: 300, r: 32, mass: 900, color: '#44aaff', glowColor: 'rgba(68,170,255,0.3)', name: '中心星' }
+    ],
+    playerStart: { x: 100, y: 300 },
+    goal: { x: 700, y: 300, r: 28 },
+    walls: [
+      { x: 200, y: 100, w: 400, h: 8 },
+      { x: 200, y: 492, w: 400, h: 8 }
+    ]
+  },
+  // 第11关：四星方阵
+  {
+    id: 11, name: '四星方阵',
+    planets: [
+      { x: 250, y: 200, r: 24, mass: 500, color: '#ff6688', glowColor: 'rgba(255,102,136,0.25)', name: '星1' },
+      { x: 550, y: 200, r: 24, mass: 500, color: '#ff6688', glowColor: 'rgba(255,102,136,0.25)', name: '星2' },
+      { x: 250, y: 400, r: 24, mass: 500, color: '#6688ff', glowColor: 'rgba(102,136,255,0.25)', name: '星3' },
+      { x: 550, y: 400, r: 24, mass: 500, color: '#6688ff', glowColor: 'rgba(102,136,255,0.25)', name: '星4' }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: []
+  },
+  // 第12关：S形弯道
+  {
+    id: 12, name: 'S形弯道',
+    planets: [
+      { x: 280, y: 200, r: 28, mass: 650, color: '#44ccaa', glowColor: 'rgba(68,204,170,0.25)', name: '上左' },
+      { x: 520, y: 400, r: 28, mass: 650, color: '#44ccaa', glowColor: 'rgba(68,204,170,0.25)', name: '下右' }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: []
+  },
+  // 第13关：黑洞双星
+  {
+    id: 13, name: '黑洞双星',
+    planets: [
+      { x: 350, y: 280, r: 30, mass: 1500, color: '#111122', glowColor: 'rgba(100,50,200,0.2)', name: '黑洞A',
+        isBlackHole: true },
+      { x: 480, y: 340, r: 30, mass: 1500, color: '#111122', glowColor: 'rgba(100,50,200,0.2)', name: '黑洞B',
+        isBlackHole: true }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: []
+  },
+  // 第14关：斥力环绕
+  {
+    id: 14, name: '斥力环绕',
+    planets: [
+      { x: 400, y: 300, r: 40, mass: -1200, color: '#ff44aa', glowColor: 'rgba(255,68,170,0.3)', name: '中心斥力',
+        isRepulsor: true },
+      { x: 200, y: 200, r: 22, mass: 400, color: '#44aaff', glowColor: 'rgba(68,170,255,0.2)', name: '小星A' },
+      { x: 600, y: 400, r: 22, mass: 400, color: '#44aaff', glowColor: 'rgba(68,170,255,0.2)', name: '小星B' }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: []
+  },
+  // 第15关：五芒星阵
+  {
+    id: 15, name: '五芒星阵',
+    planets: [
+      { x: 400, y: 160, r: 22, mass: 450, color: '#ff8844', glowColor: 'rgba(255,136,68,0.2)', name: '顶星' },
+      { x: 250, y: 260, r: 22, mass: 450, color: '#44ff88', glowColor: 'rgba(68,255,136,0.2)', name: '左星' },
+      { x: 550, y: 260, r: 22, mass: 450, color: '#4488ff', glowColor: 'rgba(68,136,255,0.2)', name: '右星' },
+      { x: 300, y: 420, r: 22, mass: 450, color: '#ff44cc', glowColor: 'rgba(255,68,204,0.2)', name: '下左' },
+      { x: 500, y: 420, r: 22, mass: 450, color: '#ffcc44', glowColor: 'rgba(255,204,68,0.2)', name: '下右' }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: []
+  },
+  // 第16关：墙壁迷宫
+  {
+    id: 16, name: '墙壁迷宫',
+    planets: [
+      { x: 400, y: 300, r: 30, mass: 800, color: '#8866ff', glowColor: 'rgba(136,102,255,0.25)', name: '中心星' }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: [
+      { x: 250, y: 80, w: 8, h: 180 },
+      { x: 550, y: 340, w: 8, h: 180 },
+      { x: 150, y: 400, w: 200, h: 8 },
+      { x: 450, y: 150, w: 200, h: 8 }
+    ]
+  },
+  // 第17关：引力弹弓大师
+  {
+    id: 17, name: '弹弓大师',
+    planets: [
+      { x: 300, y: 250, r: 38, mass: 1200, color: '#ffaa00', glowColor: 'rgba(255,170,0,0.3)', name: '巨行星' },
+      { x: 550, y: 350, r: 28, mass: 700, color: '#44aaff', glowColor: 'rgba(68,170,255,0.25)', name: '中行星' }
+    ],
+    playerStart: { x: 80, y: 200 },
+    goal: { x: 720, y: 420, r: 28 },
+    walls: []
+  },
+  // 第18关：三重黑洞
+  {
+    id: 18, name: '三重黑洞',
+    planets: [
+      { x: 280, y: 220, r: 28, mass: 1300, color: '#111122', glowColor: 'rgba(80,40,180,0.2)', name: '黑洞A',
+        isBlackHole: true },
+      { x: 520, y: 380, r: 28, mass: 1300, color: '#111122', glowColor: 'rgba(80,40,180,0.2)', name: '黑洞B',
+        isBlackHole: true },
+      { x: 400, y: 300, r: 24, mass: 1000, color: '#111122', glowColor: 'rgba(80,40,180,0.2)', name: '黑洞C',
+        isBlackHole: true }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: []
+  },
+  // 第19关：终极混合
+  {
+    id: 19, name: '终极混合',
+    planets: [
+      { x: 300, y: 200, r: 30, mass: 900, color: '#ff8844', glowColor: 'rgba(255,136,68,0.25)', name: '引力星' },
+      { x: 500, y: 400, r: 30, mass: -800, color: '#ff44aa', glowColor: 'rgba(255,68,170,0.25)', name: '斥力星',
+        isRepulsor: true },
+      { x: 400, y: 300, r: 26, mass: 1100, color: '#111122', glowColor: 'rgba(80,40,180,0.2)', name: '黑洞',
+        isBlackHole: true }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: []
+  },
+  // 第20关：最终试炼
+  {
+    id: 20, name: '最终试炼',
+    planets: [
+      { x: 200, y: 180, r: 26, mass: 600, color: '#ff6688', glowColor: 'rgba(255,102,136,0.2)', name: '星1' },
+      { x: 400, y: 140, r: 30, mass: 1000, color: '#ffaa00', glowColor: 'rgba(255,170,0,0.3)', name: '巨行星' },
+      { x: 600, y: 180, r: 26, mass: 600, color: '#6688ff', glowColor: 'rgba(102,136,255,0.2)', name: '星2' },
+      { x: 300, y: 420, r: 28, mass: 800, color: '#44ccaa', glowColor: 'rgba(68,204,170,0.25)', name: '星3' },
+      { x: 500, y: 420, r: 28, mass: -700, color: '#ff44aa', glowColor: 'rgba(255,68,170,0.25)', name: '斥力星',
+        isRepulsor: true }
+    ],
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, r: 28 },
+    walls: [
+      { x: 350, y: 250, w: 100, h: 6 },
+      { x: 350, y: 344, w: 100, h: 6 }
+    ]
+  }
+];
+
+// ─── 游戏全局状态 ───────────────────────────────────────────
+let gameState = State.MENU;
+let currentLevel = 0;          // 当前关卡索引（0-based）
+let bestLevel = 0;             // 最高通关关卡（1-based，0=未通关）
+
+// ─── 玩家/探测器状态 ────────────────────────────────────────
+let player = {
+  x: 0, y: 0,
+  vx: 0, vy: 0,
+  angle: 0,                   // 朝向角度（弧度）
+  tail: [],                   // 尾迹点数组 [{x, y, alpha}]
+  alive: true
+};
+
+// ─── 瞄准状态 ───────────────────────────────────────────────
+let aimStart = null;          // 鼠标按下位置 {x, y}
+let aimCurrent = null;        // 当前鼠标位置 {x, y}
+let predictPath = [];         // 预测轨迹点数组
+let predictDirty = true;      // 脏标记
+
+// ─── 粒子系统 ───────────────────────────────────────────────
+let particles = [];           // [{x, y, vx, vy, life, maxLife, color, size}]
+
+// ─── 星星背景 ───────────────────────────────────────────────
+let stars = [];
+
+// ─── 计时与帧率 ─────────────────────────────────────────────
+let lastTime = 0;
+let animFrameId = null;
+
+// ─── 输入状态 ───────────────────────────────────────────────
+let pointerDown = false;
+let pointerX = 0;
+let pointerY = 0;
+
+// ─── 初始化星星背景 ─────────────────────────────────────────
+function initStars() {
+  stars = [];
+  for (let i = 0; i < 120; i++) {
+    stars.push({
+      x: Math.random() * CSS_W,
+      y: Math.random() * CSS_H,
+      r: Math.random() * 1.5 + 0.3,
+      twinkle: Math.random() * Math.PI * 2,
+      speed: Math.random() * 0.02 + 0.005,
+      alpha: Math.random() * 0.6 + 0.3
+    });
+  }
+}
+initStars();
+
+// ─── 加载关卡 ───────────────────────────────────────────────
+function loadLevel(index) {
+  const lv = LEVELS[index];
+  player.x = lv.playerStart.x;
+  player.y = lv.playerStart.y;
+  player.vx = 0;
+  player.vy = 0;
+  player.angle = 0;
+  player.tail = [];
+  player.alive = true;
+  aimStart = null;
+  aimCurrent = null;
+  predictPath = [];
+  predictDirty = true;
+  particles = [];
+  gameState = State.AIMING;
+  updateHUD();
+}
+
+// ─── 重置当前关卡 ───────────────────────────────────────────
+function resetLevel() {
+  loadLevel(currentLevel);
+}
+
+// ─── 更新 HUD ────────────────────────────────────────────────
+function updateHUD() {
+  const hud = document.getElementById('hud');
+  const hudLevel = document.getElementById('hudLevel');
+  if (gameState === State.AIMING || gameState === State.FLYING) {
+    hud.style.display = 'flex';
+    hudLevel.textContent = '第 ' + (currentLevel + 1) + ' 关 · ' + LEVELS[currentLevel].name;
+  } else {
+    hud.style.display = 'none';
+  }
+}
+
+// ─── 显示/隐藏覆盖层 ─────────────────────────────────────────
+function showOverlay(id) {
+  document.querySelectorAll('.overlay').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function hideAllOverlays() {
+  document.querySelectorAll('.overlay').forEach(el => el.classList.remove('active'));
+}
+
+// ─── 粒子生成 ────────────────────────────────────────────────
+function spawnParticles(x, y, count, color, spread, life) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * spread;
+    particles.push({
+      x: x,
+      y: y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: life,
+      maxLife: life,
+      color: color,
+      size: Math.random() * 2.5 + 1
+    });
+  }
+}
+
+// ─── 更新粒子 ────────────────────────────────────────────────
+function updateParticles(dt) {
+  // swap-pop 删除：避免 splice 在循环中移动数组元素的开销
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+    if (p.life <= 0) {
+      particles[i] = particles[particles.length - 1];
+      particles.pop();
+    }
+  }
+}
+
+// ─── 计算预测轨迹（脏标记机制）───────────────────────────────
+function computePredictPath() {
+  if (!predictDirty) return;
+  predictDirty = false;
+
+  const lv = LEVELS[currentLevel];
+  predictPath = [];
+
+  // 计算发射初速度
+  if (!aimStart || !aimCurrent) return;
+  const dx = aimStart.x - aimCurrent.x;
+  const dy = aimStart.y - aimCurrent.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < MIN_DRAG_DIST) return;
+
+  // 发射方向 = 拖拽反方向（从 current 指向 start）
+  const dirX = dx / dist;
+  const dirY = dy / dist;
+  const speed = Math.min(dist * 2.5, MAX_LAUNCH_SPEED);
+
+  let px = player.x;
+  let py = player.y;
+  let pvx = dirX * speed;
+  let pvy = dirY * speed;
+
+  for (let i = 0; i < PREDICT_STEPS; i++) {
+    // 引力计算
+    let ax = 0, ay = 0;
+    for (const planet of lv.planets) {
+      const pdx = planet.x - px;
+      const pdy = planet.y - py;
+      const r = Math.sqrt(pdx * pdx + pdy * pdy);
+      if (r < planet.r) {
+        // 碰撞，停止预测
+        predictPath.push({ x: px, y: py, hit: true });
+        return;
+      }
+      if (r < 0.001) continue;
+      const aMag = G * planet.mass / (r * r);
+      const nx = pdx / r;
+      const ny = pdy / r;
+      ax += nx * aMag;
+      ay += ny * aMag;
+    }
+
+    // 墙壁碰撞预测：若下一帧位置进入墙体，预测虚线在此中断（让玩家看到撞墙风险）
+    for (const wall of lv.walls) {
+      if (px + pvx * PREDICT_DT > wall.x && px + pvx * PREDICT_DT < wall.x + wall.w &&
+          py + pvy * PREDICT_DT > wall.y && py + pvy * PREDICT_DT < wall.y + wall.h) {
+        predictPath.push({ x: px, y: py, hit: true });
+        return;
+      }
+    }
+
+    pvx += ax * PREDICT_DT;
+    pvy += ay * PREDICT_DT;
+    px += pvx * PREDICT_DT;
+    py += pvy * PREDICT_DT;
+
+    // 边界检查
+    if (px < -BOUNDARY_MARGIN || px > CSS_W + BOUNDARY_MARGIN ||
+        py < -BOUNDARY_MARGIN || py > CSS_H + BOUNDARY_MARGIN) {
+      predictPath.push({ x: px, y: py, hit: true });
+      return;
+    }
+
+    predictPath.push({ x: px, y: py, hit: false });
+  }
+}
+
+// ─── 物理更新（飞行状态）─────────────────────────────────────
+function updatePhysics(dt) {
+  if (gameState !== State.FLYING) return;
+  if (!player.alive) return;
+
+  const lv = LEVELS[currentLevel];
+
+  // 限制 dt 防止大帧跳跃
+  const clampedDt = Math.min(dt, 0.05);
+
+  // 引力计算
+  let ax = 0, ay = 0;
+  for (const planet of lv.planets) {
+    const pdx = planet.x - player.x;
+    const pdy = planet.y - player.y;
+    const r = Math.sqrt(pdx * pdx + pdy * pdy);
+
+    // 碰撞检测
+    if (r < planet.r) {
+      player.alive = false;
+      spawnParticles(player.x, player.y, 40, planet.isBlackHole ? '#8844ff' : '#ff4444', 200, 1.5);
+      gameState = State.GAME_OVER;
+      updateHUD();
+      showOverlay('overlayGameOver');
+      document.getElementById('failMsg').textContent =
+        '探测器撞击 ' + (planet.name || '行星') + '！';
+      return;
+    }
+
+    if (r < 0.001) continue;
+
+    const aMag = G * planet.mass / (r * r);
+    const nx = pdx / r;
+    const ny = pdy / r;
+    ax += nx * aMag;
+    ay += ny * aMag;
+  }
+
+  // 更新速度
+  player.vx += ax * clampedDt;
+  player.vy += ay * clampedDt;
+
+  // 子步长积分：将本帧位移拆成多个子步，每步检测墙壁碰撞，防止高速穿墙
+  const SUB_STEPS = 4;
+  const subDt = clampedDt / SUB_STEPS;
+  for (let s = 0; s < SUB_STEPS; s++) {
+    player.x += player.vx * subDt;
+    player.y += player.vy * subDt;
+
+    // 墙壁碰撞（逐子步检测）
+    for (const wall of lv.walls) {
+      if (player.x > wall.x && player.x < wall.x + wall.w &&
+          player.y > wall.y && player.y < wall.y + wall.h) {
+        player.alive = false;
+        spawnParticles(player.x, player.y, 30, '#ff8844', 150, 1.2);
+        gameState = State.GAME_OVER;
+        updateHUD();
+        showOverlay('overlayGameOver');
+        document.getElementById('failMsg').textContent = '探测器撞上墙壁！';
+        return;
+      }
+    }
+  }
+
+  // 更新朝向
+  const speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
+  if (speed > 0.5) {
+    player.angle = Math.atan2(player.vy, player.vx);
+  }
+
+  // 尾迹
+  if (speed > 1) {
+    player.tail.push({ x: player.x, y: player.y, alpha: 1 });
+    if (player.tail.length > MAX_TAIL) {
+      player.tail.shift();
+    }
+  }
+
+  // 尾迹渐隐
+  for (let i = 0; i < player.tail.length; i++) {
+    player.tail[i].alpha = (i + 1) / player.tail.length * 0.7;
+  }
+
+  // 边界检查
+  if (player.x < -BOUNDARY_MARGIN || player.x > CSS_W + BOUNDARY_MARGIN ||
+      player.y < -BOUNDARY_MARGIN || player.y > CSS_H + BOUNDARY_MARGIN) {
+    player.alive = false;
+    gameState = State.GAME_OVER;
+    updateHUD();
+    showOverlay('overlayGameOver');
+    document.getElementById('failMsg').textContent = '探测器失联——飞出通信范围！';
+    return;
+  }
+
+  // 目标检测
+  const goal = lv.goal;
+  const gdx = goal.x - player.x;
+  const gdy = goal.y - player.y;
+  const gDist = Math.sqrt(gdx * gdx + gdy * gdy);
+  if (gDist < goal.r) {
+    // 胜利！
+    gameState = State.WIN;
+    spawnParticles(player.x, player.y, 60, '#ffd740', 250, 2.5);
+    updateHUD();
+
+    // 更新最高通关记录
+    if (currentLevel + 1 > bestLevel) {
+      bestLevel = currentLevel + 1;
+      saveBest();
+    }
+
+    if (currentLevel >= LEVELS.length - 1) {
+      // 全部通关
+      gameState = State.CELEBRATE;
+      showOverlay('overlayCelebrate');
+    } else {
+      showOverlay('overlayWin');
+      document.getElementById('winMsg').textContent =
+        '探测器精准抵达目标！第 ' + (currentLevel + 1) + ' 关通过。';
+    }
+  }
+}
+
+// ─── 持久化 ──────────────────────────────────────────────────
+function saveBest() {
+  try {
+    localStorage.setItem('gravity_slingshot_best', bestLevel);
+  } catch (e) { /* 隐私模式忽略 */ }
+}
+
+function loadBest() {
+  try {
+    const v = localStorage.getItem('gravity_slingshot_best');
+    if (v !== null) bestLevel = parseInt(v, 10) || 0;
+  } catch (e) { bestLevel = 0; }
+  document.getElementById('bestInfo').textContent =
+    bestLevel > 0 ? '最高通关：第 ' + bestLevel + ' 关' : '最高通关：—';
+}
+loadBest();
+
+// ─── 渲染 ────────────────────────────────────────────────────
+function drawStars(time) {
+  for (const s of stars) {
+    const alpha = s.alpha * (0.5 + 0.5 * Math.sin(s.twinkle + time * s.speed * 0.001));
+    ctx.fillStyle = 'rgba(255,255,255,' + alpha + ')';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawPlanet(planet) {
+  const { x, y, r, color, glowColor, isBlackHole, isRepulsor } = planet;
+
+  // 光晕
+  if (isBlackHole) {
+    // 黑洞吸积盘
+    const grad = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 2.5);
+    grad.addColorStop(0, 'rgba(20,10,40,0.95)');
+    grad.addColorStop(0.3, 'rgba(60,20,120,0.6)');
+    grad.addColorStop(0.6, 'rgba(100,40,180,0.2)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 事件视界
+    const ehGrad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    ehGrad.addColorStop(0, '#000000');
+    ehGrad.addColorStop(0.7, '#0a0a1a');
+    ehGrad.addColorStop(1, '#1a1a3a');
+    ctx.fillStyle = ehGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 光环
+    ctx.strokeStyle = 'rgba(120,60,220,0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(x, y, r * 1.6, r * 0.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 危险警告环：当探测器靠近时显示红色脉冲，给玩家避险预警
+    if (player && player.alive) {
+      const ddx = player.x - x;
+      const ddy = player.y - y;
+      const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+      const dangerR = r * 4;
+      if (dd < dangerR) {
+        const t = (dangerR - dd) / dangerR;  // 0~1，越近越强
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.012);
+        ctx.strokeStyle = 'rgba(255,80,80,' + (0.3 + t * 0.5 * pulse) + ')';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.arc(x, y, r * 2.2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  } else if (isRepulsor) {
+    // 斥力星：品红色调，向外辐射
+    const grad = ctx.createRadialGradient(x, y, r * 0.3, x, y, r * 2);
+    grad.addColorStop(0, 'rgba(255,68,170,0.25)');
+    grad.addColorStop(0.5, 'rgba(255,68,170,0.1)');
+    grad.addColorStop(1, 'rgba(255,68,170,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 主体
+    const bodyGrad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, r * 0.1, x, y, r);
+    bodyGrad.addColorStop(0, '#ff88cc');
+    bodyGrad.addColorStop(0.5, color);
+    bodyGrad.addColorStop(1, '#880044');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 向外箭头指示
+    ctx.strokeStyle = 'rgba(255,100,180,0.4)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2;
+      const sx = x + Math.cos(ang) * (r + 4);
+      const sy = y + Math.sin(ang) * (r + 4);
+      const ex = x + Math.cos(ang) * (r + 14);
+      const ey = y + Math.sin(ang) * (r + 14);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      // 箭头尖
+      const tipX = x + Math.cos(ang) * (r + 18);
+      const tipY = y + Math.sin(ang) * (r + 18);
+      ctx.fillStyle = 'rgba(255,100,180,0.5)';
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    // 普通行星光晕
+    const grad = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 1.8);
+    grad.addColorStop(0, glowColor);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 主体渐变
+    const bodyGrad = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, r * 0.1, x, y, r);
+    bodyGrad.addColorStop(0, '#ffffff');
+    bodyGrad.addColorStop(0.3, color);
+    bodyGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 行星名称标签
+  if (planet.name && !isBlackHole) {
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '10px -apple-system, "PingFang SC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(planet.name, x, y + r + 16);
+  } else if (planet.name && isBlackHole) {
+    ctx.fillStyle = 'rgba(180,140,220,0.6)';
+    ctx.font = '10px -apple-system, "PingFang SC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(planet.name, x, y + r * 2.5 + 14);
+  }
+}
+
+function drawGoal(goal, time) {
+  const { x, y, r } = goal;
+  // 脉冲光环
+  const pulse = 1 + Math.sin(time * 0.003) * 0.15;
+  const outerR = r * 1.5 * pulse;
+
+  // 外光环
+  const grad = ctx.createRadialGradient(x, y, r * 0.6, x, y, outerR);
+  grad.addColorStop(0, 'rgba(255,215,64,0)');
+  grad.addColorStop(0.5, 'rgba(255,215,64,0.25)');
+  grad.addColorStop(1, 'rgba(255,215,64,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(x, y, outerR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 圆环
+  ctx.strokeStyle = 'rgba(255,215,64,0.8)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 内环虚线
+  ctx.setLineDash([4, 6]);
+  ctx.strokeStyle = 'rgba(255,215,64,0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.7, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 中心点
+  ctx.fillStyle = 'rgba(255,215,64,0.9)';
+  ctx.beginPath();
+  ctx.arc(x, y, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawPlayer() {
+  if (!player.alive && gameState === State.GAME_OVER) return;
+
+  const { x, y, angle } = player;
+  const size = 10;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  // 飞船主体（三角形）+ 发光效果（单次 fill，shadow 产生外发光，省去重复 fill）
+  ctx.fillStyle = '#00e5ff';
+  ctx.shadowColor = 'rgba(0,229,255,0.7)';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(size, 0);
+  ctx.lineTo(-size * 0.7, -size * 0.55);
+  ctx.lineTo(-size * 0.4, 0);
+  ctx.lineTo(-size * 0.7, size * 0.55);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // 引擎光点
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(-size * 0.5, 0, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawTail() {
+  if (player.tail.length < 2) return;
+
+  // 渐隐效果：逐段绘制（旧实现先用统一样式画一遍再逐段渐隐，重复绘制浪费性能）
+  ctx.lineCap = 'round';
+  for (let i = 1; i < player.tail.length; i++) {
+    const p = player.tail[i];
+    const alpha = p.alpha;
+    ctx.strokeStyle = 'rgba(0,229,255,' + alpha + ')';
+    ctx.lineWidth = 1.5 * alpha;
+    ctx.beginPath();
+    ctx.moveTo(player.tail[i - 1].x, player.tail[i - 1].y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
+}
+
+function drawPredictPath() {
+  if (gameState !== State.AIMING) return;
+  if (predictPath.length < 2) return;
+
+  // 虚线
+  ctx.setLineDash([5, 8]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(predictPath[0].x, predictPath[0].y);
+
+  for (let i = 1; i < predictPath.length; i++) {
+    const p = predictPath[i];
+    if (p.hit) break;
+    ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 终点标记
+  const last = predictPath[predictPath.length - 1];
+  if (!last.hit) {
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawAimLine() {
+  if (gameState !== State.AIMING) return;
+  if (!aimStart || !aimCurrent) return;
+
+  const dx = aimStart.x - aimCurrent.x;
+  const dy = aimStart.y - aimCurrent.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < MIN_DRAG_DIST) return;
+
+  // 蓄力线（从探测器到鼠标位置）
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(player.x, player.y);
+  ctx.lineTo(aimCurrent.x, aimCurrent.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 力度指示点
+  const power = Math.min(dist / 150, 1);
+  const r = 3 + power * 5;
+  ctx.fillStyle = 'rgba(255,255,255,' + (0.4 + power * 0.5) + ')';
+  ctx.beginPath();
+  ctx.arc(aimCurrent.x, aimCurrent.y, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 发射方向箭头（反方向）
+  const dirX = dx / dist;
+  const dirY = dy / dist;
+  const arrowLen = 20 + power * 30;
+  const ax = player.x + dirX * arrowLen;
+  const ay = player.y + dirY * arrowLen;
+  ctx.strokeStyle = 'rgba(0,229,255,' + (0.5 + power * 0.5) + ')';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(player.x, player.y);
+  ctx.lineTo(ax, ay);
+  ctx.stroke();
+
+  // 箭头尖
+  const tipSize = 8 + power * 4;
+  const tipAngle = Math.atan2(dirY, dirX);
+  ctx.fillStyle = 'rgba(0,229,255,' + (0.6 + power * 0.4) + ')';
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(
+    ax - tipSize * Math.cos(tipAngle - 0.6),
+    ay - tipSize * Math.sin(tipAngle - 0.6)
+  );
+  ctx.lineTo(
+    ax - tipSize * Math.cos(tipAngle + 0.6),
+    ay - tipSize * Math.sin(tipAngle + 0.6)
+  );
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawWalls() {
+  const lv = LEVELS[currentLevel];
+  for (const wall of lv.walls) {
+    ctx.fillStyle = 'rgba(255,136,68,0.5)';
+    ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+    // 发光边
+    ctx.strokeStyle = 'rgba(255,136,68,0.8)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const alpha = p.life / p.maxLife;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawAimHint() {
+  if (gameState !== State.AIMING) return;
+  if (aimStart) return; // 已在拖拽中
+
+  // 闪烁提示文字
+  const blink = Math.sin(Date.now() * 0.004) * 0.3 + 0.7;
+  ctx.fillStyle = 'rgba(255,255,255,' + blink + ')';
+  ctx.font = '13px -apple-system, "PingFang SC", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('按住探测器向后拖拽蓄力发射', player.x, player.y - 28);
+}
+
+// ─── 主渲染 ──────────────────────────────────────────────────
+function render(time) {
+  ctx.clearRect(0, 0, CSS_W, CSS_H);
+
+  // 深空背景
+  ctx.fillStyle = '#06060f';
+  ctx.fillRect(0, 0, CSS_W, CSS_H);
+
+  // 星星
+  drawStars(time);
+
+  const lv = LEVELS[currentLevel];
+
+  // 墙壁
+  drawWalls();
+
+  // 行星
+  for (const planet of lv.planets) {
+    drawPlanet(planet);
+  }
+
+  // 目标区域
+  drawGoal(lv.goal, time);
+
+  // 预测虚线
+  drawPredictPath();
+
+  // 尾迹
+  drawTail();
+
+  // 蓄力线
+  drawAimLine();
+
+  // 探测器
+  drawPlayer();
+
+  // 粒子
+  drawParticles();
+
+  // 瞄准提示
+  drawAimHint();
+}
+
+// ─── 主循环 ──────────────────────────────────────────────────
+function gameLoop(timestamp) {
+  if (lastTime === 0) lastTime = timestamp;
+  let dt = (timestamp - lastTime) / 1000;
+  if (dt <= 0) dt = 0.016;
+  if (dt > 0.1) dt = 0.1; // 防止标签页切换后大跳跃
+  lastTime = timestamp;
+
+  // 物理更新
+  updatePhysics(dt);
+
+  // 粒子更新
+  updateParticles(dt);
+
+  // 渲染
+  render(timestamp);
+
+  animFrameId = requestAnimationFrame(gameLoop);
+}
+
+// ─── 发射探测器 ──────────────────────────────────────────────
+function launch() {
+  if (!aimStart || !aimCurrent) return;
+  const dx = aimStart.x - aimCurrent.x;
+  const dy = aimStart.y - aimCurrent.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < MIN_DRAG_DIST) return;
+
+  const dirX = dx / dist;
+  const dirY = dy / dist;
+  const speed = Math.min(dist * 2.5, MAX_LAUNCH_SPEED);
+
+  player.vx = dirX * speed;
+  player.vy = dirY * speed;
+  player.angle = Math.atan2(dirY, dirX);
+  player.tail = [];
+  gameState = State.FLYING;
+  aimStart = null;
+  aimCurrent = null;
+  predictPath = [];
+  predictDirty = true;
+  updateHUD();
+
+  // 发射粒子
+  spawnParticles(player.x, player.y, 15, '#00e5ff', 80, 0.6);
+}
+
+// ─── 输入处理（Pointer Events 统一桌面+移动）─────────────────
+function getCanvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = CSS_W / rect.width;
+  const scaleY = CSS_H / rect.height;
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY
+  };
+}
+
+function isNearPlayer(pos) {
+  const dx = pos.x - player.x;
+  const dy = pos.y - player.y;
+  return Math.sqrt(dx * dx + dy * dy) < 30;  // 触摸判定圈从 22 扩到 30，移动端更易点中
+}
+
+canvas.addEventListener('pointerdown', function(e) {
+  if (gameState !== State.AIMING) return;
+  const pos = getCanvasPos(e);
+  if (isNearPlayer(pos)) {
+    pointerDown = true;
+    aimStart = { x: pos.x, y: pos.y };
+    aimCurrent = { x: pos.x, y: pos.y };
+    predictDirty = true;
+    canvas.setPointerCapture(e.pointerId);
+  }
+});
+
+canvas.addEventListener('pointermove', function(e) {
+  if (!pointerDown || gameState !== State.AIMING) return;
+  const pos = getCanvasPos(e);
+  aimCurrent = { x: pos.x, y: pos.y };
+  predictDirty = true;
+  computePredictPath();
+});
+
+canvas.addEventListener('pointerup', function(e) {
+  if (!pointerDown) return;
+  pointerDown = false;
+  if (gameState === State.AIMING && aimStart && aimCurrent) {
+    launch();
+  }
+  canvas.releasePointerCapture(e.pointerId);
+});
+
+canvas.addEventListener('pointercancel', function(e) {
+  pointerDown = false;
+  if (gameState === State.AIMING) {
+    aimStart = null;
+    aimCurrent = null;
+    predictPath = [];
+  }
+});
+
+// 键盘：空格重试
+document.addEventListener('keydown', function(e) {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (gameState === State.GAME_OVER) {
+      hideAllOverlays();
+      resetLevel();
+    } else if (gameState === State.WIN) {
+      hideAllOverlays();
+      nextLevel();
+    }
+  }
+  if (e.code === 'Escape') {
+    if (gameState === State.AIMING || gameState === State.FLYING ||
+        gameState === State.GAME_OVER || gameState === State.WIN ||
+        gameState === State.CELEBRATE) {
+      hideAllOverlays();
+      goToMenu();
+    }
+  }
+});
+
+// ─── 按钮事件 ────────────────────────────────────────────────
+function goToMenu() {
+  gameState = State.MENU;
+  hideAllOverlays();
+  showOverlay('overlayMenu');
+  updateHUD();
+  loadBest();
+}
+
+function nextLevel() {
+  currentLevel++;
+  if (currentLevel >= LEVELS.length) {
+    gameState = State.CELEBRATE;
+    showOverlay('overlayCelebrate');
+    updateHUD();
+    return;
+  }
+  loadLevel(currentLevel);
+}
+
+document.getElementById('btnStart').addEventListener('click', function() {
+  hideAllOverlays();
+  currentLevel = 0;
+  loadLevel(0);
+});
+
+document.getElementById('btnTutorial').addEventListener('click', function() {
+  gameState = State.TUTORIAL;
+  showOverlay('overlayTutorial');
+});
+
+document.getElementById('btnTutorialBack').addEventListener('click', function() {
+  gameState = State.MENU;
+  showOverlay('overlayMenu');
+});
+
+document.getElementById('btnSettings').addEventListener('click', function() {
+  gameState = State.SETTINGS;
+  showOverlay('overlaySettings');
+});
+
+document.getElementById('btnSettingsBack').addEventListener('click', function() {
+  gameState = State.MENU;
+  showOverlay('overlayMenu');
+});
+
+document.getElementById('btnRetry').addEventListener('click', function() {
+  hideAllOverlays();
+  resetLevel();
+});
+
+document.getElementById('btnMenu').addEventListener('click', function() {
+  hideAllOverlays();
+  goToMenu();
+});
+
+document.getElementById('btnNext').addEventListener('click', function() {
+  hideAllOverlays();
+  nextLevel();
+});
+
+document.getElementById('btnWinMenu').addEventListener('click', function() {
+  hideAllOverlays();
+  goToMenu();
+});
+
+document.getElementById('btnFailRetry').addEventListener('click', function() {
+  hideAllOverlays();
+  resetLevel();
+});
+
+document.getElementById('btnFailMenu').addEventListener('click', function() {
+  hideAllOverlays();
+  goToMenu();
+});
+
+document.getElementById('btnCelebrateMenu').addEventListener('click', function() {
+  hideAllOverlays();
+  goToMenu();
+});
+
+// ─── 启动 ────────────────────────────────────────────────────
+hideAllOverlays();
+showOverlay('overlayMenu');
+updateHUD();
+lastTime = performance.now();
+animFrameId = requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

@@ -275,6 +275,16 @@ window.ProfileData = {
       file: 'games/prism.html',
       accent: 'primary',
       available: true
+    },
+    {
+      name: '声波盲境探路',
+      slug: 'sonic',
+      desc: '赛博朋克霓虹风格，身处漆黑迷宫中，发射声波探路找金色终点。10 关真实反射。',
+      tags: ['声波', '迷宫', '探路'],
+      techStack: ['HTML', 'Canvas', 'JS'],
+      file: 'games/sonic.html',
+      accent: 'accent',
+      available: true
     }
   ],
 

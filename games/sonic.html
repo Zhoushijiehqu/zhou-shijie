@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>声波盲境探路 | Sonic Blind Maze</title>
+<style>
+  /* ========== 防御性 CSS 底模 ========== */
+  *, *::before, *::after { box-sizing: border-box; }
+  img, video { max-width: 100%; height: auto; display: block; }
+  body { overflow-wrap: break-word; }
+
+  /* ========== 全局样式 ========== */
+  :root {
+    --cyan:    #00ffff;
+    --pink:    #ff00ff;
+    --gold:    #ffd700;
+    --white:   #e0f7fa;
+    --surface: rgba(10, 10, 20, 0.92);
+    --border:  rgba(0, 255, 255, 0.25);
+    --glow-cyan: 0 0 20px rgba(0, 255, 255, 0.6), 0 0 60px rgba(0, 255, 255, 0.3);
+    --glow-pink: 0 0 20px rgba(255, 0, 255, 0.6), 0 0 60px rgba(255, 0, 255, 0.3);
+    --glow-gold: 0 0 20px rgba(255, 215, 0, 0.7), 0 0 60px rgba(255, 215, 0, 0.35);
+  }
+
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: #000;
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;
+    color: var(--white);
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #game-container {
+    position: relative; width: 100vw; height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    background: #000;
+  }
+
+  /* Canvas 逻辑尺寸 800×600，CSS 固定显示尺寸，Retina 由 JS 内部 scale 处理 */
+  #game-canvas {
+    display: block; width: 800px; height: 600px;
+    border: 1px solid rgba(0, 255, 255, 0.15);
+    box-shadow: 0 0 40px rgba(0, 255, 255, 0.08), inset 0 0 40px rgba(0, 255, 255, 0.03);
+    border-radius: 4px; touch-action: none;
+    max-width: 100vw; max-height: 100vh;
+  }
+
+  /* ========== UI 覆盖层 ========== */
+  .ui-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 10;
+  }
+  .ui-overlay.active { pointer-events: auto; }
+
+  .menu-panel {
+    display: none; flex-direction: column; align-items: center; gap: 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 48px 40px; min-width: 360px;
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 0 80px rgba(0, 255, 255, 0.08);
+    animation: fadeInUp 0.5s ease-out;
+  }
+  .menu-panel.visible { display: flex; }
+
+  .game-title {
+    font-size: 28px; font-weight: 700; letter-spacing: 0.08em;
+    text-align: center; color: var(--cyan);
+    text-shadow: var(--glow-cyan); line-height: 1.4;
+  }
+  .game-title .sub {
+    display: block; font-size: 14px; font-weight: 400;
+    letter-spacing: 0.15em; color: rgba(0, 255, 255, 0.55);
+    text-shadow: none; margin-top: 4px;
+  }
+
+  .menu-btn {
+    width: 100%; padding: 14px 28px;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: rgba(0, 255, 255, 0.06); color: var(--cyan);
+    font-size: 16px; font-weight: 600; letter-spacing: 0.05em;
+    cursor: pointer; transition: all 0.25s ease;
+    font-family: inherit; position: relative; overflow: hidden;
+  }
+  .menu-btn:hover {
+    background: rgba(0, 255, 255, 0.15); border-color: rgba(0, 255, 255, 0.5);
+    box-shadow: var(--glow-cyan); transform: translateY(-1px);
+  }
+  .menu-btn:active { transform: scale(0.97); transition: transform 0.1s ease; }
+  .menu-btn.accent {
+    border-color: rgba(255, 0, 255, 0.3); color: var(--pink);
+    background: rgba(255, 0, 255, 0.05);
+  }
+  .menu-btn.accent:hover {
+    background: rgba(255, 0, 255, 0.12); border-color: rgba(255, 0, 255, 0.5);
+    box-shadow: var(--glow-pink);
+  }
+
+  /* ========== 弹窗面板 ========== */
+  .modal-overlay {
+    display: none; position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7);
+    align-items: center; justify-content: center; z-index: 20;
+  }
+  .modal-overlay.visible { display: flex; }
+
+  .modal-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 36px 32px; min-width: 340px; max-width: 440px;
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 0 80px rgba(0, 255, 255, 0.1);
+    animation: fadeInUp 0.35s ease-out;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .modal-panel h2 {
+    margin: 0; font-size: 22px; font-weight: 700; color: var(--cyan);
+    text-shadow: 0 0 12px rgba(0, 255, 255, 0.4); letter-spacing: 0.05em;
+  }
+  .modal-panel p, .modal-panel li {
+    font-size: 14px; line-height: 1.7; color: rgba(224, 247, 250, 0.8); margin: 0;
+  }
+  .modal-panel ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+  .modal-panel li::marker { color: var(--cyan); }
+
+  .modal-close-btn {
+    align-self: flex-end; padding: 10px 24px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: rgba(0, 255, 255, 0.08); color: var(--cyan);
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: all 0.25s ease; font-family: inherit;
+  }
+  .modal-close-btn:hover { background: rgba(0, 255, 255, 0.18); box-shadow: var(--glow-cyan); }
+
+  .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+  .setting-row span { font-size: 14px; color: rgba(224, 247, 250, 0.85); }
+  .toggle-switch {
+    position: relative; width: 48px; height: 26px;
+    background: rgba(255, 255, 255, 0.1); border-radius: 13px;
+    cursor: pointer; transition: background 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+  .toggle-switch.on { background: rgba(0, 255, 255, 0.3); border-color: rgba(0, 255, 255, 0.5); }
+  .toggle-switch::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; border-radius: 50%; background: #fff;
+    transition: transform 0.3s ease;
+  }
+  .toggle-switch.on::after { transform: translateX(22px); }
+
+  /* ========== 关卡完成提示 ========== */
+  .level-complete-toast {
+    display: none; flex-direction: column; align-items: center; gap: 16px;
+    animation: fadeInUp 0.4s ease-out;
+  }
+  .level-complete-toast.visible { display: flex; }
+  .level-complete-toast .big-text {
+    font-size: 32px; font-weight: 700; color: var(--gold);
+    text-shadow: var(--glow-gold); letter-spacing: 0.06em;
+  }
+  .level-complete-toast .hint {
+    font-size: 14px; color: rgba(255, 215, 0, 0.6); letter-spacing: 0.04em;
+  }
+
+  /* ========== 移动端虚拟方向键 ========== */
+  .mobile-controls {
+    display: none; position: absolute; bottom: 24px; left: 50%;
+    transform: translateX(-50%); z-index: 15; pointer-events: auto;
+  }
+  .dpad {
+    display: grid;
+    grid-template-areas: ". up ." "left . right" ". down .";
+    grid-template-columns: 56px 56px 56px;
+    grid-template-rows: 56px 56px 56px; gap: 4px;
+  }
+  .dpad-btn {
+    width: 56px; height: 56px; border-radius: 12px;
+    border: 1px solid rgba(0, 255, 255, 0.25);
+    background: rgba(0, 255, 255, 0.06); color: var(--cyan);
+    font-size: 20px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; touch-action: manipulation;
+    transition: background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dpad-btn:active, .dpad-btn.pressed {
+    background: rgba(0, 255, 255, 0.25);
+    box-shadow: 0 0 16px rgba(0, 255, 255, 0.4);
+  }
+  .dpad-up    { grid-area: up; }
+  .dpad-down  { grid-area: down; }
+  .dpad-left  { grid-area: left; }
+  .dpad-right { grid-area: right; }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 768px) {
+    .menu-panel { min-width: 280px; padding: 32px 24px; gap: 18px; }
+    .game-title { font-size: 22px; }
+    .game-title .sub { font-size: 12px; }
+    .menu-btn { padding: 12px 20px; font-size: 14px; }
+    .modal-panel { min-width: 260px; max-width: 90vw; padding: 24px 20px; }
+    .mobile-controls { display: block; }
+    #game-canvas { width: 100vw; height: auto; }
+  }
+  @media (min-width: 769px) {
+    .mobile-controls { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== 游戏容器 ==================== -->
+<div id="game-container">
+  <canvas id="game-canvas"></canvas>
+
+  <!-- 主菜单 -->
+  <div class="ui-overlay active" id="menu-overlay">
+    <div class="menu-panel visible" id="menu-panel">
+      <div class="game-title">声波盲境探路<span class="sub">SONIC BLIND MAZE</span></div>
+      <button class="menu-btn" id="btn-start">开始游戏</button>
+      <button class="menu-btn accent" id="btn-tutorial">教学模式</button>
+      <button class="menu-btn" id="btn-settings">游戏设置</button>
+    </div>
+  </div>
+
+  <!-- 教学面板 -->
+  <div class="modal-overlay" id="tutorial-overlay">
+    <div class="modal-panel">
+      <h2>🎵 教学模式</h2>
+      <ul>
+        <li>你身处一片漆黑的迷宫中，只能依靠<strong style="color:var(--cyan)">声波</strong>探路</li>
+        <li>使用 <strong style="color:var(--cyan)">WASD</strong> 或 <strong style="color:var(--cyan)">方向键</strong> 移动角色</li>
+        <li><strong style="color:var(--pink)">点击鼠标左键</strong>（或触摸屏幕）发射声波</li>
+        <li>声波以射线方式传播，碰到墙壁会<strong style="color:var(--pink)">真实反射</strong>，最多反弹 2 次</li>
+        <li>找到发光的<strong style="color:var(--gold)">金色终点</strong>即可进入下一关</li>
+      </ul>
+      <button class="modal-close-btn" id="btn-tutorial-close">知道了</button>
+    </div>
+  </div>
+
+  <!-- 设置面板 -->
+  <div class="modal-overlay" id="settings-overlay">
+    <div class="modal-panel">
+      <h2>⚙️ 游戏设置</h2>
+      <div class="setting-row">
+        <span>音效</span>
+        <div class="toggle-switch on" id="toggle-sound"></div>
+      </div>
+      <div class="setting-row">
+        <span>震动反馈</span>
+        <div class="toggle-switch" id="toggle-vibration"></div>
+      </div>
+      <p style="font-size:12px;color:rgba(224,247,250,0.4);margin-top:8px;">
+        音效与震动功能将在后续版本中实装，当前仅保留 UI 占位。
+      </p>
+      <button class="modal-close-btn" id="btn-settings-close">关闭</button>
+    </div>
+  </div>
+
+  <!-- 关卡完成提示 -->
+  <div class="ui-overlay" id="level-complete-overlay">
+    <div class="level-complete-toast" id="level-complete-toast">
+      <div class="big-text" id="level-complete-text"></div>
+      <div class="hint">按空格键或点击屏幕继续</div>
+    </div>
+  </div>
+
+  <!-- 移动端虚拟方向键 -->
+  <div class="mobile-controls" id="mobile-controls">
+    <div class="dpad">
+      <button class="dpad-btn dpad-up"    id="dpad-up">▲</button>
+      <button class="dpad-btn dpad-left"  id="dpad-left">◀</button>
+      <button class="dpad-btn dpad-right" id="dpad-right">▶</button>
+      <button class="dpad-btn dpad-down"  id="dpad-down">▼</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =============================================================================
+//  声波盲境探路 (Sonic Blind Maze)  v3.0
+//  赛博朋克霓虹风格 · 2D 光线追踪 · 真实反射 · deltaTime · Retina · 贴墙滑动
+//  完整 10 关 · Canvas 2D 渲染 · 面向对象架构
+// =============================================================================
+
+// ==================== 常量定义 ====================
+const CANVAS_W        = 800;      // 逻辑宽度
+const CANVAS_H        = 600;      // 逻辑高度
+const PLAYER_R        = 8;        // 玩家碰撞半径
+const PLAYER_SPD      = 180;      // 玩家移动速度（px/s，deltaTime 驱动）
+const RAY_COUNT       = 360;      // 声波射线数量（可调：240/180 降低性能消耗）
+const RAY_MAX_DIST    = 800;      // 射线最大传播距离（px）
+const RAY_MAX_BOUNCES = 2;        // 最大反射次数（0=不反射）
+const RAY_INTENSITY_DECAY = 0.7;  // 每次反射强度衰减系数
+const RAY_OFFSET      = 0.5;      // 反射起点偏移量（避免自相交）
+const GOAL_R          = 18;       // 终点半径
+const SHADOW_BLUR     = 18;       // 霓虹发光模糊半径
+const AFTERGLOW_S     = 0.8;      // 墙壁余晖持续时间（秒）
+const SPOT_SEG_LEN    = 20;       // 光斑照亮段长度（px）
+const DELTA_MAX       = 1 / 30;   // deltaTime 上限（防止跳帧后瞬移）
+
+// 反弹颜色表：0=青色, 1=粉紫, 2=品红
+const BOUNCE_COLORS = [
+  { r: 0,   g: 255, b: 255 },  // 原始声波：青色
+  { r: 180, g: 60,  b: 255 },  // 第 1 次反弹：粉紫
+  { r: 255, g: 30,  b: 180 }   // 第 2 次反弹：品红
+];
+
+// =============================================================================
+//  关卡数据 — 完整 10 关（保持不变）
+// =============================================================================
+const LEVELS = [
+  // ===== 第 1 关：新手教学 — 中间一堵墙 =====
+  {
+    levelId: 1,
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, radius: GOAL_R },
+    walls: [
+      { x1: 400, y1: 120, x2: 400, y2: 480 }
+    ]
+  },
+  // ===== 第 2 关：简单折线 — 4 堵墙 =====
+  {
+    levelId: 2,
+    playerStart: { x: 80, y: 100 },
+    goal: { x: 720, y: 500, radius: GOAL_R },
+    walls: [
+      { x1: 220, y1: 100, x2: 220, y2: 320 },
+      { x1: 220, y1: 320, x2: 500, y2: 320 },
+      { x1: 500, y1: 200, x2: 500, y2: 500 },
+      { x1: 600, y1: 200, x2: 600, y2: 420 }
+    ]
+  },
+  // ===== 第 3 关：回廊迷宫 — 5 堵墙 =====
+  {
+    levelId: 3,
+    playerStart: { x: 80, y: 300 },
+    goal: { x: 720, y: 300, radius: GOAL_R },
+    walls: [
+      { x1: 180, y1: 100, x2: 180, y2: 380 },
+      { x1: 180, y1: 380, x2: 380, y2: 380 },
+      { x1: 380, y1: 220, x2: 380, y2: 500 },
+      { x1: 520, y1: 100, x2: 520, y2: 350 },
+      { x1: 520, y1: 350, x2: 680, y2: 350 }
+    ]
+  },
+  // ===== 第 4 关：死胡同迷宫 — 10 堵墙 =====
+  {
+    levelId: 4,
+    playerStart: { x: 60, y: 540 },
+    goal: { x: 740, y: 60, radius: GOAL_R },
+    walls: [
+      { x1: 140, y1: 460, x2: 140, y2: 140 },
+      { x1: 140, y1: 140, x2: 300, y2: 140 },
+      { x1: 300, y1: 140, x2: 300, y2: 340 },
+      { x1: 300, y1: 460, x2: 460, y2: 460 },
+      { x1: 460, y1: 340, x2: 460, y2: 140 },
+      { x1: 460, y1: 140, x2: 620, y2: 140 },
+      { x1: 620, y1: 140, x2: 620, y2: 380 },
+      { x1: 460, y1: 460, x2: 460, y2: 540 },
+      { x1: 300, y1: 340, x2: 460, y2: 340 },
+      { x1: 140, y1: 460, x2: 300, y2: 460 }
+    ]
+  },
+  // ===== 第 5 关：多层回廊 — 10 堵墙 =====
+  {
+    levelId: 5,
+    playerStart: { x: 80, y: 80 },
+    goal: { x: 720, y: 520, radius: GOAL_R },
+    walls: [
+      { x1: 160, y1: 80,  x2: 160, y2: 240 },
+      { x1: 160, y1: 240, x2: 340, y2: 240 },
+      { x1: 340, y1: 160, x2: 340, y2: 400 },
+      { x1: 340, y1: 400, x2: 200, y2: 400 },
+      { x1: 200, y1: 400, x2: 200, y2: 520 },
+      { x1: 480, y1: 80,  x2: 480, y2: 280 },
+      { x1: 480, y1: 280, x2: 640, y2: 280 },
+      { x1: 640, y1: 200, x2: 640, y2: 440 },
+      { x1: 520, y1: 440, x2: 720, y2: 440 },
+      { x1: 200, y1: 520, x2: 520, y2: 520 }
+    ]
+  },
+  // ===== 第 6 关：狭长通道 — 16 堵墙 =====
+  {
+    levelId: 6,
+    playerStart: { x: 60, y: 300 },
+    goal: { x: 740, y: 300, radius: GOAL_R },
+    walls: [
+      { x1: 130, y1: 60,  x2: 130, y2: 200 },
+      { x1: 130, y1: 200, x2: 280, y2: 200 },
+      { x1: 280, y1: 130, x2: 280, y2: 340 },
+      { x1: 200, y1: 340, x2: 400, y2: 340 },
+      { x1: 400, y1: 260, x2: 400, y2: 460 },
+      { x1: 280, y1: 460, x2: 520, y2: 460 },
+      { x1: 520, y1: 380, x2: 520, y2: 540 },
+      { x1: 400, y1: 540, x2: 660, y2: 540 },
+      { x1: 660, y1: 460, x2: 660, y2: 200 },
+      { x1: 580, y1: 200, x2: 740, y2: 200 },
+      { x1: 130, y1: 400, x2: 130, y2: 540 },
+      { x1: 280, y1: 60,  x2: 280, y2: 130 },
+      { x1: 400, y1: 60,  x2: 400, y2: 180 },
+      { x1: 520, y1: 60,  x2: 520, y2: 200 },
+      { x1: 660, y1: 60,  x2: 660, y2: 130 },
+      { x1: 580, y1: 340, x2: 580, y2: 460 }
+    ]
+  },
+  // ===== 第 7 关：螺旋通道 — 18 堵墙 =====
+  {
+    levelId: 7,
+    playerStart: { x: 400, y: 560 },
+    goal: { x: 400, y: 40, radius: GOAL_R },
+    walls: [
+      { x1: 100, y1: 500, x2: 300, y2: 500 },
+      { x1: 300, y1: 400, x2: 300, y2: 500 },
+      { x1: 300, y1: 400, x2: 500, y2: 400 },
+      { x1: 500, y1: 300, x2: 500, y2: 400 },
+      { x1: 300, y1: 300, x2: 500, y2: 300 },
+      { x1: 300, y1: 200, x2: 300, y2: 300 },
+      { x1: 300, y1: 200, x2: 500, y2: 200 },
+      { x1: 500, y1: 100, x2: 500, y2: 200 },
+      { x1: 300, y1: 100, x2: 500, y2: 100 },
+      { x1: 100, y1: 500, x2: 100, y2: 300 },
+      { x1: 100, y1: 300, x2: 200, y2: 300 },
+      { x1: 200, y1: 300, x2: 200, y2: 100 },
+      { x1: 200, y1: 100, x2: 300, y2: 100 },
+      { x1: 600, y1: 500, x2: 700, y2: 500 },
+      { x1: 700, y1: 400, x2: 700, y2: 500 },
+      { x1: 600, y1: 400, x2: 700, y2: 400 },
+      { x1: 600, y1: 300, x2: 600, y2: 400 },
+      { x1: 600, y1: 300, x2: 700, y2: 300 }
+    ]
+  },
+  // ===== 第 8 关：密集障碍 — 18 堵墙 =====
+  {
+    levelId: 8,
+    playerStart: { x: 60, y: 60 },
+    goal: { x: 740, y: 540, radius: GOAL_R },
+    walls: [
+      { x1: 140, y1: 60,  x2: 140, y2: 180 },
+      { x1: 140, y1: 260, x2: 280, y2: 260 },
+      { x1: 280, y1: 180, x2: 280, y2: 380 },
+      { x1: 200, y1: 380, x2: 400, y2: 380 },
+      { x1: 400, y1: 300, x2: 400, y2: 460 },
+      { x1: 320, y1: 460, x2: 520, y2: 460 },
+      { x1: 520, y1: 380, x2: 520, y2: 540 },
+      { x1: 440, y1: 540, x2: 660, y2: 540 },
+      { x1: 660, y1: 460, x2: 660, y2: 300 },
+      { x1: 580, y1: 300, x2: 740, y2: 300 },
+      { x1: 140, y1: 340, x2: 140, y2: 460 },
+      { x1: 60,  y1: 460, x2: 200, y2: 460 },
+      { x1: 340, y1: 60,  x2: 340, y2: 140 },
+      { x1: 480, y1: 60,  x2: 480, y2: 200 },
+      { x1: 620, y1: 60,  x2: 620, y2: 180 },
+      { x1: 740, y1: 180, x2: 740, y2: 380 },
+      { x1: 60,  y1: 180, x2: 60,  y2: 340 },
+      { x1: 400, y1: 140, x2: 560, y2: 140 }
+    ]
+  },
+  // ===== 第 9 关：硬核迷宫 — 26 堵墙 =====
+  {
+    levelId: 9,
+    playerStart: { x: 60, y: 300 },
+    goal: { x: 740, y: 300, radius: GOAL_R },
+    walls: [
+      { x1: 120, y1: 60,  x2: 120, y2: 180 },
+      { x1: 120, y1: 180, x2: 240, y2: 180 },
+      { x1: 240, y1: 120, x2: 240, y2: 300 },
+      { x1: 160, y1: 300, x2: 360, y2: 300 },
+      { x1: 360, y1: 220, x2: 360, y2: 420 },
+      { x1: 240, y1: 420, x2: 480, y2: 420 },
+      { x1: 480, y1: 340, x2: 480, y2: 520 },
+      { x1: 360, y1: 520, x2: 600, y2: 520 },
+      { x1: 600, y1: 440, x2: 600, y2: 200 },
+      { x1: 520, y1: 200, x2: 720, y2: 200 },
+      { x1: 720, y1: 120, x2: 720, y2: 340 },
+      { x1: 640, y1: 340, x2: 740, y2: 340 },
+      { x1: 120, y1: 380, x2: 120, y2: 540 },
+      { x1: 240, y1: 60,  x2: 240, y2: 120 },
+      { x1: 360, y1: 60,  x2: 360, y2: 140 },
+      { x1: 480, y1: 60,  x2: 480, y2: 180 },
+      { x1: 600, y1: 60,  x2: 600, y2: 140 },
+      { x1: 720, y1: 60,  x2: 720, y2: 120 },
+      { x1: 60,  y1: 380, x2: 60,  y2: 540 },
+      { x1: 360, y1: 140, x2: 480, y2: 140 },
+      { x1: 480, y1: 260, x2: 600, y2: 260 },
+      { x1: 600, y1: 380, x2: 640, y2: 380 },
+      { x1: 120, y1: 460, x2: 240, y2: 460 },
+      { x1: 360, y1: 460, x2: 360, y2: 520 },
+      { x1: 600, y1: 520, x2: 600, y2: 580 },
+      { x1: 60,  y1: 60,  x2: 60,  y2: 220 }
+    ]
+  },
+  // ===== 第 10 关：终极迷宫 — 30 堵墙 =====
+  {
+    levelId: 10,
+    playerStart: { x: 400, y: 560 },
+    goal: { x: 400, y: 40, radius: GOAL_R },
+    walls: [
+      { x1: 320, y1: 540, x2: 480, y2: 540 },
+      { x1: 480, y1: 520, x2: 480, y2: 580 },
+      { x1: 120, y1: 500, x2: 320, y2: 500 },
+      { x1: 120, y1: 420, x2: 120, y2: 540 },
+      { x1: 200, y1: 460, x2: 200, y2: 540 },
+      { x1: 120, y1: 380, x2: 320, y2: 380 },
+      { x1: 320, y1: 340, x2: 320, y2: 420 },
+      { x1: 400, y1: 380, x2: 400, y2: 460 },
+      { x1: 320, y1: 300, x2: 560, y2: 300 },
+      { x1: 560, y1: 260, x2: 560, y2: 340 },
+      { x1: 640, y1: 300, x2: 640, y2: 380 },
+      { x1: 480, y1: 220, x2: 640, y2: 220 },
+      { x1: 480, y1: 180, x2: 480, y2: 260 },
+      { x1: 560, y1: 180, x2: 560, y2: 260 },
+      { x1: 200, y1: 140, x2: 480, y2: 140 },
+      { x1: 200, y1: 100, x2: 200, y2: 180 },
+      { x1: 280, y1: 100, x2: 280, y2: 180 },
+      { x1: 360, y1: 100, x2: 360, y2: 180 },
+      { x1: 200, y1: 60,  x2: 480, y2: 60 },
+      { x1: 480, y1: 40,  x2: 480, y2: 100 },
+      { x1: 60,  y1: 560, x2: 200, y2: 560 },
+      { x1: 60,  y1: 480, x2: 60,  y2: 580 },
+      { x1: 680, y1: 520, x2: 740, y2: 520 },
+      { x1: 740, y1: 440, x2: 740, y2: 560 },
+      { x1: 680, y1: 140, x2: 740, y2: 140 },
+      { x1: 740, y1: 60,  x2: 740, y2: 180 },
+      { x1: 60,  y1: 100, x2: 140, y2: 100 },
+      { x1: 60,  y1: 60,  x2: 60,  y2: 140 }
+    ]
+  }
+];
+
+// =============================================================================
+//  工具函数
+// =============================================================================
+
+/** 两点欧氏距离 */
+function dist(x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/** 2D 叉积：cross(a, b) = a.x * b.y - a.y * b.x */
+function cross2D(ax, ay, bx, by) {
+  return ax * by - ay * bx;
+}
+
+/** 向量点积 */
+function dot2D(ax, ay, bx, by) {
+  return ax * bx + ay * by;
+}
+
+/** 向量归一化，返回 {x, y}，零向量返回 {1, 0} */
+function normalize(x, y) {
+  const len = Math.sqrt(x * x + y * y);
+  if (len < 1e-10) return { x: 1, y: 0 };
+  return { x: x / len, y: y / len };
+}
+
+/**
+ * 射线与线段相交检测（标准参数化算法）
+ * 射线: P = O + t*D, t > 0
+ * 线段: Q = A + u*E, 0 <= u <= 1, E = B - A
+ *
+ * @param {number} ox 射线起点 X
+ * @param {number} oy 射线起点 Y
+ * @param {number} dx 射线方向 X（单位向量）
+ * @param {number} dy 射线方向 Y（单位向量）
+ * @param {number} ax 线段起点 X
+ * @param {number} ay 线段起点 Y
+ * @param {number} bx 线段终点 X
+ * @param {number} by 线段终点 Y
+ * @returns {{t:number, u:number, x:number, y:number}|null} 交点信息或 null
+ */
+function raySegmentIntersection(ox, oy, dx, dy, ax, ay, bx, by) {
+  const ex = bx - ax, ey = by - ay;           // E = B - A（线段方向）
+  const denom = cross2D(dx, dy, ex, ey);       // denom = D × E
+
+  // 平行或接近平行（|denom| < epsilon），无交点
+  if (Math.abs(denom) < 1e-8) return null;
+
+  const fx = ox - ax, fy = oy - ay;            // F = O - A
+
+  // t = -cross(F, E) / cross(D, E)
+  const t = -cross2D(fx, fy, ex, ey) / denom;
+  if (t <= 0) return null;                     // 交点在射线后方
+
+  // u = cross(F, D) / cross(E, D)
+  const u = cross2D(fx, fy, dx, dy) / cross2D(ex, ey, dx, dy);
+  if (u < 0 || u > 1) return null;             // 交点不在线段上
+
+  return {
+    t: t,
+    u: u,
+    x: ox + t * dx,
+    y: oy + t * dy
+  };
+}
+
+/**
+ * 计算反射方向向量
+ * 反射公式: R = D - 2 * dot(D, N) * N
+ *
+ * @param {number} dx 入射方向 X
+ * @param {number} dy 入射方向 Y
+ * @param {number} ex 墙壁线段方向 X（B - A）
+ * @param {number} ey 墙壁线段方向 Y
+ * @returns {{x:number, y:number}} 反射方向（单位向量）
+ */
+function reflectDirection(dx, dy, ex, ey) {
+  // 墙壁法线：(-ey, ex)，即 E 逆时针旋转 90°
+  let nx = -ey, ny = ex;
+  // 确保法线朝向入射方向（dot(D, N) < 0）
+  const dotDN = dot2D(dx, dy, nx, ny);
+  if (dotDN > 0) { nx = -nx; ny = -ny; }
+  // R = D - 2 * dot(D, N) * N
+  const dotVal = dot2D(dx, dy, nx, ny);
+  const rx = dx - 2 * dotVal * nx;
+  const ry = dy - 2 * dotVal * ny;
+  return normalize(rx, ry);
+}
+
+// =============================================================================
+//  InputManager — 输入管理（键盘 + 鼠标 + 触摸）
+// =============================================================================
+class InputManager {
+  /**
+   * @param {HTMLCanvasElement} canvas
+   */
+  constructor(canvas) {
+    this.canvas = canvas;
+    /** @type {Set<string>} 当前按下的键 */
+    this.keys = new Set();
+    /** 鼠标/触摸点击事件队列（每帧消费） */
+    this.clickQueue = [];
+    /** 是否允许处理点击（由 Game 状态控制） */
+    this.clickEnabled = false;
+
+    this._onKeyDown = this._onKeyDown.bind(this);
+    this._onKeyUp   = this._onKeyUp.bind(this);
+    this._onClick   = this._onClick.bind(this);
+    this._onTouch   = this._onTouch.bind(this);
+
+    window.addEventListener('keydown', this._onKeyDown);
+    window.addEventListener('keyup',   this._onKeyUp);
+    canvas.addEventListener('click',   this._onClick);
+    canvas.addEventListener('touchstart', this._onTouch, { passive: false });
+  }
+
+  _onKeyDown(e) {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) {
+      e.preventDefault();
+    }
+    this.keys.add(e.key);
+  }
+
+  _onKeyUp(e) {
+    this.keys.delete(e.key);
+  }
+
+  _onClick(e) {
+    if (!this.clickEnabled) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = CANVAS_W / rect.width;
+    const scaleY = CANVAS_H / rect.height;
+    this.clickQueue.push({
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top)  * scaleY
+    });
+  }
+
+  _onTouch(e) {
+    if (!this.clickEnabled) return;
+    e.preventDefault();
+    if (e.touches.length === 0) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = CANVAS_W / rect.width;
+    const scaleY = CANVAS_H / rect.height;
+    for (let i = 0; i < e.touches.length; i++) {
+      const t = e.touches[i];
+      this.clickQueue.push({
+        x: (t.clientX - rect.left) * scaleX,
+        y: (t.clientY - rect.top)  * scaleY
+      });
+    }
+  }
+
+  /** 消费所有点击事件 */
+  consumeClicks() {
+    const clicks = this.clickQueue.slice();
+    this.clickQueue = [];
+    return clicks;
+  }
+
+  /** 获取归一化移动方向 {dx, dy} */
+  getMoveDir() {
+    let dx = 0, dy = 0;
+    if (this.keys.has('ArrowUp')    || this.keys.has('w') || this.keys.has('W')) dy -= 1;
+    if (this.keys.has('ArrowDown')  || this.keys.has('s') || this.keys.has('S')) dy += 1;
+    if (this.keys.has('ArrowLeft')  || this.keys.has('a') || this.keys.has('A')) dx -= 1;
+    if (this.keys.has('ArrowRight') || this.keys.has('d') || this.keys.has('D')) dx += 1;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len > 0) { dx /= len; dy /= len; }
+    return { dx, dy };
+  }
+
+  destroy() {
+    window.removeEventListener('keydown', this._onKeyDown);
+    window.removeEventListener('keyup',   this._onKeyUp);
+    this.canvas.removeEventListener('click', this._onClick);
+    this.canvas.removeEventListener('touchstart', this._onTouch);
+  }
+}
+
+// =============================================================================
+//  Player — 玩家类（deltaTime 驱动 + 分轴碰撞 + 贴墙滑动）
+// =============================================================================
+class Player {
+  /**
+   * @param {number} x 初始 X
+   * @param {number} y 初始 Y
+   * @param {number} radius 碰撞半径
+   * @param {number} speed 移动速度 px/s
+   */
+  constructor(x, y, radius, speed) {
+    this.x = x;
+    this.y = y;
+    this.radius = radius;
+    this.speed = speed; // px/s
+  }
+
+  /**
+   * 分轴移动 + 碰撞检测，实现自然的贴墙滑动
+   *
+   * 算法：先沿 X 轴移动，检测碰撞 → 回退；再沿 Y 轴移动，检测碰撞 → 回退。
+   * 这样斜向撞墙时，被阻挡的轴回退、未阻挡的轴继续滑动，手感丝滑。
+   *
+   * @param {number} dx 归一化方向 X
+   * @param {number} dy 归一化方向 Y
+   * @param {number} dt deltaTime（秒）
+   * @param {Array} walls 墙壁数组 [{x1,y1,x2,y2}]
+   */
+  move(dx, dy, dt, walls) {
+    if (dx === 0 && dy === 0) return;
+
+    const moveX = dx * this.speed * dt;
+    const moveY = dy * this.speed * dt;
+
+    // === 第 1 步：X 轴移动 ===
+    this.x += moveX;
+    // 边界约束
+    this.x = Math.max(this.radius, Math.min(CANVAS_W - this.radius, this.x));
+    if (this._collidesWithAny(walls)) {
+      this.x -= moveX; // 回退 X
+    }
+
+    // === 第 2 步：Y 轴移动 ===
+    this.y += moveY;
+    this.y = Math.max(this.radius, Math.min(CANVAS_H - this.radius, this.y));
+    if (this._collidesWithAny(walls)) {
+      this.y -= moveY; // 回退 Y
+    }
+  }
+
+  /**
+   * 检测玩家圆形是否与任意墙壁碰撞
+   * @param {Array} walls
+   * @returns {boolean}
+   */
+  _collidesWithAny(walls) {
+    for (const w of walls) {
+      if (this._circleSegmentCollision(w)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * 圆形与线段碰撞检测
+   * 计算圆心到线段的最短距离，若 < 半径则碰撞
+   * @param {{x1:number,y1:number,x2:number,y2:number}} wall
+   * @returns {boolean}
+   */
+  _circleSegmentCollision(wall) {
+    const dx = wall.x2 - wall.x1, dy = wall.y2 - wall.y1;
+    const lenSq = dx * dx + dy * dy;
+    // 零长度线段：退化为点-圆检测
+    if (lenSq === 0) return dist(this.x, this.y, wall.x1, wall.y1) < this.radius;
+
+    // 投影参数 t，clamp 到 [0, 1]
+    let t = ((this.x - wall.x1) * dx + (this.y - wall.y1) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+
+    const closestX = wall.x1 + t * dx;
+    const closestY = wall.y1 + t * dy;
+    return dist(this.x, this.y, closestX, closestY) < this.radius;
+  }
+
+  /** 检测玩家是否碰到终点 */
+  hitGoal(goal) {
+    return dist(this.x, this.y, goal.x, goal.y) < this.radius + goal.radius;
+  }
+}
+
+// =============================================================================
+//  RayCaster — 2D 光线追踪引擎
+//  核心算法：从玩家位置向四周发射 N 条射线，每条射线与墙壁求交，
+//  在交点处反射，记录所有碰撞点用于墙壁照亮渲染。
+// =============================================================================
+class RayCaster {
+  /**
+   * 从指定位置发射声波射线，返回所有墙壁碰撞点
+   *
+   * @param {number} originX 声源 X
+   * @param {number} originY 声源 Y
+   * @param {Array} walls 墙壁数组 [{x1,y1,x2,y2}]
+   * @param {number} rayCount 射线数量（默认 RAY_COUNT）
+   * @param {number} maxDist 最大传播距离
+   * @param {number} maxBounces 最大反射次数
+   * @returns {Array<{wallIndex:number, u:number, x:number, y:number, intensity:number, bounce:number}>}
+   */
+  static cast(originX, originY, walls, rayCount, maxDist, maxBounces) {
+    /** @type {Array} 所有碰撞点 */
+    const allHits = [];
+
+    // 生成均匀分布的射线方向
+    for (let i = 0; i < rayCount; i++) {
+      const angle = (Math.PI * 2 * i) / rayCount;
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+
+      // 追踪单条射线（含反射）
+      RayCaster._traceRay(
+        originX, originY, dx, dy,
+        0,           // 当前已传播距离
+        1.0,         // 初始强度
+        0,           // 当前反弹次数
+        walls, maxDist, maxBounces,
+        allHits
+      );
+    }
+
+    return allHits;
+  }
+
+  /**
+   * 递归追踪单条射线
+   * @param {number} ox 当前起点 X
+   * @param {number} oy 当前起点 Y
+   * @param {number} dx 方向 X
+   * @param {number} dy 方向 Y
+   * @param {number} traveled 已传播距离
+   * @param {number} intensity 当前强度
+   * @param {number} bounce 当前反弹次数
+   * @param {Array} walls
+   * @param {number} maxDist
+   * @param {number} maxBounces
+   * @param {Array} outHits 输出碰撞点数组
+   */
+  static _traceRay(ox, oy, dx, dy, traveled, intensity, bounce, walls, maxDist, maxBounces, outHits) {
+    if (bounce > maxBounces || intensity < 0.05) return;
+
+    let nearestT = Infinity;
+    let nearestWallIdx = -1;
+    let nearestU = 0;
+    let nearestX = 0, nearestY = 0;
+
+    // 遍历所有墙壁，找最近交点
+    for (let wi = 0; wi < walls.length; wi++) {
+      const w = walls[wi];
+      const hit = raySegmentIntersection(ox, oy, dx, dy, w.x1, w.y1, w.x2, w.y2);
+      if (hit && hit.t < nearestT) {
+        nearestT = hit.t;
+        nearestWallIdx = wi;
+        nearestU = hit.u;
+        nearestX = hit.x;
+        nearestY = hit.y;
+      }
+    }
+
+    // 无交点或超出最大距离
+    if (nearestWallIdx < 0 || traveled + nearestT > maxDist) return;
+
+    // 记录碰撞点
+    outHits.push({
+      wallIndex: nearestWallIdx,
+      u: nearestU,                    // 在线段上的归一化位置 0~1
+      x: nearestX,
+      y: nearestY,
+      intensity: intensity,
+      bounce: bounce
+    });
+
+    // 如果还能反弹，计算反射方向并继续追踪
+    if (bounce < maxBounces) {
+      const w = walls[nearestWallIdx];
+      const ex = w.x2 - w.x1, ey = w.y2 - w.y1;
+      const ref = reflectDirection(dx, dy, ex, ey);
+
+      // 从交点沿反射方向偏移微小距离，避免自相交
+      const newOx = nearestX + ref.x * RAY_OFFSET;
+      const newOy = nearestY + ref.y * RAY_OFFSET;
+      const newTraveled = traveled + nearestT + RAY_OFFSET;
+
+      RayCaster._traceRay(
+        newOx, newOy, ref.x, ref.y,
+        newTraveled,
+        intensity * RAY_INTENSITY_DECAY,
+        bounce + 1,
+        walls, maxDist, maxBounces,
+        outHits
+      );
+    }
+  }
+}
+
+// =============================================================================
+//  LevelManager — 关卡管理（不变）
+// =============================================================================
+class LevelManager {
+  constructor() {
+    this.levels = LEVELS;
+    this.currentIndex = 0;
+  }
+
+  getCurrent() { return this.levels[this.currentIndex]; }
+
+  nextLevel() {
+    this.currentIndex++;
+    return this.currentIndex < this.levels.length;
+  }
+
+  reset() { this.currentIndex = 0; }
+
+  get currentLevelId() { return this.currentIndex + 1; }
+  get totalLevels() { return this.levels.length; }
+}
+
+// =============================================================================
+//  Renderer — 渲染管理（Retina 适配 + 墙壁光斑渲染 + 射线可视化）
+// =============================================================================
+class Renderer {
+  /**
+   * @param {HTMLCanvasElement} canvas
+   */
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.time = 0;
+
+    // === Retina 适配 ===
+    this.dpr = window.devicePixelRatio || 1;
+    this._setupRetina();
+
+    // 监听 devicePixelRatio 变化（外接显示器切换等）
+    this._onDPRChange = this._onDPRChange.bind(this);
+    matchMedia(`(resolution: ${this.dpr}dppx)`).addEventListener('change', this._onDPRChange);
+  }
+
+  /** 设置 Canvas 物理像素并应用缩放 */
+  _setupRetina() {
+    this.dpr = window.devicePixelRatio || 1;
+    this.canvas.width  = CANVAS_W * this.dpr;
+    this.canvas.height = CANVAS_H * this.dpr;
+    // CSS 尺寸已在样式表中固定为 800×600
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    // 注意：shadowBlur 等属性不受 scale 影响，无需额外调整
+  }
+
+  _onDPRChange() {
+    this._setupRetina();
+  }
+
+  /** 清屏为纯黑 */
+  clear() {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.restore();
+  }
+
+  /**
+   * 渲染终点（始终可见，脉冲发光）
+   * @param {{x:number, y:number, radius:number}} goal
+   * @param {number} dt deltaTime（秒）
+   */
+  renderGoal(goal, dt) {
+    const ctx = this.ctx;
+    this.time += dt;
+
+    const pulse = 1 + 0.25 * Math.sin(this.time * 3.0);
+    const r = goal.radius * pulse;
+    const alpha = 0.7 + 0.3 * Math.sin(this.time * 3.0);
+
+    ctx.save();
+
+    // 外层大光晕
+    const grd = ctx.createRadialGradient(goal.x, goal.y, r * 0.2, goal.x, goal.y, r * 3);
+    grd.addColorStop(0, `rgba(255, 215, 0, ${alpha * 0.9})`);
+    grd.addColorStop(0.35, `rgba(255, 180, 0, ${alpha * 0.5})`);
+    grd.addColorStop(0.7, `rgba(255, 140, 0, ${alpha * 0.12})`);
+    grd.addColorStop(1, 'rgba(255, 100, 0, 0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(goal.x, goal.y, r * 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 核心发光圆
+    ctx.shadowColor = `rgba(255, 215, 0, ${alpha})`;
+    ctx.shadowBlur = 30;
+    ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(goal.x, goal.y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 内核白点
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.beginPath();
+    ctx.arc(goal.x, goal.y, r * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  /**
+   * 渲染玩家（始终可见，发光）
+   * @param {Player} player
+   */
+  renderPlayer(player) {
+    const ctx = this.ctx;
+    ctx.save();
+
+    const grd = ctx.createRadialGradient(
+      player.x, player.y, player.radius * 0.3,
+      player.x, player.y, player.radius * 3.5
+    );
+    grd.addColorStop(0, 'rgba(180, 240, 255, 0.85)');
+    grd.addColorStop(0.5, 'rgba(0, 220, 255, 0.3)');
+    grd.addColorStop(1, 'rgba(0, 180, 255, 0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius * 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowColor = 'rgba(180, 240, 255, 0.9)';
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = 'rgba(220, 245, 255, 0.95)';
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  /**
+   * 渲染墙壁光斑（余晖系统）
+   *
+   * 每堵墙维护一个光斑数组，每个光斑有位置(u)、强度、时间戳。
+   * 渲染时根据时间衰减亮度，在墙壁上绘制短发光线段。
+   *
+   * @param {Array} walls 墙壁数组
+   * @param {Array<Array<{u:number, intensity:number, bounce:number, time:number}>>} wallSpots
+   * @param {number} now 当前时间戳（performance.now）
+   */
+  renderWallSpots(walls, wallSpots, now) {
+    const ctx = this.ctx;
+    const afterglowMs = AFTERGLOW_S * 1000;
+
+    for (let wi = 0; wi < walls.length; wi++) {
+      const spots = wallSpots[wi];
+      if (!spots || spots.length === 0) continue;
+
+      const wall = walls[wi];
+      const wx = wall.x2 - wall.x1;
+      const wy = wall.y2 - wall.y1;
+      const wallLen = Math.sqrt(wx * wx + wy * wy);
+      if (wallLen < 1) continue;
+
+      // 墙壁单位方向向量
+      const ux = wx / wallLen;
+      const uy = wy / wallLen;
+
+      // 合并相邻光斑：按 u 排序，合并间距 < 阈值的光斑
+      const merged = Renderer._mergeSpots(spots, now, afterglowMs);
+
+      for (const spot of merged) {
+        if (spot.intensity < 0.02) continue;
+
+        // 光斑在墙壁上的实际坐标
+        const sx = wall.x1 + spot.u * wx;
+        const sy = wall.y1 + spot.u * wy;
+
+        // 光斑照亮段长度（随强度缩放）
+        const segHalf = (SPOT_SEG_LEN / 2) * spot.intensity;
+        const x1 = sx - ux * segHalf;
+        const y1 = sy - uy * segHalf;
+        const x2 = sx + ux * segHalf;
+        const y2 = sy + uy * segHalf;
+
+        // 根据反弹次数选择颜色
+        const col = BOUNCE_COLORS[Math.min(spot.bounce, BOUNCE_COLORS.length - 1)];
+        const alpha = 0.2 + spot.intensity * 0.8;
+
+        ctx.save();
+
+        // 霓虹发光
+        ctx.shadowColor = `rgba(${col.r}, ${col.g}, ${col.b}, ${alpha})`;
+        ctx.shadowBlur = SHADOW_BLUR * spot.intensity;
+
+        ctx.strokeStyle = `rgba(${col.r}, ${col.g}, ${col.b}, ${alpha})`;
+        ctx.lineWidth = 1.5 + spot.intensity * 3;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // 高亮二次描边
+        if (spot.intensity > 0.4) {
+          ctx.shadowBlur = SHADOW_BLUR * spot.intensity * 1.5;
+          ctx.strokeStyle = `rgba(${col.r}, ${col.g}, ${col.b}, ${alpha * 0.5})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+    }
+  }
+
+  /**
+   * 合并相邻光斑：按 u 排序，合并间距 < 阈值的相邻光斑
+   * @returns {Array<{u:number, intensity:number, bounce:number}>}
+   */
+  static _mergeSpots(spots, now, afterglowMs) {
+    // 先衰减并过滤过期光斑
+    const active = [];
+    for (const s of spots) {
+      const elapsed = (now - s.time) / 1000; // 秒
+      if (elapsed > AFTERGLOW_S) continue;
+      const fade = Math.max(0, 1 - elapsed / AFTERGLOW_S);
+      active.push({ u: s.u, intensity: s.intensity * fade, bounce: s.bounce });
+    }
+    if (active.length === 0) return [];
+
+    // 按 u 排序
+    active.sort((a, b) => a.u - b.u);
+
+    // 合并间距 < 0.08 的光斑
+    const merged = [active[0]];
+    for (let i = 1; i < active.length; i++) {
+      const prev = merged[merged.length - 1];
+      if (active[i].u - prev.u < 0.08 && active[i].bounce === prev.bounce) {
+        // 合并：取平均位置，叠加强度（上限 1.0）
+        prev.u = (prev.u * prev.intensity + active[i].u * active[i].intensity)
+                / (prev.intensity + active[i].intensity + 0.001);
+        prev.intensity = Math.min(1, prev.intensity + active[i].intensity * 0.5);
+      } else {
+        merged.push(active[i]);
+      }
+    }
+
+    return merged;
+  }
+
+  /**
+   * 渲染声波射线（调试/视觉反馈：从玩家位置到各碰撞点的细线）
+   * @param {Array} rayHits 碰撞点数组
+   * @param {number} originX 声源 X
+   * @param {number} originY 声源 Y
+   * @param {number} now 当前时间戳
+   */
+  renderRayLines(rayHits, originX, originY, now) {
+    if (!rayHits || rayHits.length === 0) return;
+    const ctx = this.ctx;
+    const elapsed = (now - rayHits._time) / 1000;
+    if (elapsed > AFTERGLOW_S * 1.5) return;
+
+    const fade = Math.max(0, 1 - elapsed / (AFTERGLOW_S * 1.5));
+    ctx.save();
+    ctx.globalAlpha = fade * 0.3;
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+    ctx.lineWidth = 0.5;
+
+    // 绘制从声源到每个碰撞点的细线
+    const drawn = new Set();
+    for (const hit of rayHits) {
+      // 去重：同一墙壁同一位置的碰撞点只画一次
+      const key = `${hit.wallIndex}_${hit.u.toFixed(3)}`;
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+
+      ctx.beginPath();
+      ctx.moveTo(originX, originY);
+      ctx.lineTo(hit.x, hit.y);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+}
+
+// =============================================================================
+//  Game — 游戏主类（deltaTime 主循环 + 光线追踪 + 墙壁余晖）
+// =============================================================================
+class Game {
+  /** 状态枚举 */
+  static State = Object.freeze({
+    MENU:           'MENU',
+    PLAYING:        'PLAYING',
+    LEVEL_COMPLETE: 'LEVEL_COMPLETE',
+    ALL_COMPLETE:   'ALL_COMPLETE',
+    TUTORIAL:       'TUTORIAL',
+    SETTINGS:       'SETTINGS'
+  });
+
+  constructor() {
+    // DOM 元素
+    this.canvas               = document.getElementById('game-canvas');
+    this.menuOverlay          = document.getElementById('menu-overlay');
+    this.menuPanel            = document.getElementById('menu-panel');
+    this.tutorialOverlay      = document.getElementById('tutorial-overlay');
+    this.settingsOverlay      = document.getElementById('settings-overlay');
+    this.levelCompleteOverlay = document.getElementById('level-complete-overlay');
+    this.levelCompleteToast   = document.getElementById('level-complete-toast');
+    this.levelCompleteText    = document.getElementById('level-complete-text');
+    this.mobileControls       = document.getElementById('mobile-controls');
+
+    // 核心模块
+    this.input    = new InputManager(this.canvas);
+    this.renderer = new Renderer(this.canvas);
+    this.levels   = new LevelManager();
+
+    /** @type {Player|null} */
+    this.player = null;
+
+    /**
+     * 墙壁光斑数组，与当前关卡 walls 一一对应
+     * 每个元素是一个数组：[{u, intensity, bounce, time}]
+     */
+    this.wallSpots = [];
+
+    /**
+     * 最近一次射线追踪的碰撞点（用于射线可视化）
+     * @type {Array|null}
+     */
+    this.lastRayHits = null;
+
+    /** @type {string} 当前状态 */
+    this.state = Game.State.MENU;
+    /** @type {number|null} rAF ID */
+    this.rafId = null;
+    /** @type {number} 上一帧时间戳 */
+    this._lastTime = 0;
+    /** 最高通关关卡 */
+    this.bestLevel = this._loadBestLevel();
+
+    // Web Audio 上下文（延迟初始化）
+    this._audioCtx = null;
+
+    this._loop = this._loop.bind(this);
+    this._initUI();
+    this._detectMobile();
+  }
+
+  // ==================== 持久化 ====================
+
+  _loadBestLevel() {
+    try { return parseInt(localStorage.getItem('sonic_maze_best') || '0', 10); }
+    catch (e) { return 0; }
+  }
+
+  _saveBestLevel(level) {
+    try {
+      if (level > this.bestLevel) {
+        this.bestLevel = level;
+        localStorage.setItem('sonic_maze_best', String(level));
+      }
+    } catch (e) { /* 隐私模式忽略 */ }
+  }
+
+  // ==================== 音频 ====================
+
+  _playBeep(freq = 880, duration = 0.12, type = 'sine') {
+    try {
+      if (!this._audioCtx) this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = this._audioCtx.createOscillator();
+      const gain = this._audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.15, this._audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this._audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(this._audioCtx.destination);
+      osc.start(this._audioCtx.currentTime);
+      osc.stop(this._audioCtx.currentTime + duration);
+    } catch (e) { /* 静默 */ }
+  }
+
+  // ==================== 移动端检测 ====================
+
+  _detectMobile() {
+    const isMobile = /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent)
+                     || ('ontouchstart' in window && window.innerWidth < 1024);
+    if (isMobile) {
+      this.mobileControls.style.display = 'block';
+      this._initMobileControls();
+    }
+  }
+
+  _initMobileControls() {
+    const map = {
+      'dpad-up':    'ArrowUp',
+      'dpad-down':  'ArrowDown',
+      'dpad-left':  'ArrowLeft',
+      'dpad-right': 'ArrowRight'
+    };
+    for (const [id, key] of Object.entries(map)) {
+      const btn = document.getElementById(id);
+      if (!btn) continue;
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        this.input.keys.add(key);
+        btn.classList.add('pressed');
+      });
+      btn.addEventListener('pointerup', (e) => {
+        e.preventDefault();
+        this.input.keys.delete(key);
+        btn.classList.remove('pressed');
+      });
+      btn.addEventListener('pointerleave', () => {
+        this.input.keys.delete(key);
+        btn.classList.remove('pressed');
+      });
+      btn.addEventListener('pointercancel', () => {
+        this.input.keys.delete(key);
+        btn.classList.remove('pressed');
+      });
+      btn.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+  }
+
+  // ==================== UI 初始化 ====================
+
+  _initUI() {
+    document.getElementById('btn-start').addEventListener('click', () => this.startGame());
+    document.getElementById('btn-tutorial').addEventListener('click', () => this.showTutorial());
+    document.getElementById('btn-settings').addEventListener('click', () => this.showSettings());
+    document.getElementById('btn-tutorial-close').addEventListener('click', () => this.hideTutorial());
+    document.getElementById('btn-settings-close').addEventListener('click', () => this.hideSettings());
+
+    this._initToggle('toggle-sound');
+    this._initToggle('toggle-vibration');
+
+    // 关卡完成：空格键或点击继续
+    const onContinue = (e) => {
+      if (this.state !== Game.State.LEVEL_COMPLETE && this.state !== Game.State.ALL_COMPLETE) return;
+      if (e.type === 'keydown' && e.key !== ' ') return;
+      if (e.type === 'click' && (e.target === this.canvas || e.target.closest('#game-canvas'))) return;
+      e.preventDefault();
+      this._continueFromLevelComplete();
+    };
+    window.addEventListener('keydown', onContinue);
+    this.levelCompleteOverlay.addEventListener('click', onContinue);
+  }
+
+  _initToggle(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', () => el.classList.toggle('on'));
+  }
+
+  // ==================== 状态切换 ====================
+
+  showMenu() {
+    this.state = Game.State.MENU;
+    this._stopLoop();
+    this.input.clickEnabled = false;
+    this.menuOverlay.classList.add('active');
+    this.menuPanel.classList.add('visible');
+    this.levelCompleteOverlay.classList.remove('active');
+    this.levelCompleteToast.classList.remove('visible');
+    this.mobileControls.style.display = 'none';
+    this._detectMobile();
+    this.renderer.clear();
+  }
+
+  startGame() {
+    this.levels.reset();
+    this._saveBestLevel(0);
+    this._startLevel();
+  }
+
+  _startLevel() {
+    const level = this.levels.getCurrent();
+
+    // 隐藏所有 UI
+    this.menuOverlay.classList.remove('active');
+    this.menuPanel.classList.remove('visible');
+    this.tutorialOverlay.classList.remove('visible');
+    this.settingsOverlay.classList.remove('visible');
+    this.levelCompleteOverlay.classList.remove('active');
+    this.levelCompleteToast.classList.remove('visible');
+
+    // 初始化玩家
+    this.player = new Player(level.playerStart.x, level.playerStart.y, PLAYER_R, PLAYER_SPD);
+
+    // 初始化墙壁光斑数组（每堵墙一个空数组）
+    this.wallSpots = level.walls.map(() => []);
+    this.lastRayHits = null;
+
+    // 切换到游戏状态，启用点击
+    this.state = Game.State.PLAYING;
+    this.input.clickEnabled = true;
+
+    // 重置时间戳（避免第一帧 deltaTime 跳变）
+    this._lastTime = 0;
+
+    this._detectMobile();
+    this._startLoop();
+  }
+
+  _onLevelComplete() {
+    this._stopLoop();
+    this.input.clickEnabled = false;
+
+    const levelId = this.levels.currentLevelId;
+    this._saveBestLevel(levelId);
+
+    this.levelCompleteOverlay.classList.add('active');
+    this.levelCompleteToast.classList.add('visible');
+
+    if (levelId >= this.levels.totalLevels) {
+      this.state = Game.State.ALL_COMPLETE;
+      this.levelCompleteText.textContent = '🎉 恭喜通关全部关卡！';
+      this._playBeep(660, 0.15, 'sine');
+      setTimeout(() => this._playBeep(880, 0.15, 'sine'), 150);
+      setTimeout(() => this._playBeep(1100, 0.2, 'sine'), 300);
+    } else {
+      this.state = Game.State.LEVEL_COMPLETE;
+      this.levelCompleteText.textContent = `第 ${levelId} 关完成！`;
+      this._playBeep(880, 0.12, 'sine');
+    }
+
+    this._render(0);
+  }
+
+  _continueFromLevelComplete() {
+    if (this.state === Game.State.ALL_COMPLETE) {
+      this.showMenu();
+      return;
+    }
+    if (this.levels.nextLevel()) {
+      this._startLevel();
+    } else {
+      this.showMenu();
+    }
+  }
+
+  showTutorial() {
+    this.state = Game.State.TUTORIAL;
+    this.tutorialOverlay.classList.add('visible');
+  }
+
+  hideTutorial() {
+    this.tutorialOverlay.classList.remove('visible');
+    this.state = Game.State.MENU;
+  }
+
+  showSettings() {
+    this.state = Game.State.SETTINGS;
+    this.settingsOverlay.classList.add('visible');
+  }
+
+  hideSettings() {
+    this.settingsOverlay.classList.remove('visible');
+    this.state = Game.State.MENU;
+  }
+
+  // ==================== 主循环（deltaTime 驱动） ====================
+
+  _startLoop() {
+    if (this.rafId !== null) return;
+    this._lastTime = 0; // 重置，让第一帧 dt=0
+    this.rafId = requestAnimationFrame(this._loop);
+  }
+
+  _stopLoop() {
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+  }
+
+  /**
+   * 主循环回调
+   * @param {number} timestamp requestAnimationFrame 传入的高精度时间戳（ms）
+   */
+  _loop(timestamp) {
+    if (this.state !== Game.State.PLAYING) {
+      this._stopLoop();
+      return;
+    }
+
+    // 计算 deltaTime（秒），第一帧为 0
+    let dt = 0;
+    if (this._lastTime > 0) {
+      dt = (timestamp - this._lastTime) / 1000;
+      // Clamp 上限防止跳帧后瞬移（例如切 Tab 回来后第一帧）
+      if (dt > DELTA_MAX) dt = DELTA_MAX;
+    }
+    this._lastTime = timestamp;
+
+    this._update(dt);
+    this._render(dt);
+    this.rafId = requestAnimationFrame(this._loop);
+  }
+
+  // ==================== 更新逻辑 ====================
+
+  /**
+   * @param {number} dt deltaTime（秒）
+   */
+  _update(dt) {
+    if (this.state !== Game.State.PLAYING || !this.player) return;
+
+    const level = this.levels.getCurrent();
+    const walls = level.walls;
+
+    // 1. 玩家移动（deltaTime 驱动）
+    const { dx, dy } = this.input.getMoveDir();
+    this.player.move(dx, dy, dt, walls);
+
+    // 2. 声波发射（光线追踪）
+    const clicks = this.input.consumeClicks();
+    for (const click of clicks) {
+      // 执行光线追踪
+      const hits = RayCaster.cast(
+        this.player.x, this.player.y,
+        walls,
+        RAY_COUNT, RAY_MAX_DIST, RAY_MAX_BOUNCES
+      );
+
+      // 将碰撞点添加到墙壁光斑数组
+      const now = performance.now();
+      for (const hit of hits) {
+        this.wallSpots[hit.wallIndex].push({
+          u: hit.u,
+          intensity: hit.intensity,
+          bounce: hit.bounce,
+          time: now
+        });
+      }
+
+      // 保存射线数据用于可视化
+      hits._time = now;
+      this.lastRayHits = hits;
+    }
+
+    // 3. 清理过期光斑（每 60 帧清理一次，减少 GC 压力）
+    if (!this._cleanFrameCounter) this._cleanFrameCounter = 0;
+    this._cleanFrameCounter++;
+    if (this._cleanFrameCounter > 60) {
+      this._cleanFrameCounter = 0;
+      const expireTime = performance.now() - AFTERGLOW_S * 1000;
+      for (let i = 0; i < this.wallSpots.length; i++) {
+        this.wallSpots[i] = this.wallSpots[i].filter(s => s.time > expireTime);
+      }
+    }
+
+    // 4. 检测终点
+    if (this.player.hitGoal(level.goal)) {
+      this._onLevelComplete();
+    }
+  }
+
+  // ==================== 渲染逻辑 ====================
+
+  /**
+   * @param {number} dt deltaTime（秒）
+   */
+  _render(dt) {
+    const renderer = this.renderer;
+    const level = this.levels.getCurrent();
+    const now = performance.now();
+
+    renderer.clear();
+    if (!this.player) return;
+
+    // 1. 墙壁光斑（余晖系统）
+    renderer.renderWallSpots(level.walls, this.wallSpots, now);
+
+    // 2. 射线可视化（从声源到碰撞点的细线）
+    if (this.lastRayHits) {
+      renderer.renderRayLines(this.lastRayHits, this.player.x, this.player.y, now);
+    }
+
+    // 3. 终点（脉冲动画，deltaTime 驱动）
+    renderer.renderGoal(level.goal, dt);
+
+    // 4. 玩家
+    renderer.renderPlayer(this.player);
+  }
+}
+
+// =============================================================================
+//  启动游戏
+// =============================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  const game = new Game();
+  game.renderer.clear();
+  window.__game = game;
+});
+</script>
+
+</body>
+</html>

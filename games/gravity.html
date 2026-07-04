@@ -51,18 +51,24 @@
     touch-action: none;
   }
 
-  /* Overlay panels */
+  /* Overlay panels —— 默认隐藏，.active 才显示 */
   .overlay {
     position: absolute;
     inset: 0;
-    display: flex;
+    display: none;              /* 默认隐藏，根治"点击开始不消失"Bug */
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    background: rgba(6, 6, 15, 0.75); /* 深色半透明压暗背景游戏 */
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
     pointer-events: none;
     z-index: 10;
   }
-  .overlay.active { pointer-events: auto; }
+  .overlay.active {
+    display: flex;               /* 仅当带 .active 时显示 */
+    pointer-events: auto;
+  }
 
   .panel {
     background: var(--bg-panel);
@@ -155,13 +161,60 @@
     gap: 8px;
   }
 
-  /* HUD */
+  /* 选关网格 */
+  .level-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    width: 100%;
+    max-width: 360px;
+    margin: 0 auto 20px;
+  }
+  .level-cell {
+    aspect-ratio: 1;
+    border: 1px solid var(--border);
+    background: rgba(13,13,36,0.6);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--cyan);
+    font-size: 18px;
+    font-weight: 700;
+    transition: all 0.2s;
+    font-family: inherit;
+    position: relative;
+  }
+  .level-cell:hover:not(.locked) {
+    border-color: var(--cyan);
+    background: rgba(0,229,255,0.1);
+    box-shadow: 0 0 12px rgba(0,229,255,0.3);
+    transform: translateY(-2px);
+  }
+  .level-cell.locked {
+    color: var(--muted);
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+  .level-cell .lock-icon { font-size: 14px; }
+  .level-cell.completed::after {
+    content: '✓';
+    position: absolute;
+    top: 3px;
+    right: 5px;
+    font-size: 10px;
+    color: var(--gold);
+  }
+
+  /* HUD —— 默认隐藏，由 updateHUD() 切换显示 */
   .hud {
     position: absolute;
     top: 12px;
     left: 16px;
     right: 16px;
-    display: flex;
+    display: none;
     justify-content: space-between;
     align-items: center;
     pointer-events: none;
@@ -228,7 +281,7 @@
   <canvas id="gameCanvas"></canvas>
 
   <!-- HUD -->
-  <div class="hud" id="hud" style="display:none;">
+  <div class="hud" id="hud">
     <span class="hud-level" id="hudLevel">第 1 关</span>
     <div class="hud-btns">
       <button class="hud-btn" id="btnRetry">↻ 重试</button>
@@ -243,6 +296,7 @@
       <p>利用行星引力场进行弹弓变轨，<br>将探测器精准送达目标区域。</p>
       <div class="btn-row">
         <button class="btn primary" id="btnStart">▶ 开始游戏</button>
+        <button class="btn" id="btnSelectLevel">📦 选择关卡</button>
         <button class="btn" id="btnTutorial">📖 教学原理</button>
         <button class="btn" id="btnSettings">⚙ 游戏设置</button>
       </div>
@@ -250,8 +304,18 @@
     </div>
   </div>
 
+  <!-- Level Select Overlay -->
+  <div class="overlay" id="overlayLevels">
+    <div class="panel" style="max-width:460px;">
+      <h2>📦 选择关卡</h2>
+      <p style="font-size:12px;color:var(--muted);">已通关关卡可重玩，下一关自动解锁。</p>
+      <div class="level-grid" id="levelGrid"></div>
+      <button class="btn" id="btnLevelsBack">← 返回菜单</button>
+    </div>
+  </div>
+
   <!-- Tutorial Overlay -->
-  <div class="overlay" id="overlayTutorial" style="display:none;">
+  <div class="overlay" id="overlayTutorial">
     <div class="panel">
       <h2>📖 引力弹弓原理</h2>
       <div class="diagram">
@@ -272,7 +336,7 @@
   </div>
 
   <!-- Settings Overlay -->
-  <div class="overlay" id="overlaySettings" style="display:none;">
+  <div class="overlay" id="overlaySettings">
     <div class="panel">
       <h2>⚙ 游戏设置</h2>
       <p style="color:var(--muted);">音效开关（预留）</p>
@@ -283,7 +347,7 @@
   </div>
 
   <!-- Win Overlay -->
-  <div class="overlay" id="overlayWin" style="display:none;">
+  <div class="overlay" id="overlayWin">
     <div class="panel">
       <h2 style="color:var(--gold);">🎉 通关成功！</h2>
       <p id="winMsg">探测器精准抵达目标！</p>
@@ -295,7 +359,7 @@
   </div>
 
   <!-- Game Over Overlay -->
-  <div class="overlay" id="overlayGameOver" style="display:none;">
+  <div class="overlay" id="overlayGameOver">
     <div class="panel">
       <h2 style="color:var(--magenta);">💥 任务失败</h2>
       <p id="failMsg">探测器坠毁！</p>
@@ -307,7 +371,7 @@
   </div>
 
   <!-- Celebration Overlay -->
-  <div class="overlay" id="overlayCelebrate" style="display:none;">
+  <div class="overlay" id="overlayCelebrate">
     <div class="panel">
       <h1 style="color:var(--gold);font-size:32px;">🏆 全通关！</h1>
       <p>你已征服全部 20 个引力弹弓关卡！<br>引力大师，实至名归。</p>
@@ -1530,6 +1594,40 @@ document.getElementById('btnSettings').addEventListener('click', function() {
 });
 
 document.getElementById('btnSettingsBack').addEventListener('click', function() {
+  gameState = State.MENU;
+  showOverlay('overlayMenu');
+});
+
+// ─── 选关面板 ───────────────────────────────────────────────
+// 动态生成 20 关网格按钮；bestLevel+1 关以内可玩，已通关打 ✓
+function buildLevelGrid() {
+  const grid = document.getElementById('levelGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (let i = 0; i < LEVELS.length; i++) {
+    const cell = document.createElement('button');
+    const completed = (i + 1) <= bestLevel;          // 已通关
+    const unlocked  = (i + 1) <= bestLevel + 1;       // 可玩（含下一关）
+    cell.className = 'level-cell' + (unlocked ? '' : ' locked') + (completed ? ' completed' : '');
+    cell.textContent = unlocked ? (i + 1) : '🔒';
+    if (unlocked) {
+      cell.addEventListener('click', function() {
+        currentLevel = i;
+        hideAllOverlays();
+        loadLevel(i);
+      });
+    }
+    grid.appendChild(cell);
+  }
+}
+
+document.getElementById('btnSelectLevel').addEventListener('click', function() {
+  gameState = State.MENU;
+  buildLevelGrid();
+  showOverlay('overlayLevels');
+});
+
+document.getElementById('btnLevelsBack').addEventListener('click', function() {
   gameState = State.MENU;
   showOverlay('overlayMenu');
 });

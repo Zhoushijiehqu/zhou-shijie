@@ -249,6 +249,52 @@
     border-color: var(--cyan);
     color: var(--cyan);
   }
+  .hud-btn.accent-hint { border-color: var(--gold); color: var(--gold); }
+  .hud-btn.accent-hint:hover { background: var(--gold); color: var(--bg-deep); }
+  .hud-btn.accent-hint.active { background: var(--gold); color: var(--bg-deep); box-shadow: 0 0 12px rgba(255,215,64,0.5); }
+  .hud-btn.accent-skip { border-color: var(--magenta); color: var(--magenta); }
+  .hud-btn.accent-skip:hover { background: var(--magenta); color: #fff; }
+
+  /* iOS 风格开关 */
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--border);
+    border-radius: 24px;
+    transition: 0.3s;
+  }
+  .toggle-slider::before {
+    content: "";
+    position: absolute;
+    height: 18px; width: 18px;
+    left: 3px; top: 3px;
+    background: var(--white);
+    border-radius: 50%;
+    transition: 0.3s;
+  }
+  .toggle-switch input:checked + .toggle-slider { background: var(--cyan); }
+  .toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+    background: var(--bg-deep);
+  }
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 4px;
+    color: var(--white);
+    font-size: 14px;
+  }
 
   /* Tutorial diagram */
   .diagram {
@@ -285,6 +331,8 @@
     <span class="hud-level" id="hudLevel">第 1 关</span>
     <div class="hud-btns">
       <button class="hud-btn" id="btnRetry">↻ 重试</button>
+      <button class="hud-btn accent-hint" id="btnHint">💡 航线提示</button>
+      <button class="hud-btn accent-skip" id="btnAutoComplete">✨ 自动通关</button>
       <button class="hud-btn" id="btnMenu">☰ 菜单</button>
     </div>
   </div>
@@ -330,7 +378,7 @@
         </svg>
       </div>
       <p>探测器飞越行星时，行星引力会弯曲其轨迹并改变速度。<br>巧妙利用多颗行星的引力叠加，可实现"免费加速"——<br>这就是 NASA 旅行者号使用的引力弹弓技术。</p>
-      <p style="font-size:12px;color:var(--muted);">💡 操作：按住探测器向后拖拽蓄力，松开发射</p>
+      <p style="font-size:12px;color:var(--muted);">💡 操作：按住画布任意位置向后拖拽蓄力，松开发射</p>
       <button class="btn" id="btnTutorialBack">← 返回菜单</button>
     </div>
   </div>
@@ -340,6 +388,13 @@
     <div class="panel">
       <h2>⚙ 游戏设置</h2>
       <p style="color:var(--muted);">音效开关（预留）</p>
+      <div class="setting-row" style="border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin:8px 0;">
+        <span>🔓 自由随意选关 (解开锁定)</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="chkFreeSelect">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
       <div class="btn-row" style="margin-top:16px;">
         <button class="btn" id="btnSettingsBack">← 返回菜单</button>
       </div>
@@ -697,6 +752,14 @@ let aimCurrent = null;        // 当前鼠标位置 {x, y}
 let predictPath = [];         // 预测轨迹点数组
 let predictDirty = true;      // 脏标记
 
+// ─── 辅助功能状态 ───────────────────────────────────────────
+let showIdealPath = false;    // 航线提示开关：true 时绘制绿色黄金航线
+let idealPath = [];           // 缓存的理想航线点数组 [{x,y}]
+let idealPathDirty = true;    // 理想航线脏标记
+let showGoalHint = true;      // 开局终点引导（载入后未拖拽时显示）
+let freeSelectMode = false;   // 自由选关作弊开关：true 时所有关卡解锁
+let physicsAccumulator = 0;   // 物理步长累加器（固定 PREDICT_DT 步进，消除航线漂移）
+
 // ─── 粒子系统 ───────────────────────────────────────────────
 let particles = [];           // [{x, y, vx, vy, life, maxLife, color, size}]
 
@@ -743,6 +806,12 @@ function loadLevel(index) {
   predictPath = [];
   predictDirty = true;
   particles = [];
+  // 辅助功能复位：每关载入时强制重置航线提示与终点引导
+  showIdealPath = false;
+  idealPath = [];
+  idealPathDirty = true;
+  showGoalHint = true;
+  physicsAccumulator = 0;     // 物理累加器清零，避免上一关残留步进
   gameState = State.AIMING;
   updateHUD();
 }
@@ -879,32 +948,46 @@ function computePredictPath() {
 }
 
 // ─── 物理更新（飞行状态）─────────────────────────────────────
+// 核心修复：引入固定步长累加器，将动态 dt 拆解为 PREDICT_DT(0.016s) 微步，
+// 使飞行物理迭代与预测虚线 100% 同步，消除"航线漂移"。
 function updatePhysics(dt) {
   if (gameState !== State.FLYING) return;
   if (!player.alive) return;
 
   const lv = LEVELS[currentLevel];
-
-  // 限制 dt 防止大帧跳跃
   const clampedDt = Math.min(dt, 0.05);
+  physicsAccumulator += clampedDt;
 
-  // 引力计算
+  // 安全上限：防止极端帧率下死循环
+  let safety = 0;
+  while (physicsAccumulator >= PREDICT_DT && safety < 8) {
+    physicsAccumulator -= PREDICT_DT;
+    stepPhysics(PREDICT_DT, lv);
+    safety++;
+    // 若本步触发坠毁/胜利，清空累加器并退出
+    if (!player.alive || gameState !== State.FLYING) {
+      physicsAccumulator = 0;
+      return;
+    }
+  }
+}
+
+// 单步物理迭代：严格复刻 computePredictPath 的积分顺序（引力→墙检→速度→位置→边界→目标），
+// 保证预测虚线与实际飞行轨迹完全重合。
+function stepPhysics(stepDt, lv) {
+  // 1. 引力计算（含行星碰撞检测）
   let ax = 0, ay = 0;
   for (const planet of lv.planets) {
     const pdx = planet.x - player.x;
     const pdy = planet.y - player.y;
     const r = Math.sqrt(pdx * pdx + pdy * pdy);
 
-    // 碰撞检测
     if (r < planet.r) {
-      // 斥力星：表面附近斥力已极强，正常物理下玩家无法触及，但高速直冲可能突破
-      // 这里不立即坠毁，而是反弹回表面外（避免"反重力星却因靠近而坠毁"的悖论）
+      // 斥力星：反弹回表面外（避免"反重力星却因靠近坠毁"的悖论）
       if (planet.isRepulsor) {
-        // 将探测器推回到表面外 r+1 处
         const pushR = planet.r + 1;
         player.x = planet.x - (pdx / r) * pushR;
         player.y = planet.y - (pdy / r) * pushR;
-        // 沿表面法线反弹（反向速度的法向分量）
         const vdotn = player.vx * (-pdx / r) + player.vy * (-pdy / r);
         if (vdotn < 0) {
           player.vx -= 2 * vdotn * (-pdx / r);
@@ -912,7 +995,7 @@ function updatePhysics(dt) {
         }
         spawnParticles(player.x, player.y, 12, '#ff88cc', 100, 0.5);
       } else {
-        // 引力星/黑洞：正常坠毁
+        // 引力星/黑洞：坠毁
         player.alive = false;
         spawnParticles(player.x, player.y, 40, planet.isBlackHole ? '#8844ff' : '#ff4444', 200, 1.5);
         gameState = State.GAME_OVER;
@@ -925,60 +1008,34 @@ function updatePhysics(dt) {
     }
 
     if (r < 0.001) continue;
-
     const aMag = G * planet.mass / (r * r);
-    const nx = pdx / r;
-    const ny = pdy / r;
-    ax += nx * aMag;
-    ay += ny * aMag;
+    ax += (pdx / r) * aMag;
+    ay += (pdy / r) * aMag;
   }
 
-  // 更新速度
-  player.vx += ax * clampedDt;
-  player.vy += ay * clampedDt;
-
-  // 子步长积分：将本帧位移拆成多个子步，每步检测墙壁碰撞，防止高速穿墙
-  const SUB_STEPS = 4;
-  const subDt = clampedDt / SUB_STEPS;
-  for (let s = 0; s < SUB_STEPS; s++) {
-    player.x += player.vx * subDt;
-    player.y += player.vy * subDt;
-
-    // 墙壁碰撞（逐子步检测）
-    for (const wall of lv.walls) {
-      if (player.x > wall.x && player.x < wall.x + wall.w &&
-          player.y > wall.y && player.y < wall.y + wall.h) {
-        player.alive = false;
-        spawnParticles(player.x, player.y, 30, '#ff8844', 150, 1.2);
-        gameState = State.GAME_OVER;
-        updateHUD();
-        showOverlay('overlayGameOver');
-        document.getElementById('failMsg').textContent = '探测器撞上墙壁！';
-        return;
-      }
+  // 2. 墙壁碰撞预测（用旧速度检测下一帧位置，与预测虚线一致）
+  for (const wall of lv.walls) {
+    if (player.x + player.vx * stepDt > wall.x && player.x + player.vx * stepDt < wall.x + wall.w &&
+        player.y + player.vy * stepDt > wall.y && player.y + player.vy * stepDt < wall.y + wall.h) {
+      player.alive = false;
+      spawnParticles(player.x, player.y, 30, '#ff8844', 150, 1.2);
+      gameState = State.GAME_OVER;
+      updateHUD();
+      showOverlay('overlayGameOver');
+      document.getElementById('failMsg').textContent = '探测器撞上墙壁！';
+      return;
     }
   }
 
-  // 更新朝向
-  const speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
-  if (speed > 0.5) {
-    player.angle = Math.atan2(player.vy, player.vx);
-  }
+  // 3. 速度更新
+  player.vx += ax * stepDt;
+  player.vy += ay * stepDt;
 
-  // 尾迹
-  if (speed > 1) {
-    player.tail.push({ x: player.x, y: player.y, alpha: 1 });
-    if (player.tail.length > MAX_TAIL) {
-      player.tail.shift();
-    }
-  }
+  // 4. 位置更新
+  player.x += player.vx * stepDt;
+  player.y += player.vy * stepDt;
 
-  // 尾迹渐隐
-  for (let i = 0; i < player.tail.length; i++) {
-    player.tail[i].alpha = (i + 1) / player.tail.length * 0.7;
-  }
-
-  // 边界检查
+  // 5. 边界检查
   if (player.x < -BOUNDARY_MARGIN || player.x > CSS_W + BOUNDARY_MARGIN ||
       player.y < -BOUNDARY_MARGIN || player.y > CSS_H + BOUNDARY_MARGIN) {
     player.alive = false;
@@ -989,32 +1046,50 @@ function updatePhysics(dt) {
     return;
   }
 
-  // 目标检测
+  // 6. 目标检测
   const goal = lv.goal;
   const gdx = goal.x - player.x;
   const gdy = goal.y - player.y;
   const gDist = Math.sqrt(gdx * gdx + gdy * gdy);
   if (gDist < goal.r) {
-    // 胜利！
-    gameState = State.WIN;
-    spawnParticles(player.x, player.y, 60, '#ffd740', 250, 2.5);
-    updateHUD();
+    triggerWin(false);
+    return;
+  }
 
-    // 更新最高通关记录
-    if (currentLevel + 1 > bestLevel) {
-      bestLevel = currentLevel + 1;
-      saveBest();
-    }
+  // 7. 朝向与尾迹
+  const speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
+  if (speed > 0.5) {
+    player.angle = Math.atan2(player.vy, player.vx);
+  }
+  if (speed > 1) {
+    player.tail.push({ x: player.x, y: player.y, alpha: 1 });
+    if (player.tail.length > MAX_TAIL) player.tail.shift();
+  }
+  for (let i = 0; i < player.tail.length; i++) {
+    player.tail[i].alpha = (i + 1) / player.tail.length * 0.7;
+  }
+}
 
-    if (currentLevel >= LEVELS.length - 1) {
-      // 全部通关
-      gameState = State.CELEBRATE;
-      showOverlay('overlayCelebrate');
-    } else {
-      showOverlay('overlayWin');
-      document.getElementById('winMsg').textContent =
-        '探测器精准抵达目标！第 ' + (currentLevel + 1) + ' 关通过。';
-    }
+// ─── 胜利结算（可被飞行命中或自动通关按钮调用）──────────────
+// force=true：自动通关，不计入 bestLevel（作弊跳关）
+function triggerWin(force) {
+  gameState = State.WIN;
+  spawnParticles(player.x, player.y, 60, '#ffd740', 250, 2.5);
+  updateHUD();
+
+  if (!force && currentLevel + 1 > bestLevel) {
+    bestLevel = currentLevel + 1;
+    saveBest();
+  }
+
+  if (currentLevel >= LEVELS.length - 1) {
+    gameState = State.CELEBRATE;
+    showOverlay('overlayCelebrate');
+  } else {
+    showOverlay('overlayWin');
+    document.getElementById('winMsg').textContent = force
+      ? '✨ 自动通关！第 ' + (currentLevel + 1) + ' 关已跳过。'
+      : '探测器精准抵达目标！第 ' + (currentLevel + 1) + ' 关通过。';
   }
 }
 
@@ -1273,22 +1348,143 @@ function drawPredictPath() {
   ctx.beginPath();
   ctx.moveTo(predictPath[0].x, predictPath[0].y);
 
+  let hitIndex = -1;
   for (let i = 1; i < predictPath.length; i++) {
     const p = predictPath[i];
-    if (p.hit) break;
+    if (p.hit) { hitIndex = i; break; }
     ctx.lineTo(p.x, p.y);
   }
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // 终点标记
-  const last = predictPath[predictPath.length - 1];
-  if (!last.hit) {
+  // 截断点红色警示圈：预测因碰撞中断时提示玩家
+  if (hitIndex >= 0) {
+    const hp = predictPath[hitIndex];
+    ctx.fillStyle = 'rgba(255,68,129,0.9)';
+    ctx.beginPath();
+    ctx.arc(hp.x, hp.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,68,129,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(hp.x, hp.y, 9, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    // 终点标记（无碰撞中断）
+    const last = predictPath[predictPath.length - 1];
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.beginPath();
     ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+// ─── 理想航线计算（搜索能到达目标的发射初速度）──────────────
+// 暴力搜索角度×速度空间，复刻预测物理，找到首条命中目标的航线。
+function computeIdealLaunch() {
+  const lv = LEVELS[currentLevel];
+  const sx = lv.playerStart.x, sy = lv.playerStart.y;
+  const goal = lv.goal;
+
+  for (let speed = 180; speed <= MAX_LAUNCH_SPEED; speed += 40) {
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 36) { // 每 5°
+      const vx0 = Math.cos(a) * speed;
+      const vy0 = Math.sin(a) * speed;
+      let px = sx, py = sy, pvx = vx0, pvy = vy0;
+      const path = [{ x: px, y: py }];
+      let ok = false;
+
+      for (let i = 0; i < PREDICT_STEPS; i++) {
+        let ax = 0, ay = 0;
+        let crashed = false;
+        for (const planet of lv.planets) {
+          const pdx = planet.x - px;
+          const pdy = planet.y - py;
+          const r = Math.sqrt(pdx * pdx + pdy * pdy);
+          if (r < planet.r) { crashed = true; break; }
+          if (r < 0.001) continue;
+          const aMag = G * planet.mass / (r * r);
+          ax += (pdx / r) * aMag;
+          ay += (pdy / r) * aMag;
+        }
+        if (crashed) break;
+
+        let wallHit = false;
+        for (const wall of lv.walls) {
+          if (px + pvx * PREDICT_DT > wall.x && px + pvx * PREDICT_DT < wall.x + wall.w &&
+              py + pvy * PREDICT_DT > wall.y && py + pvy * PREDICT_DT < wall.y + wall.h) {
+            wallHit = true; break;
+          }
+        }
+        if (wallHit) break;
+
+        pvx += ax * PREDICT_DT;
+        pvy += ay * PREDICT_DT;
+        px += pvx * PREDICT_DT;
+        py += pvy * PREDICT_DT;
+
+        if (px < -BOUNDARY_MARGIN || px > CSS_W + BOUNDARY_MARGIN ||
+            py < -BOUNDARY_MARGIN || py > CSS_H + BOUNDARY_MARGIN) break;
+
+        path.push({ x: px, y: py });
+        const gdx = goal.x - px, gdy = goal.y - py;
+        if (Math.sqrt(gdx * gdx + gdy * gdy) < goal.r) { ok = true; break; }
+      }
+      if (ok) return path;
+    }
+  }
+  return null;
+}
+
+// ─── 绘制理想航线（绿色虚线）────────────────────────────────
+function drawIdealPath() {
+  if (!showIdealPath) return;
+  if (gameState !== State.AIMING && gameState !== State.FLYING) return;
+  if (idealPath.length < 2) return;
+
+  ctx.setLineDash([6, 6]);
+  ctx.strokeStyle = 'rgba(80,255,120,0.6)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(idealPath[0].x, idealPath[0].y);
+  for (let i = 1; i < idealPath.length; i++) {
+    ctx.lineTo(idealPath[i].x, idealPath[i].y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 终点绿色标记
+  const last = idealPath[idealPath.length - 1];
+  ctx.fillStyle = 'rgba(80,255,120,0.9)';
+  ctx.beginPath();
+  ctx.arc(last.x, last.y, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ─── 开局终点引导（扩散光环 + 顶部提示文字）────────────────
+function drawGoalHintRing(time) {
+  if (!showGoalHint) return;
+  if (gameState !== State.AIMING) return;
+  const lv = LEVELS[currentLevel];
+  const { x, y, r } = lv.goal;
+
+  // 向外扩散的脉冲光环
+  const t = (time % 2000) / 2000;            // 0~1 循环
+  const ringR = r + t * 40;
+  const alpha = (1 - t) * 0.6;
+  ctx.strokeStyle = 'rgba(255,215,64,' + alpha + ')';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, ringR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 屏幕中央上方微弱提示
+  const blink = Math.sin(time * 0.003) * 0.25 + 0.5;
+  ctx.fillStyle = 'rgba(255,215,64,' + blink + ')';
+  ctx.font = '14px -apple-system, "PingFang SC", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('目标：将探测器送入金色虫洞', CSS_W / 2, 28);
+  ctx.textAlign = 'left';
 }
 
 function drawAimLine() {
@@ -1382,7 +1578,7 @@ function drawAimHint() {
   ctx.fillStyle = 'rgba(255,255,255,' + blink + ')';
   ctx.font = '13px -apple-system, "PingFang SC", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('按住探测器向后拖拽蓄力发射', player.x, player.y - 28);
+  ctx.fillText('按住任意位置向后拖拽蓄力，松开发射', player.x, player.y - 28);
 }
 
 // ─── 主渲染 ──────────────────────────────────────────────────
@@ -1409,8 +1605,14 @@ function render(time) {
   // 目标区域
   drawGoal(lv.goal, time);
 
+  // 开局终点引导光环（未拖拽时）
+  drawGoalHintRing(time);
+
   // 预测虚线
   drawPredictPath();
+
+  // 理想航线（航线提示开启时）
+  drawIdealPath();
 
   // 尾迹
   drawTail();
@@ -1486,22 +1688,18 @@ function getCanvasPos(e) {
   };
 }
 
-function isNearPlayer(pos) {
-  const dx = pos.x - player.x;
-  const dy = pos.y - player.y;
-  return Math.sqrt(dx * dx + dy * dy) < 30;  // 触摸判定圈从 22 扩到 30，移动端更易点中
-}
+// isNearPlayer 已移除：允许在画布全屏任意空白位置按下拖拽蓄力，降低新手门槛
 
 canvas.addEventListener('pointerdown', function(e) {
   if (gameState !== State.AIMING) return;
   const pos = getCanvasPos(e);
-  if (isNearPlayer(pos)) {
-    pointerDown = true;
-    aimStart = { x: pos.x, y: pos.y };
-    aimCurrent = { x: pos.x, y: pos.y };
-    predictDirty = true;
-    canvas.setPointerCapture(e.pointerId);
-  }
+  // 取消近飞船限制：全屏任意位置按下即激活瞄准蓄力
+  pointerDown = true;
+  aimStart = { x: pos.x, y: pos.y };
+  aimCurrent = { x: pos.x, y: pos.y };
+  predictDirty = true;
+  showGoalHint = false;   // 一旦开始拖拽，关闭开局终点引导
+  canvas.setPointerCapture(e.pointerId);
 });
 
 canvas.addEventListener('pointermove', function(e) {
@@ -1530,7 +1728,7 @@ canvas.addEventListener('pointercancel', function(e) {
   }
 });
 
-// 键盘：空格重试
+// 键盘：空格重试 / R 键重试 / Esc 返回菜单
 document.addEventListener('keydown', function(e) {
   if (e.code === 'Space') {
     e.preventDefault();
@@ -1540,6 +1738,14 @@ document.addEventListener('keydown', function(e) {
     } else if (gameState === State.WIN) {
       hideAllOverlays();
       nextLevel();
+    }
+  }
+  // R 键：AIMING/FLYING 状态下随时无条件重玩当前关卡
+  if (e.code === 'KeyR') {
+    if (gameState === State.AIMING || gameState === State.FLYING) {
+      e.preventDefault();
+      hideAllOverlays();
+      resetLevel();
     }
   }
   if (e.code === 'Escape') {
@@ -1600,6 +1806,7 @@ document.getElementById('btnSettingsBack').addEventListener('click', function() 
 
 // ─── 选关面板 ───────────────────────────────────────────────
 // 动态生成 20 关网格按钮；bestLevel+1 关以内可玩，已通关打 ✓
+// freeSelectMode 开启时全部解锁
 function buildLevelGrid() {
   const grid = document.getElementById('levelGrid');
   if (!grid) return;
@@ -1607,7 +1814,7 @@ function buildLevelGrid() {
   for (let i = 0; i < LEVELS.length; i++) {
     const cell = document.createElement('button');
     const completed = (i + 1) <= bestLevel;          // 已通关
-    const unlocked  = (i + 1) <= bestLevel + 1;       // 可玩（含下一关）
+    const unlocked  = freeSelectMode || (i + 1) <= bestLevel + 1;  // 可玩
     cell.className = 'level-cell' + (unlocked ? '' : ' locked') + (completed ? ' completed' : '');
     cell.textContent = unlocked ? (i + 1) : '🔒';
     if (unlocked) {
@@ -1630,6 +1837,40 @@ document.getElementById('btnSelectLevel').addEventListener('click', function() {
 document.getElementById('btnLevelsBack').addEventListener('click', function() {
   gameState = State.MENU;
   showOverlay('overlayMenu');
+});
+
+// ─── 航线提示按钮 ───────────────────────────────────────────
+document.getElementById('btnHint').addEventListener('click', function() {
+  showIdealPath = !showIdealPath;
+  this.classList.toggle('active', showIdealPath);
+  if (showIdealPath) {
+    // 懒计算：首次开启时搜索理想航线并缓存
+    if (idealPathDirty) {
+      const path = computeIdealLaunch();
+      idealPath = path || [];
+      idealPathDirty = false;
+      if (!path) {
+        // 未找到解：自动关闭并提示
+        showIdealPath = false;
+        this.classList.remove('active');
+        alert('当前关卡未搜索到直达航线，请尝试自行探索！');
+      }
+    }
+  }
+});
+
+// ─── 自动通关按钮 ───────────────────────────────────────────
+document.getElementById('btnAutoComplete').addEventListener('click', function() {
+  if (gameState !== State.AIMING && gameState !== State.FLYING) return;
+  hideAllOverlays();
+  triggerWin(true);
+});
+
+// ─── 自由选关开关 ───────────────────────────────────────────
+document.getElementById('chkFreeSelect').addEventListener('change', function() {
+  freeSelectMode = this.checked;
+  // 核心联动：立刻刷新关卡网格锁定状态，避免返回选关界面时刷新滞后
+  buildLevelGrid();
 });
 
 document.getElementById('btnRetry').addEventListener('click', function() {

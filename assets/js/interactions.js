@@ -1,4 +1,12 @@
 /**
+ * 版权所有 © 2026 周世杰 (ZHOU SHIJIE)
+ * 代码遵循 MIT 许可证，创意内容遵循 CC-BY-NC 4.0
+ * 作者邮箱：a15759219744@163.com
+ * GitHub：https://github.com/Zhoushijiehqu
+ * 未经授权商用必究
+ */
+
+/**
  * interactions.js - 交互逻辑（滚动动画、页面效果等）
  */
 

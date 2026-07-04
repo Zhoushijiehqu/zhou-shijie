@@ -612,6 +612,9 @@ function raySegmentIntersection(ox, oy, dx, dy, ax, ay, bx, by) {
 function reflectDirection(dx, dy, ex, ey) {
   // 墙壁法线：(-ey, ex)，即 E 逆时针旋转 90°
   let nx = -ey, ny = ex;
+  // 归一化法线为单位向量（关键修复：墙壁线段长度不同时法线长度不同，会导致反射角度错乱）
+  const nlen = Math.sqrt(nx * nx + ny * ny);
+  if (nlen > 1e-10) { nx /= nlen; ny /= nlen; }
   // 确保法线朝向入射方向（dot(D, N) < 0）
   const dotDN = dot2D(dx, dy, nx, ny);
   if (dotDN > 0) { nx = -nx; ny = -ny; }
@@ -882,14 +885,17 @@ class RayCaster {
     // 无交点或超出最大距离
     if (nearestWallIdx < 0 || traveled + nearestT > maxDist) return;
 
-    // 记录碰撞点
+    // 记录碰撞点（含累计总距离和本次射线起点，用于扩散动画和正确连线）
     outHits.push({
       wallIndex: nearestWallIdx,
       u: nearestU,                    // 在线段上的归一化位置 0~1
       x: nearestX,
       y: nearestY,
       intensity: intensity,
-      bounce: bounce
+      bounce: bounce,
+      totalDistance: traveled + nearestT,  // 从玩家出发的累计总像素长度（用于扩散动画）
+      fromX: ox,                            // 本次射线起点 X（用于正确画锯齿形反射路线）
+      fromY: oy                             // 本次射线起点 Y
     });
 
     // 如果还能反弹，计算反射方向并继续追踪
@@ -1187,16 +1193,10 @@ class Renderer {
     ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
     ctx.lineWidth = 0.5;
 
-    // 绘制从声源到每个碰撞点的细线
-    const drawn = new Set();
+    // 从每个 hit 的 fromX/fromY 画到 hit.x/hit.y，正确呈现锯齿形反射路线
     for (const hit of rayHits) {
-      // 去重：同一墙壁同一位置的碰撞点只画一次
-      const key = `${hit.wallIndex}_${hit.u.toFixed(3)}`;
-      if (drawn.has(key)) continue;
-      drawn.add(key);
-
       ctx.beginPath();
-      ctx.moveTo(originX, originY);
+      ctx.moveTo(hit.fromX, hit.fromY);
       ctx.lineTo(hit.x, hit.y);
       ctx.stroke();
     }
@@ -1250,6 +1250,19 @@ class Game {
      * @type {Array|null}
      */
     this.lastRayHits = null;
+
+    /**
+     * 活跃的声波数组（扩散动画系统）
+     * 每个 ActiveWave: { x, y, startTime, speed, hits, activatedCount }
+     * @type {Array}
+     */
+    this.activeWaves = [];
+
+    /**
+     * 当前关卡的墙壁数组（含屏幕边界墙）
+     * @type {Array}
+     */
+    this.currentWalls = [];
 
     /** @type {string} 当前状态 */
     this.state = Game.State.MENU;
@@ -1399,6 +1412,14 @@ class Game {
   _startLevel() {
     const level = this.levels.getCurrent();
 
+    // 补全屏幕四周边界墙，使游戏空间闭合，射线不再飞入虚空
+    this.currentWalls = level.walls.concat([
+      { x1: 0,            y1: 0,            x2: CANVAS_W, y2: 0            },  // 上边界
+      { x1: CANVAS_W,     y1: 0,            x2: CANVAS_W, y2: CANVAS_H     },  // 右边界
+      { x1: CANVAS_W,     y1: CANVAS_H,     x2: 0,        y2: CANVAS_H      },  // 下边界
+      { x1: 0,            y1: CANVAS_H,     x2: 0,        y2: 0             }   // 左边界
+    ]);
+
     // 隐藏所有 UI
     this.menuOverlay.classList.remove('active');
     this.menuPanel.classList.remove('visible');
@@ -1410,9 +1431,10 @@ class Game {
     // 初始化玩家
     this.player = new Player(level.playerStart.x, level.playerStart.y, PLAYER_R, PLAYER_SPD);
 
-    // 初始化墙壁光斑数组（每堵墙一个空数组）
-    this.wallSpots = level.walls.map(() => []);
+    // 初始化墙壁光斑数组（每堵墙一个空数组，含边界墙）
+    this.wallSpots = this.currentWalls.map(() => []);
     this.lastRayHits = null;
+    this.activeWaves = [];  // 重置活跃声波
 
     // 切换到游戏状态，启用点击
     this.state = Game.State.PLAYING;
@@ -1530,39 +1552,74 @@ class Game {
     if (this.state !== Game.State.PLAYING || !this.player) return;
 
     const level = this.levels.getCurrent();
-    const walls = level.walls;
+    const walls = this.currentWalls;
 
     // 1. 玩家移动（deltaTime 驱动）
     const { dx, dy } = this.input.getMoveDir();
     this.player.move(dx, dy, dt, walls);
 
-    // 2. 声波发射（光线追踪）
+    // 2. 声波发射：点击时创建 ActiveWave，不立即点亮墙壁
     const clicks = this.input.consumeClicks();
+    const now = performance.now();
     for (const click of clicks) {
-      // 执行光线追踪
+      // 执行光线追踪（hit 已含 totalDistance 和 fromX/fromY）
       const hits = RayCaster.cast(
         this.player.x, this.player.y,
         walls,
         RAY_COUNT, RAY_MAX_DIST, RAY_MAX_BOUNCES
       );
 
-      // 将碰撞点添加到墙壁光斑数组
-      const now = performance.now();
-      for (const hit of hits) {
-        this.wallSpots[hit.wallIndex].push({
-          u: hit.u,
-          intensity: hit.intensity,
-          bounce: hit.bounce,
-          time: now
-        });
-      }
+      // 按 totalDistance 升序排序，使扩散动画由近及远依次激活
+      hits.sort((a, b) => a.totalDistance - b.totalDistance);
+
+      // 创建活跃声波对象，记录发射信息，等待扩散激活
+      const wave = {
+        x: this.player.x,
+        y: this.player.y,
+        startTime: now,
+        speed: 400,        // 声波扩散速度 px/s
+        hits: hits,
+        activatedCount: 0   // 已激活的碰撞点数
+      };
+      this.activeWaves.push(wave);
 
       // 保存射线数据用于可视化
       hits._time = now;
       this.lastRayHits = hits;
     }
 
-    // 3. 清理过期光斑（每 60 帧清理一次，减少 GC 压力）
+    // 3. 处理活跃声波的扩散激活：声波随时间一圈圈荡漾出去
+    const stillActive = [];
+    for (const wave of this.activeWaves) {
+      const elapsed = (now - wave.startTime) / 1000;  // 秒
+      const currentRadius = elapsed * wave.speed;     // 当前扩散半径 px
+
+      // 激活已达扩散半径的碰撞点（hits 已按 totalDistance 排序）
+      for (let i = wave.activatedCount; i < wave.hits.length; i++) {
+        const hit = wave.hits[i];
+        if (currentRadius >= hit.totalDistance) {
+          // 激活该碰撞点：加入墙壁光斑数组
+          this.wallSpots[hit.wallIndex].push({
+            u: hit.u,
+            intensity: hit.intensity,
+            bounce: hit.bounce,
+            time: now
+          });
+          wave.activatedCount++;
+        } else {
+          break;  // 后面的 totalDistance 更大，尚未到达，跳出
+        }
+      }
+
+      // 若仍有未激活的碰撞点且扩散半径未超最大值，保留该声波
+      const maxRadius = RAY_MAX_DIST + 200;
+      if (wave.activatedCount < wave.hits.length && currentRadius < maxRadius) {
+        stillActive.push(wave);
+      }
+    }
+    this.activeWaves = stillActive;
+
+    // 4. 清理过期光斑（每 60 帧清理一次，减少 GC 压力）
     if (!this._cleanFrameCounter) this._cleanFrameCounter = 0;
     this._cleanFrameCounter++;
     if (this._cleanFrameCounter > 60) {
@@ -1573,7 +1630,7 @@ class Game {
       }
     }
 
-    // 4. 检测终点
+    // 5. 检测终点
     if (this.player.hitGoal(level.goal)) {
       this._onLevelComplete();
     }
@@ -1592,10 +1649,10 @@ class Game {
     renderer.clear();
     if (!this.player) return;
 
-    // 1. 墙壁光斑（余晖系统）
-    renderer.renderWallSpots(level.walls, this.wallSpots, now);
+    // 1. 墙壁光斑（余晖系统）— 使用含边界墙的 currentWalls
+    renderer.renderWallSpots(this.currentWalls, this.wallSpots, now);
 
-    // 2. 射线可视化（从声源到碰撞点的细线）
+    // 2. 射线可视化（锯齿形反射路线，用 hit.fromX/fromY）
     if (this.lastRayHits) {
       renderer.renderRayLines(this.lastRayHits, this.player.x, this.player.y, now);
     }

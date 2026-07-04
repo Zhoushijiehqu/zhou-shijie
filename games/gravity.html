@@ -833,14 +833,31 @@ function updatePhysics(dt) {
 
     // 碰撞检测
     if (r < planet.r) {
-      player.alive = false;
-      spawnParticles(player.x, player.y, 40, planet.isBlackHole ? '#8844ff' : '#ff4444', 200, 1.5);
-      gameState = State.GAME_OVER;
-      updateHUD();
-      showOverlay('overlayGameOver');
-      document.getElementById('failMsg').textContent =
-        '探测器撞击 ' + (planet.name || '行星') + '！';
-      return;
+      // 斥力星：表面附近斥力已极强，正常物理下玩家无法触及，但高速直冲可能突破
+      // 这里不立即坠毁，而是反弹回表面外（避免"反重力星却因靠近而坠毁"的悖论）
+      if (planet.isRepulsor) {
+        // 将探测器推回到表面外 r+1 处
+        const pushR = planet.r + 1;
+        player.x = planet.x - (pdx / r) * pushR;
+        player.y = planet.y - (pdy / r) * pushR;
+        // 沿表面法线反弹（反向速度的法向分量）
+        const vdotn = player.vx * (-pdx / r) + player.vy * (-pdy / r);
+        if (vdotn < 0) {
+          player.vx -= 2 * vdotn * (-pdx / r);
+          player.vy -= 2 * vdotn * (-pdy / r);
+        }
+        spawnParticles(player.x, player.y, 12, '#ff88cc', 100, 0.5);
+      } else {
+        // 引力星/黑洞：正常坠毁
+        player.alive = false;
+        spawnParticles(player.x, player.y, 40, planet.isBlackHole ? '#8844ff' : '#ff4444', 200, 1.5);
+        gameState = State.GAME_OVER;
+        updateHUD();
+        showOverlay('overlayGameOver');
+        document.getElementById('failMsg').textContent =
+          '探测器撞击 ' + (planet.name || '行星') + '！';
+        return;
+      }
     }
 
     if (r < 0.001) continue;

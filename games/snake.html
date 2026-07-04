@@ -895,6 +895,8 @@
       function gameOver() {
         state = 'over';
         if (timer) { clearTimeout(timer); timer = null; }
+        // 取消 rAF 主循环：游戏结束后不再重绘，节省 CPU
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
         if (score > highScore) {
           highScore = score;
           saveHighScore(highScore);
@@ -915,6 +917,8 @@
           startBtn.textContent = '暂停';
           if (timer) clearTimeout(timer);
           timer = setTimeout(loop, currentSpeed);
+          // 重启 rAF 主循环（上一局 gameOver 时已取消）
+          if (!rafId) rafId = requestAnimationFrame(animLoop);
         } else if (state === 'playing') {
           // 暂停
           state = 'paused';

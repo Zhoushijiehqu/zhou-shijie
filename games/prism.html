@@ -519,7 +519,7 @@ body { overflow-wrap: break-word; }
     {
       emitters: [{ x: 80, y: 320, angle: -0.15, color: 'white' }],
       components: [
-        { id: 'm0', type: 'MIRROR', x: 400, y: 240, angle: 0, targetAngle: 1.28 }
+        { id: 'm0', type: 'MIRROR', x: 400, y: 265, angle: 0, targetAngle: 2.8036 }
       ],
       targets: [{ x: 680, y: 110, color: '#ffffff' }],
       hint: '按住中央平面镜并绕圈拖动，将白光反射至上方靶点'
@@ -528,8 +528,8 @@ body { overflow-wrap: break-word; }
     {
       emitters: [{ x: 70, y: 370, angle: -0.35, color: 'white' }],
       components: [
-        { id: 'm0', type: 'MIRROR', x: 240, y: 290, angle: 0, targetAngle: 0.85 },
-        { id: 'm1', type: 'MIRROR', x: 520, y: 160, angle: 0, targetAngle: 1.15 }
+        { id: 'm0', type: 'MIRROR', x: 240, y: 250, angle: 0, targetAngle: -0.182 },
+        { id: 'm1', type: 'MIRROR', x: 520, y: 200, angle: 0, targetAngle: 2.7128 }
       ],
       targets: [{ x: 710, y: 90, color: '#ffffff' }]
     },
@@ -537,12 +537,12 @@ body { overflow-wrap: break-word; }
     {
       emitters: [{ x: 70, y: 225, angle: 0, color: 'white' }],
       components: [
-        { id: 'p0', type: 'PRISM', x: 340, y: 225, angle: 0, targetAngle: 0.18, size: 44 }
+        { id: 'p0', type: 'PRISM', x: 340, y: 225, angle: 0, targetAngle: 0.523, size: 44 }
       ],
       targets: [
-        { x: 600, y: 140, color: '#ff4444' },
-        { x: 630, y: 225, color: '#44ff44' },
-        { x: 600, y: 310, color: '#4444ff' }
+        { x: 550, y: 408, color: '#ff4444' },
+        { x: 550, y: 423, color: '#44ff44' },
+        { x: 550, y: 438, color: '#4444ff' }
       ]
     },
     // Level 3: 双重反射
@@ -558,8 +558,8 @@ body { overflow-wrap: break-word; }
     {
       emitters: [{ x: 80, y: 225, angle: 0, color: '#44ff44' }],
       components: [
-        { id: 's0', type: 'SPLITTER', x: 330, y: 225, angle: 0, targetAngle: 0.72 },
-        { id: 'm0', type: 'MIRROR', x: 530, y: 310, angle: 0, targetAngle: 1.05 }
+        { id: 's0', type: 'SPLITTER', x: 330, y: 225, angle: 0, targetAngle: -2.949 },
+        { id: 'm0', type: 'MIRROR', x: 430, y: 220, angle: 0, targetAngle: 3.0129 }
       ],
       targets: [
         { x: 650, y: 140, color: '#44ff44' },
@@ -570,14 +570,14 @@ body { overflow-wrap: break-word; }
     {
       emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
       components: [
-        { id: 'p0', type: 'PRISM', x: 260, y: 225, angle: 0, targetAngle: 0.12, size: 44 },
-        { id: 'm0', type: 'MIRROR', x: 490, y: 120, angle: 0, targetAngle: 0.88 },
-        { id: 'm1', type: 'MIRROR', x: 490, y: 330, angle: 0, targetAngle: 1.25 }
+        { id: 'p0', type: 'PRISM', x: 260, y: 225, angle: 0, targetAngle: 0.5864, size: 44 },
+        { id: 'm0', type: 'MIRROR', x: 100, y: 420, angle: 0, targetAngle: 0.88, static: true },
+        { id: 'm1', type: 'MIRROR', x: 100, y: 30, angle: 0, targetAngle: 1.25, static: true }
       ],
       targets: [
-        { x: 700, y: 75, color: '#ff4444' },
-        { x: 720, y: 225, color: '#44ff44' },
-        { x: 700, y: 375, color: '#4444ff' }
+        { x: 500, y: 417, color: '#ff4444' },
+        { x: 500, y: 433, color: '#44ff44' },
+        { x: 500, y: 449, color: '#4444ff' }
       ]
     },
     // Level 6: 交叉火力
@@ -587,9 +587,9 @@ body { overflow-wrap: break-word; }
         { x: 740, y: 300, angle: 2.85, color: '#4444ff' }
       ],
       components: [
-        { id: 'm0', type: 'MIRROR', x: 280, y: 220, angle: 0, targetAngle: 0.78 },
-        { id: 'm1', type: 'MIRROR', x: 520, y: 220, angle: 0, targetAngle: 0.95 },
-        { id: 'm2', type: 'MIRROR', x: 400, y: 320, angle: 0, targetAngle: 1.42 }
+        { id: 'm0', type: 'MIRROR', x: 280, y: 220, angle: 0, targetAngle: 0.0119 },
+        { id: 'm1', type: 'MIRROR', x: 520, y: 220, angle: 0, targetAngle: 2.3341 },
+        { id: 'm2', type: 'MIRROR', x: 350, y: 380, angle: 0, targetAngle: 0.237 }
       ],
       targets: [
         { x: 700, y: 100, color: '#ff4444' },
@@ -611,16 +611,11 @@ body { overflow-wrap: break-word; }
     {
       emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
       components: [
-        { id: 'p0', type: 'PRISM', x: 220, y: 225, angle: 0, targetAngle: 0.1, size: 40 },
-        { id: 's0', type: 'SPLITTER', x: 400, y: 225, angle: 0, targetAngle: 0.78 },
-        { id: 'm0', type: 'MIRROR', x: 560, y: 120, angle: 0, targetAngle: 0.92 },
-        { id: 'm1', type: 'MIRROR', x: 560, y: 330, angle: 0, targetAngle: 1.18 }
+        { id: 'm0', type: 'MIRROR', x: 200, y: 150, angle: 0, targetAngle: 0.876 },
+        { id: 'm1', type: 'MIRROR', x: 500, y: 150, angle: 0, targetAngle: -2.9844 }
       ],
       targets: [
-        { x: 720, y: 225, color: '#44ff44' },
-        { x: 680, y: 70, color: '#ff4444' },
-        { x: 720, y: 225, color: '#44ff44' },
-        { x: 680, y: 380, color: '#4444ff' }
+        { x: 720, y: 225, color: '#ffffff' }
       ]
     },
     // Level 9: 精密变轨
@@ -683,9 +678,9 @@ body { overflow-wrap: break-word; }
     {
       emitters: [{ x: 400, y: 400, angle: -1.57, color: 'white' }],
       components: [
-        { id: 'm0', type: 'MIRROR', x: 400, y: 280, angle: 0, targetAngle: 0.52 },
-        { id: 'm1', type: 'MIRROR', x: 280, y: 160, angle: 0, targetAngle: 1.57 },
-        { id: 'm2', type: 'MIRROR', x: 520, y: 160, angle: 0, targetAngle: -1.57 }
+        { id: 'm0', type: 'SPLITTER', x: 400, y: 280, angle: 0, targetAngle: 1.7775 },
+        { id: 'm1', type: 'SPLITTER', x: 280, y: 160, angle: 0, targetAngle: -1.7229 },
+        { id: 'm2', type: 'MIRROR', x: 520, y: 160, angle: 0, targetAngle: -2.396 }
       ],
       targets: [
         { x: 400, y: 60, color: '#ffffff' },
@@ -697,19 +692,10 @@ body { overflow-wrap: break-word; }
     {
       emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
       components: [
-        { id: 's0', type: 'SPLITTER', x: 200, y: 225, angle: 0, targetAngle: 0.78 },
-        { id: 'p0', type: 'PRISM', x: 360, y: 130, angle: 0, targetAngle: 0.15, size: 36 },
-        { id: 'p1', type: 'PRISM', x: 360, y: 320, angle: 0, targetAngle: -0.15, size: 36 },
-        { id: 'm0', type: 'MIRROR', x: 540, y: 80, angle: 0, targetAngle: 0.9 },
-        { id: 'm1', type: 'MIRROR', x: 540, y: 370, angle: 0, targetAngle: 1.1 }
+        { id: 's0', type: 'SPLITTER', x: 200, y: 225, angle: 0, targetAngle: 0.876 }
       ],
       targets: [
-        { x: 700, y: 50, color: '#ff4444' },
-        { x: 720, y: 130, color: '#44ff44' },
-        { x: 700, y: 210, color: '#4444ff' },
-        { x: 700, y: 240, color: '#ff4444' },
-        { x: 720, y: 320, color: '#44ff44' },
-        { x: 700, y: 400, color: '#4444ff' }
+        { x: 720, y: 225, color: '#ffffff' }
       ]
     },
     // Level 15: 缝隙穿行
@@ -744,28 +730,27 @@ body { overflow-wrap: break-word; }
     {
       emitters: [{ x: 60, y: 400, angle: -0.5, color: 'white' }],
       components: [
-        { id: 'm0', type: 'MIRROR', x: 160, y: 320, angle: 0, targetAngle: 0.4 },
-        { id: 'm1', type: 'MIRROR', x: 280, y: 240, angle: 0, targetAngle: 0.7 },
-        { id: 'm2', type: 'MIRROR', x: 400, y: 180, angle: 0, targetAngle: 0.95 },
-        { id: 'm3', type: 'MIRROR', x: 520, y: 130, angle: 0, targetAngle: 1.15 },
-        { id: 'm4', type: 'MIRROR', x: 640, y: 90, angle: 0, targetAngle: 1.35 }
+        { id: 'm0', type: 'MIRROR', x: 160, y: 320, angle: 0, targetAngle: 2.774 },
+        { id: 'm1', type: 'MIRROR', x: 280, y: 240, angle: 0, targetAngle: -0.4306 },
+        { id: 'm2', type: 'MIRROR', x: 400, y: 180, angle: 0, targetAngle: -0.2773 },
+        { id: 'm3', type: 'MIRROR', x: 520, y: 130, angle: 0, targetAngle: -0.1617 },
+        { id: 'm4', type: 'MIRROR', x: 640, y: 90, angle: 0, targetAngle: -1.4236 }
       ],
       targets: [
         { x: 120, y: 360, color: '#ffffff' },
         { x: 240, y: 280, color: '#ffffff' },
         { x: 360, y: 210, color: '#ffffff' },
-        { x: 480, y: 150, color: '#ffffff' },
-        { x: 720, y: 60, color: '#ffffff' }
+        { x: 480, y: 150, color: '#ffffff' }
       ]
     },
     // Level 18: 高精宽窄
     {
       emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
       components: [
-        { id: 'm0', type: 'MIRROR', x: 220, y: 225, angle: 0, targetAngle: 0.65, width: 180 },
-        { id: 'm1', type: 'MIRROR', x: 420, y: 150, angle: 0, targetAngle: 0.9, width: 90 },
-        { id: 'm2', type: 'MIRROR', x: 420, y: 300, angle: 0, targetAngle: 1.1, width: 90 },
-        { id: 'm3', type: 'MIRROR', x: 600, y: 225, angle: 0, targetAngle: 1.25, width: 180 }
+        { id: 'm0', type: 'SPLITTER', x: 220, y: 225, angle: 0, targetAngle: -3.0177, width: 180 },
+        { id: 'm1', type: 'MIRROR', x: 420, y: 150, angle: 0, targetAngle: 1.9518, width: 90 },
+        { id: 'm2', type: 'MIRROR', x: 420, y: 300, angle: 0, targetAngle: -3.1048, width: 90 },
+        { id: 'm3', type: 'MIRROR', x: 600, y: 225, angle: 0, targetAngle: 2.7509, width: 180 }
       ],
       targets: [
         { x: 720, y: 100, color: '#ffffff' },
@@ -796,20 +781,17 @@ body { overflow-wrap: break-word; }
         { x: 60, y: 300, angle: -0.1, color: 'white' }
       ],
       components: [
-        { id: 'p0', type: 'PRISM', x: 220, y: 150, angle: 0, targetAngle: 0.12, size: 38 },
-        { id: 'p1', type: 'PRISM', x: 220, y: 300, angle: 0, targetAngle: -0.12, size: 38 },
-        { id: 'm0', type: 'MIRROR', x: 400, y: 80, angle: 0, targetAngle: 0.85 },
-        { id: 'm1', type: 'MIRROR', x: 400, y: 225, angle: 0, targetAngle: 1.0 },
-        { id: 'm2', type: 'MIRROR', x: 400, y: 370, angle: 0, targetAngle: 1.15 },
-        { id: 'm3', type: 'MIRROR', x: 580, y: 225, angle: 0, targetAngle: 0.95 }
+        { id: 'p0', type: 'PRISM', x: 220, y: 150, angle: 0, targetAngle: -2.7114, size: 38 },
+        { id: 'p1', type: 'PRISM', x: 220, y: 300, angle: 0, targetAngle: -1.6381, size: 38 },
+        { id: 'm0', type: 'MIRROR', x: 400, y: 80, angle: 0, targetAngle: -0.1057 },
+        { id: 'm1', type: 'MIRROR', x: 400, y: 225, angle: 0, targetAngle: 2.8362 },
+        { id: 'm2', type: 'MIRROR', x: 400, y: 370, angle: 0, targetAngle: -0.1685 },
+        { id: 'm3', type: 'MIRROR', x: 580, y: 225, angle: 0, targetAngle: 2.8701 }
       ],
       targets: [
-        { x: 700, y: 50, color: '#ff4444' },
-        { x: 720, y: 130, color: '#44ff44' },
-        { x: 700, y: 200, color: '#4444ff' },
-        { x: 700, y: 250, color: '#ff4444' },
-        { x: 720, y: 330, color: '#44ff44' },
-        { x: 700, y: 400, color: '#4444ff' }
+        { x: 700, y: 100, color: '#ff4444' },
+        { x: 720, y: 225, color: '#44ff44' },
+        { x: 700, y: 350, color: '#4444ff' }
       ]
     },
     // Level 21: 光之织网
@@ -847,11 +829,11 @@ body { overflow-wrap: break-word; }
         { x: 60, y: 300, angle: -0.4, color: '#4444ff' }
       ],
       components: [
-        { id: 'p0', type: 'PRISM', x: 350, y: 225, angle: 0, targetAngle: 0.08, size: 44 },
-        { id: 'm0', type: 'MIRROR', x: 200, y: 225, angle: 0, targetAngle: 1.0 },
-        { id: 'm1', type: 'MIRROR', x: 500, y: 225, angle: 0, targetAngle: 0.8 }
+        { id: 'p0', type: 'PRISM', x: 350, y: 225, angle: 0, targetAngle: 0.5663, size: 44 },
+        { id: 'm0', type: 'MIRROR', x: 200, y: 225, angle: 0, targetAngle: 0.201 },
+        { id: 'm1', type: 'MIRROR', x: 500, y: 225, angle: 0, targetAngle: -0.0347 }
       ],
-      targets: [{ x: 720, y: 225, color: '#ffffff' }]
+      targets: [{ x: 720, y: 225, color: '#ff4444' }]
     },
     // Level 24: 正五边形
     {
@@ -902,23 +884,17 @@ body { overflow-wrap: break-word; }
     {
       emitters: [{ x: 60, y: 225, angle: 0, color: 'white' }],
       components: [
-        { id: 's0', type: 'SPLITTER', x: 180, y: 225, angle: 0, targetAngle: 0.75 },
-        { id: 's1', type: 'SPLITTER', x: 320, y: 130, angle: 0, targetAngle: 0.85 },
-        { id: 's2', type: 'SPLITTER', x: 320, y: 320, angle: 0, targetAngle: 1.0 },
-        { id: 'p0', type: 'PRISM', x: 480, y: 80, angle: 0, targetAngle: 0.1, size: 32 },
-        { id: 'p1', type: 'PRISM', x: 480, y: 370, angle: 0, targetAngle: -0.1, size: 32 },
-        { id: 'm0', type: 'MIRROR', x: 600, y: 180, angle: 0, targetAngle: 0.95 },
-        { id: 'm1', type: 'MIRROR', x: 600, y: 270, angle: 0, targetAngle: 1.1 }
+        { id: 's0', type: 'SPLITTER', x: 180, y: 225, angle: 0, targetAngle: -3.0209 },
+        { id: 's1', type: 'SPLITTER', x: 320, y: 130, angle: 0, targetAngle: 0.451 },
+        { id: 's2', type: 'SPLITTER', x: 320, y: 320, angle: 0, targetAngle: -1.617 },
+        { id: 'p0', type: 'PRISM', x: 480, y: 80, angle: 0, targetAngle: -2.7369, size: 32 },
+        { id: 'p1', type: 'PRISM', x: 480, y: 370, angle: 0, targetAngle: -1.6779, size: 32 },
+        { id: 'm0', type: 'MIRROR', x: 600, y: 180, angle: 0, targetAngle: 0.6372 },
+        { id: 'm1', type: 'MIRROR', x: 600, y: 270, angle: 0, targetAngle: -0.0282 }
       ],
       targets: [
         { x: 720, y: 100, color: '#ffffff' },
-        { x: 720, y: 350, color: '#ffffff' },
-        { x: 680, y: 40, color: '#ff4444' },
-        { x: 720, y: 80, color: '#44ff44' },
-        { x: 680, y: 120, color: '#4444ff' },
-        { x: 680, y: 330, color: '#ff4444' },
-        { x: 720, y: 370, color: '#44ff44' },
-        { x: 680, y: 410, color: '#4444ff' }
+        { x: 720, y: 350, color: '#ffffff' }
       ]
     },
     // Level 28: 暗物质迷宫
@@ -943,14 +919,14 @@ body { overflow-wrap: break-word; }
         { x: 760, y: 225, angle: 3.14159, color: 'white' }
       ],
       components: [
-        { id: 'p0', type: 'PRISM', x: 200, y: 225, angle: 0, targetAngle: 0.1, size: 40 },
-        { id: 'p1', type: 'PRISM', x: 600, y: 225, angle: 0, targetAngle: -0.1, size: 40 },
-        { id: 'm0', type: 'MIRROR', x: 350, y: 100, angle: 0, targetAngle: 0.85 },
-        { id: 'm1', type: 'MIRROR', x: 350, y: 350, angle: 0, targetAngle: 1.15 },
-        { id: 'm2', type: 'MIRROR', x: 450, y: 100, angle: 0, targetAngle: 1.0 },
-        { id: 'm3', type: 'MIRROR', x: 450, y: 350, angle: 0, targetAngle: 1.0 },
-        { id: 's0', type: 'SPLITTER', x: 280, y: 225, angle: 0, targetAngle: 0.75 },
-        { id: 's1', type: 'SPLITTER', x: 520, y: 225, angle: 0, targetAngle: 0.9 }
+        { id: 'p0', type: 'PRISM', x: 180, y: 225, angle: 0, targetAngle: 2.8185, size: 40 },
+        { id: 'p1', type: 'PRISM', x: 580, y: 225, angle: 0, targetAngle: -2.0444, size: 40 },
+        { id: 'm0', type: 'MIRROR', x: 370, y: 100, angle: 0, targetAngle: -2.3478 },
+        { id: 'm1', type: 'MIRROR', x: 350, y: 350, angle: 0, targetAngle: -0.8416 },
+        { id: 'm2', type: 'MIRROR', x: 450, y: 100, angle: 0, targetAngle: 2.3356 },
+        { id: 'm3', type: 'MIRROR', x: 450, y: 350, angle: 0, targetAngle: 0.253 },
+        { id: 's0', type: 'SPLITTER', x: 280, y: 225, angle: 0, targetAngle: 1.7748 },
+        { id: 's1', type: 'SPLITTER', x: 520, y: 225, angle: 0, targetAngle: 1.1808 }
       ],
       targets: [
         { x: 100, y: 60, color: '#ff4444' },

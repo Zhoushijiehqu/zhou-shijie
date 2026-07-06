@@ -544,6 +544,113 @@
       letter-spacing: 0;
     }
 
+    /* ========== 背景音乐开关 ========== */
+    .audio-controls {
+      display: flex;
+      justify-content: center;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .audio-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px;
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      font-family: var(--font-family-base);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--color-text-secondary);
+      transition: all var(--transition-base);
+      user-select: none;
+    }
+
+    .audio-toggle:hover {
+      border-color: var(--color-accent-light);
+      color: var(--color-text-primary);
+      transform: translateY(-1px);
+    }
+
+    .audio-toggle:active {
+      transform: scale(0.97);
+    }
+
+    .audio-toggle.is-on {
+      color: var(--color-accent);
+      border-color: var(--color-accent-light);
+      background: var(--color-accent-lighter);
+    }
+
+    .audio-ico {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .audio-toggle .audio-ico-on { display: none; }
+    .audio-toggle .audio-ico-off { display: inline; }
+    .audio-toggle.is-on .audio-ico-on { display: inline; }
+    .audio-toggle.is-on .audio-ico-off { display: none; }
+
+    .audio-vol {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-full);
+    }
+
+    .audio-vol-label {
+      font-family: var(--font-family-base);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--color-text-tertiary);
+    }
+
+    .audio-vol input[type="range"] {
+      width: 80px;
+      height: 4px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: var(--color-border-medium);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .audio-vol input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(212, 145, 0, 0.4);
+      transition: transform var(--transition-fast);
+    }
+
+    .audio-vol input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .audio-vol input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 6px rgba(212, 145, 0, 0.4);
+    }
+
     /* ========== 响应式 ========== */
     @media (max-width: 560px) {
       .header-inner {
@@ -636,6 +743,19 @@
         </div>
       </div>
 
+      <!-- 背景音乐控制 -->
+      <div class="audio-controls" id="audioControls">
+        <button class="audio-toggle" id="audioToggle" aria-label="背景音乐开关" title="背景音乐">
+          <span class="audio-ico audio-ico-off">🔇</span>
+          <span class="audio-ico audio-ico-on">🎵</span>
+          <span class="audio-label">背景音乐</span>
+        </button>
+        <div class="audio-vol" id="audioVolWrap">
+          <span class="audio-vol-label">音量</span>
+          <input type="range" id="audioVol" min="0" max="100" value="35" aria-label="音量调节">
+        </div>
+      </div>
+
       <!-- 难度选择 -->
       <div class="difficulty-selector" id="diffSelector">
         <button class="project-cat-btn active" data-diff="beginner">初级 9×9</button>
@@ -689,6 +809,14 @@
           <span class="hint-item">
             <span class="key-cap">😊</span>
             <span>重新开始</span>
+          </span>
+          <span class="hint-item">
+            <span class="key-cap">R</span>
+            <span>重开 · 1/2/3 切难度</span>
+          </span>
+          <span class="hint-item">
+            <span class="key-cap">M</span>
+            <span>背景音乐开关</span>
           </span>
         </div>
       </div>
@@ -909,7 +1037,8 @@
 
       // ----- 更新状态条 -----
       function updateHUD() {
-        mineCountNumEl.textContent = totalMines - flagsPlaced;
+        var remaining = totalMines - flagsPlaced;
+        mineCountNumEl.textContent = Math.max(0, remaining);
         timerNumEl.textContent = elapsed;
       }
 
@@ -1050,6 +1179,10 @@
         }
         updateHUD();
         showOverlay(true);
+        // 胜利音效
+        if (window.MineBGM) {
+          try { window.MineBGM.playWin(); } catch (e) {}
+        }
       }
 
       // ----- 失败 -----
@@ -1077,6 +1210,10 @@
         // 确保踩中的雷爆炸样式优先
         renderCell(exX, exY);
         showOverlay(false);
+        // 失败音效
+        if (window.MineBGM) {
+          try { window.MineBGM.playLose(); } catch (e) {}
+        }
       }
 
       // ----- 显示遮罩 -----
@@ -1270,8 +1407,754 @@
         resizeTimer = setTimeout(fitCellSize, 120);
       });
 
+      // ----- 键盘快捷键 -----
+      document.addEventListener('keydown', function (e) {
+        var key = e.key;
+        if (key === 'r' || key === 'R') {
+          newGame();
+          e.preventDefault();
+        } else if (key === '1') {
+          newGame('beginner');
+          e.preventDefault();
+        } else if (key === '2') {
+          newGame('intermediate');
+          e.preventDefault();
+        } else if (key === '3') {
+          newGame('expert');
+          e.preventDefault();
+        } else if (key === 'm' || key === 'M') {
+          // 切换背景音乐
+          if (window.MineBGM) {
+            var toggle = document.getElementById('audioToggle');
+            if (toggle) toggle.click();
+          }
+          e.preventDefault();
+        }
+      });
+
       // ----- 启动：默认初级 -----
       newGame('beginner');
+    })();
+
+    /* ============================================================
+     * 背景音乐系统 - 纯代码生成（Web Audio API）
+     * 风格：A小调 · 悬疑神秘 · 72BPM · 16小节A+A'+B+A''曲式
+     * ============================================================ */
+    (function bgmSystem() {
+      // ---------- 配置 ----------
+      var STORAGE_KEY = 'mine_bgm_v3';
+      var BPM = 72;
+      var BEAT = 60 / BPM;
+      var TOTAL_BARS = 16;
+
+      // 完整音符频率表（含升降号，C2 - C6）
+      var NOTE_FREQS = {
+        'C2': 65.41,  'Cs2': 69.30,  'D2': 73.42,  'Eb2': 77.78,  'E2': 82.41,
+        'F2': 87.31,  'Fs2': 92.50,  'G2': 98.00,  'Ab2': 103.83, 'A2': 110.00,
+        'Bb2': 116.54, 'B2': 123.47,
+        'C3': 130.81, 'Cs3': 138.59, 'D3': 146.83, 'Eb3': 155.56, 'E3': 164.81,
+        'F3': 174.61, 'Fs3': 185.00, 'G3': 196.00, 'Ab3': 207.65, 'A3': 220.00,
+        'Bb3': 233.08, 'B3': 246.94,
+        'C4': 261.63, 'Cs4': 277.18, 'D4': 293.66, 'Eb4': 311.13, 'E4': 329.63,
+        'F4': 349.23, 'Fs4': 369.99, 'G4': 392.00, 'Ab4': 415.30, 'A4': 440.00,
+        'Bb4': 466.16, 'B4': 493.88,
+        'C5': 523.25, 'Cs5': 554.37, 'D5': 587.33, 'Eb5': 622.25, 'E5': 659.25,
+        'F5': 698.46, 'Fs5': 739.99, 'G5': 783.99, 'Ab5': 830.61, 'A5': 880.00,
+        'Bb5': 932.33, 'B5': 987.77,
+        'C6': 1046.50
+      };
+
+      function freqOf(name) {
+        return NOTE_FREQS[name] || 220;
+      }
+
+      // 16小节完整曲式：A(4) + A'(4) + B(4) + A''(4)
+      // 和弦进行：Am-F-C-G 为核心，中间增加变化
+      var CHORDS = [
+        // === A段 (第1-4小节)：主题呈示 ===
+        ['A3', 'C4', 'E4'], // 0: Am
+        ['F3', 'A3', 'C4'], // 1: F
+        ['C4', 'E4', 'G4'], // 2: C
+        ['G3', 'B3', 'D4'], // 3: G
+        // === A'段 (第5-8小节)：主题变化 ===
+        ['A3', 'C4', 'E4'], // 4: Am
+        ['F3', 'A3', 'C4'], // 5: F
+        ['C4', 'E4', 'G4'], // 6: C
+        ['E3', 'Gs3', 'B3'],// 7: E7 (属七，引入张力)
+        // === B段 (第9-12小节)：对比发展 ===
+        ['D3', 'F3', 'A3'], // 8: Dm (下属方向)
+        ['G3', 'B3', 'D4'], // 9: G
+        ['E3', 'Gs3', 'B3'],// 10: E7 (重属)
+        ['A3', 'C4', 'E4'], // 11: Am (回到主调)
+        // === A''段 (第13-16小节)：主题再现与终止 ===
+        ['F3', 'A3', 'C4'], // 12: F
+        ['C4', 'E4', 'G4'], // 13: C
+        ['G3', 'B3', 'D4'], // 14: G
+        ['A3', 'C4', 'E4']  // 15: Am (终止主和弦)
+      ];
+
+      // 琶音模式：每个和弦对应一个8分音符琶音型
+      var ARP_PATTERNS = [
+        [0, 1, 2, 1, 0, 2, 1, 0],
+        [0, 2, 1, 2, 0, 1, 2, 1],
+        [2, 1, 0, 1, 2, 0, 1, 2],
+        [0, 1, 2, 0, 1, 2, 0, 2],
+        [0, 1, 2, 1, 0, 2, 1, 0],
+        [0, 2, 1, 2, 0, 1, 2, 1],
+        [2, 1, 0, 1, 2, 0, 1, 2],
+        [0, 2, 0, 1, 2, 1, 0, 1],
+        [0, 1, 2, 1, 0, 2, 1, 0],
+        [0, 2, 1, 2, 0, 1, 2, 1],
+        [0, 2, 0, 1, 2, 1, 0, 1],
+        [0, 1, 2, 1, 0, 2, 1, 0],
+        [0, 2, 1, 2, 0, 1, 2, 1],
+        [2, 1, 0, 1, 2, 0, 1, 2],
+        [0, 1, 2, 0, 1, 2, 0, 2],
+        [0, 1, 2, 1, 0, 2, 1, 0]
+      ];
+
+      // 低音线（16小节，每拍一个音）
+      var BASSLINE = [
+        // A段
+        ['A2', 1], ['A2', 1], ['E2', 1], ['A2', 1], // 0: Am
+        ['F2', 1], ['F2', 1], ['C3', 1], ['F2', 1], // 1: F
+        ['C3', 1], ['G2', 1], ['C3', 1], ['E2', 1], // 2: C
+        ['G2', 1], ['D2', 1], ['G2', 1], ['B2', 1], // 3: G
+        // A'段
+        ['A2', 1], ['E2', 1], ['A2', 1], ['Cs3', 1],// 4: Am (经过音引导)
+        ['F2', 1], ['C3', 1], ['F2', 1], ['A2', 1], // 5: F
+        ['C3', 1], ['E2', 1], ['G2', 1], ['C3', 1], // 6: C
+        ['E2', 1], ['B2', 1], ['E2', 1], ['Gs2', 1],// 7: E7
+        // B段
+        ['D2', 1], ['A2', 1], ['D2', 1], ['F2', 1], // 8: Dm
+        ['G2', 1], ['D2', 1], ['G2', 1], ['B2', 1], // 9: G
+        ['E2', 1], ['B2', 1], ['E2', 1], ['Gs2', 1],// 10: E7
+        ['A2', 1], ['E2', 1], ['A2', 1], ['C3', 1], // 11: Am
+        // A''段
+        ['F2', 1], ['C3', 1], ['F2', 1], ['A2', 1], // 12: F
+        ['C3', 1], ['G2', 1], ['C3', 1], ['E3', 1], // 13: C
+        ['G2', 1], ['D2', 1], ['G2', 1], ['B2', 1], // 14: G
+        ['A2', 1], ['E2', 1], ['A2', 2]              // 15: Am (终止音延长)
+      ];
+
+      // 主旋律（16小节，A+A'+B+A'' 结构）
+      var MELODY = [
+        // === A段：主题呈示 (第1-4小节) ===
+        // 第1小节 Am
+        ['E5', 0.5], ['D5', 0.5], ['C5', 0.5], ['B4', 0.5],
+        ['A4', 1], ['E4', 1],
+        // 第2小节 F
+        ['F4', 0.5], ['A4', 0.5], ['C5', 0.5], ['A4', 0.5],
+        ['F4', 1], [null, 1],
+        // 第3小节 C
+        ['G4', 0.5], ['E5', 0.5], ['G5', 0.5], ['E5', 0.5],
+        ['C5', 1], ['G4', 1],
+        // 第4小节 G
+        ['B4', 0.5], ['A4', 0.5], ['G4', 0.5], ['F4', 0.5],
+        ['E4', 2],
+
+        // === A'段：主题变化 (第5-8小节) ===
+        // 第5小节 Am (装饰变奏)
+        ['E5', 0.5], ['F5', 0.5], ['E5', 0.5], ['D5', 0.5],
+        ['C5', 0.5], ['E5', 0.5], ['A4', 1],
+        // 第6小节 F
+        ['A4', 0.5], ['C5', 0.5], ['F5', 0.5], ['C5', 0.5],
+        ['A4', 1], [null, 1],
+        // 第7小节 C
+        ['E5', 0.5], ['G5', 0.5], ['E5', 0.5], ['C5', 0.5],
+        ['G4', 0.5], ['C5', 0.5], ['E4', 1],
+        // 第8小节 E7 (引入张力)
+        ['Gs5', 0.5], ['B5', 0.5], ['A5', 0.5], ['Gs5', 0.5],
+        ['E5', 1], [null, 1],
+
+        // === B段：对比发展 (第9-12小节) ===
+        // 第9小节 Dm (转到下属方向)
+        ['D5', 1], ['F5', 0.5], ['A5', 0.5],
+        ['G5', 0.5], ['F5', 0.5], ['E5', 1],
+        // 第10小节 G
+        ['D5', 0.5], ['G5', 0.5], ['B5', 0.5], ['G5', 0.5],
+        ['D5', 1], [null, 1],
+        // 第11小节 E7 (最大张力)
+        ['E5', 0.5], ['Gs5', 0.5], ['B5', 0.5],
+        ['A5', 0.25], ['Gs5', 0.25], ['E5', 1], [null, 1],
+        // 第12小节 Am (解决回主调)
+        ['A5', 1], ['G5', 0.5], ['E5', 0.5],
+        ['C5', 0.5], ['A4', 0.5], ['E4', 1],
+
+        // === A''段：主题再现与终止 (第13-16小节) ===
+        // 第13小节 F
+        ['F5', 0.5], ['A5', 0.5], ['C5', 0.5], ['A4', 0.5],
+        ['F4', 1], [null, 1],
+        // 第14小节 C
+        ['C5', 0.5], ['E5', 0.5], ['G5', 0.5], ['E5', 0.5],
+        ['C5', 1], ['G4', 1],
+        // 第15小节 G (属和弦，准备终止)
+        ['B4', 0.5], ['D5', 0.5], ['G5', 0.5], ['D5', 0.5],
+        ['B4', 1], ['G4', 1],
+        // 第16小节 Am (主和弦终止)
+        ['A4', 1], ['C5', 0.5], ['E5', 0.5],
+        ['A5', 1.5], [null, 0.5]
+      ];
+
+      // 打击乐：心跳模式（4拍一组，重音在第1、3拍）
+      var KICK_PATTERN = [1.0, 0.25, 0.6, 0.25];
+
+      // ---------- 状态 ----------
+      var audioCtx = null;
+      var masterGain = null;
+
+      // 各层 gain
+      var droneGain = null;    // 持续低音铺底
+      var bassGain = null;     // 低音线
+      var arpGain = null;      // 琶音
+      var melodyGain = null;   // 主旋律
+      var percGain = null;     // 打击乐(心跳)
+
+      var isPlaying = false;
+      var wasPlaying = false;  // 用于 visibilitychange 恢复
+      var isUserEnabled = false;
+      var hasInteracted = false;
+      var volume = 0.35;
+
+      // 调度器状态
+      var nextNoteTime = 0;
+      var currentChordIdx = 0;
+      var arpStep = 0;
+      var bassStep = 0;
+      var bassTimeInBar = 0;
+      var melodyIdx = 0;
+      var melodyTimeInBar = 0;
+      var beatInBar = 0;       // 当前小节内的拍数
+      var totalBeats = 0;      // 总拍数（用于同步各层）
+      var schedulerTimer = null;
+      var LOOKAHEAD = 25;      // ms
+      var SCHEDULE_AHEAD = 0.1; // s
+      var TICK = BEAT * 0.25;  // 16分音符精度
+
+      // drone 相关
+      var droneOscs = [];
+      var droneLfo = null;
+
+      // ---------- 工具 ----------
+      function now() {
+        return audioCtx ? audioCtx.currentTime : 0;
+      }
+
+      function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+      // 各层默认音量配置
+      var LAYER_GAIN = {
+        drone: 0.20,
+        bass: 0.28,
+        arp: 0.14,
+        melody: 0.26,
+        perc: 0.10
+      };
+
+      // ---------- 初始化 ----------
+      function initAudio() {
+        if (audioCtx) return true;
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+          console.warn('Web Audio API 不支持');
+          return false;
+        }
+
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 0;
+        masterGain.connect(audioCtx.destination);
+
+        droneGain = audioCtx.createGain();
+        droneGain.gain.value = LAYER_GAIN.drone;
+        droneGain.connect(masterGain);
+
+        bassGain = audioCtx.createGain();
+        bassGain.gain.value = LAYER_GAIN.bass;
+        bassGain.connect(masterGain);
+
+        arpGain = audioCtx.createGain();
+        arpGain.gain.value = LAYER_GAIN.arp;
+        arpGain.connect(masterGain);
+
+        melodyGain = audioCtx.createGain();
+        melodyGain.gain.value = LAYER_GAIN.melody;
+        melodyGain.connect(masterGain);
+
+        percGain = audioCtx.createGain();
+        percGain.gain.value = LAYER_GAIN.perc;
+        percGain.connect(masterGain);
+
+        return true;
+      }
+
+      // ---------- 单音符播放 ----------
+      function playNote(freq, startTime, duration, type, destGain, attack, release, peakGain) {
+        if (!audioCtx) return;
+        attack = attack || 0.02;
+        release = release || 0.1;
+        peakGain = peakGain == null ? 1 : peakGain;
+
+        var osc = audioCtx.createOscillator();
+        osc.type = type;
+        osc.frequency.value = freq;
+
+        var gain = audioCtx.createGain();
+        var st = Math.max(startTime, now());
+        gain.gain.setValueAtTime(0, st);
+        gain.gain.linearRampToValueAtTime(peakGain, st + attack);
+        var sustainEnd = st + duration - release;
+        if (sustainEnd < st + attack) sustainEnd = st + attack;
+        gain.gain.setValueAtTime(peakGain, sustainEnd);
+        gain.gain.linearRampToValueAtTime(0.001, st + duration);
+
+        osc.connect(gain);
+        gain.connect(destGain);
+
+        osc.start(st);
+        osc.stop(st + duration + 0.05);
+
+        osc.onended = function () {
+          try { osc.disconnect(); } catch (e) {}
+          try { gain.disconnect(); } catch (e) {}
+        };
+      }
+
+      // ---------- 心跳打击乐 ----------
+      function playKick(startTime, intensity) {
+        if (!audioCtx) return;
+        intensity = intensity || 1;
+
+        var osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(80, startTime);
+        osc.frequency.exponentialRampToValueAtTime(35, startTime + 0.12);
+
+        var gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(intensity * 0.8, startTime + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.18);
+
+        osc.connect(gain);
+        gain.connect(percGain);
+        osc.start(startTime);
+        osc.stop(startTime + 0.25);
+
+        osc.onended = function () {
+          try { osc.disconnect(); } catch (e) {}
+          try { gain.disconnect(); } catch (e) {}
+        };
+      }
+
+      // ---------- 持续音铺底 ----------
+      function startDrone() {
+        if (!audioCtx || droneOscs.length > 0) return;
+
+        var chord = CHORDS[currentChordIdx];
+        var rootF = freqOf(chord[0]);
+
+        // 恢复 droneGain 音量（stopDrone 会淡出到0）
+        var t = now();
+        droneGain.gain.cancelScheduledValues(t);
+        droneGain.gain.setValueAtTime(0, t);
+        droneGain.gain.linearRampToValueAtTime(LAYER_GAIN.drone, t + 1.2);
+
+        var osc1 = audioCtx.createOscillator();
+        osc1.type = 'sine';
+        osc1.frequency.value = rootF / 2;
+
+        var osc2 = audioCtx.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.value = rootF * 1.5 / 2;
+
+        // 用独立的 lfoGain 串联，不直接调制 droneGain.gain
+        var lfoOsc = audioCtx.createOscillator();
+        lfoOsc.type = 'sine';
+        lfoOsc.frequency.value = 0.12;
+        var lfoGain = audioCtx.createGain();
+        lfoGain.gain.value = 0.06;
+        lfoOsc.connect(lfoGain);
+        lfoGain.connect(droneGain.gain);
+
+        osc1.connect(droneGain);
+        osc2.connect(droneGain);
+
+        osc1.start(t);
+        osc2.start(t);
+        lfoOsc.start(t);
+
+        droneOscs = [osc1, osc2];
+        droneLfo = lfoOsc;
+      }
+
+      function stopDrone() {
+        if (droneOscs.length === 0 || !audioCtx) return;
+        var t = now();
+        for (var i = 0; i < droneOscs.length; i++) {
+          try {
+            droneOscs[i].frequency.cancelScheduledValues(t);
+            var cur = droneOscs[i].frequency.value;
+            droneOscs[i].frequency.setValueAtTime(cur, t);
+            droneOscs[i].frequency.linearRampToValueAtTime(cur * 0.5, t + 1.5);
+          } catch (e) {}
+        }
+        var curGain = droneGain.gain.value;
+        droneGain.gain.cancelScheduledValues(t);
+        droneGain.gain.setValueAtTime(curGain, t);
+        droneGain.gain.linearRampToValueAtTime(0, t + 1.2);
+
+        var toStop = droneOscs.slice();
+        var lfo = droneLfo;
+        setTimeout(function () {
+          for (var i = 0; i < toStop.length; i++) {
+            try { toStop[i].stop(); } catch (e) {}
+            try { toStop[i].disconnect(); } catch (e) {}
+          }
+          if (lfo) { try { lfo.stop(); lfo.disconnect(); } catch (e) {} }
+        }, 1500);
+        droneOscs = [];
+        droneLfo = null;
+      }
+
+      function updateDroneChord() {
+        if (droneOscs.length === 0 || !audioCtx) return;
+        var chord = CHORDS[currentChordIdx];
+        var rootF = freqOf(chord[0]);
+        var t = now();
+        droneOscs[0].frequency.linearRampToValueAtTime(rootF / 2, t + 0.6);
+        droneOscs[1].frequency.linearRampToValueAtTime(rootF * 1.5 / 2, t + 0.6);
+      }
+
+      // ---------- 调度器（核心）----------
+      function scheduler() {
+        if (!isPlaying || !audioCtx) return;
+
+        while (nextNoteTime < now() + SCHEDULE_AHEAD) {
+          var t = nextNoteTime;
+          var beatFloat = totalBeats;
+          var beatFloor = Math.floor(beatFloat);
+          var inBeatPos = beatFloat - beatFloor; // 0~1
+          var barBeat = beatFloor % 4;
+          var barIdx = Math.floor(beatFloor / 4) % CHORDS.length;
+          var tickInBeat = Math.round(inBeatPos / (TICK / BEAT));
+
+          // ----- 低音线调度（按时长调度，与旋律逻辑一致）-----
+          if (bassStep < BASSLINE.length) {
+            if (bassTimeInBar <= 0.001) {
+              var bassNote = BASSLINE[bassStep];
+              if (bassNote) {
+                var bfreq = freqOf(bassNote[0]);
+                playNote(bfreq, t, BEAT * bassNote[1] * 0.85, 'triangle', bassGain, 0.03, 0.15, 1);
+              }
+              bassTimeInBar = bassNote[1];
+              bassStep++;
+              if (bassStep >= BASSLINE.length) bassStep = 0;
+            }
+            bassTimeInBar -= TICK / BEAT;
+            if (bassTimeInBar < 0) bassTimeInBar = 0;
+          }
+
+          // ----- 每拍触发（tickInBeat === 0）-----
+          if (tickInBeat === 0) {
+            // 打击乐：每拍一个心跳
+            var kickIntensity = KICK_PATTERN[barBeat % KICK_PATTERN.length];
+            if (kickIntensity > 0.05) {
+              playKick(t, kickIntensity);
+            }
+
+            // 每小节换和弦
+            if (barBeat === 0) {
+              currentChordIdx = barIdx % CHORDS.length;
+              updateDroneChord();
+            }
+          }
+
+          // ----- 8分音符触发：琶音（每拍2个，在第0、2个tick即0、0.5拍位置）-----
+          var isEighth = (tickInBeat === 0 || tickInBeat === 2);
+          if (isEighth) {
+            var chord = CHORDS[currentChordIdx];
+            var patIdx = currentChordIdx % ARP_PATTERNS.length;
+            var pattern = ARP_PATTERNS[patIdx];
+            var noteIdx = pattern[arpStep % pattern.length];
+            var noteName = chord[noteIdx];
+            var arpFreq = freqOf(noteName) * 2; // 高一个八度
+            playNote(arpFreq, t, BEAT * 0.35, 'triangle', arpGain, 0.008, 0.08, 1);
+            arpStep++;
+          }
+
+          // ----- 旋律调度（正确处理不同时长）-----
+          if (melodyIdx < MELODY.length) {
+            var mNote = MELODY[melodyIdx];
+            if (melodyTimeInBar <= 0.001) {
+              // 新音符开始
+              if (mNote[0]) {
+                var mFreq = freqOf(mNote[0]);
+                var mDur = BEAT * mNote[1];
+                playNote(mFreq, t, mDur * 0.92, 'sine', melodyGain, 0.025, 0.18, 1);
+              }
+              melodyTimeInBar = mNote[1];
+            }
+            // 每个 tick 减去经过的时间
+            melodyTimeInBar -= TICK / BEAT;
+            if (melodyTimeInBar <= 0.001) {
+              melodyTimeInBar = 0;
+              melodyIdx++;
+              if (melodyIdx >= MELODY.length) {
+                melodyIdx = 0;
+                melodyTimeInBar = 0;
+              }
+            }
+          }
+
+          // 推进时间
+          nextNoteTime += TICK;
+          totalBeats += TICK / BEAT;
+        }
+
+        schedulerTimer = setTimeout(scheduler, LOOKAHEAD);
+      }
+
+      // ---------- 播放 / 停止 ----------
+      function play() {
+        if (isPlaying) return;
+        if (!initAudio()) return;
+
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(function () {});
+        }
+
+        isPlaying = true;
+        wasPlaying = true;
+
+        // 重置各层状态
+        currentChordIdx = 0;
+        arpStep = 0;
+        bassStep = 0;
+        bassTimeInBar = 0;
+        melodyIdx = 0;
+        melodyTimeInBar = 0;
+        totalBeats = 0;
+        beatInBar = 0;
+        nextNoteTime = now() + 0.15;
+
+        startDrone();
+
+        // 主音量淡入
+        var t = now();
+        masterGain.gain.cancelScheduledValues(t);
+        masterGain.gain.setValueAtTime(0, t);
+        masterGain.gain.linearRampToValueAtTime(volume, t + 1.5);
+
+        scheduler();
+      }
+
+      function stop(preserveWasPlaying) {
+        if (!isPlaying) return;
+        isPlaying = false;
+        if (!preserveWasPlaying) {
+          wasPlaying = false;
+        }
+
+        if (schedulerTimer) {
+          clearTimeout(schedulerTimer);
+          schedulerTimer = null;
+        }
+
+        stopDrone();
+
+        // 主音量淡出
+        if (audioCtx && masterGain) {
+          var t = now();
+          var cur = masterGain.gain.value;
+          masterGain.gain.cancelScheduledValues(t);
+          masterGain.gain.setValueAtTime(cur, t);
+          masterGain.gain.linearRampToValueAtTime(0, t + 0.8);
+        }
+      }
+
+      function setVolume(v) {
+        volume = clamp(v, 0, 1);
+        if (masterGain && audioCtx && isPlaying) {
+          var t = now();
+          masterGain.gain.cancelScheduledValues(t);
+          masterGain.gain.linearRampToValueAtTime(volume, t + 0.1);
+        }
+      }
+
+      // ---------- 胜利 / 失败音效 ----------
+      function playWinFanfare() {
+        if (!isUserEnabled) return;
+        if (!initAudio()) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+
+        var t = now();
+        var notes = ['C5', 'E5', 'G5', 'C6', 'E6'];
+        var fxGain = audioCtx.createGain();
+        fxGain.gain.value = 0.5;
+        fxGain.connect(masterGain); // 连到 masterGain，受音量控制
+
+        for (var i = 0; i < notes.length; i++) {
+          var f = freqOf(notes[i]);
+          playNote(f, t + i * 0.1, 0.45, 'sine', fxGain, 0.02, 0.2, 1);
+        }
+        // 加一个钟声效果的高音
+        playNote(freqOf('C6'), t + 0.5, 1.0, 'sine', fxGain, 0.02, 0.6, 0.6);
+
+        setTimeout(function () {
+          try { fxGain.disconnect(); } catch (e) {}
+        }, 1800);
+      }
+
+      function playLoseSting() {
+        if (!isUserEnabled) return;
+        if (!initAudio()) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+
+        var t = now();
+        var fxGain = audioCtx.createGain();
+        fxGain.gain.value = 0.6;
+        fxGain.connect(masterGain); // 连到 masterGain
+
+        // 下行半音阶
+        var notes = ['E4', 'Eb4', 'D4', 'Cs4', 'C4'];
+        for (var i = 0; i < notes.length; i++) {
+          var f = freqOf(notes[i]);
+          playNote(f, t + i * 0.09, 0.28, 'sawtooth', fxGain, 0.015, 0.1, 0.55);
+        }
+
+        // 低频撞击
+        var boom = audioCtx.createOscillator();
+        boom.type = 'sine';
+        boom.frequency.setValueAtTime(120, t);
+        boom.frequency.exponentialRampToValueAtTime(35, t + 0.5);
+        var boomGain = audioCtx.createGain();
+        boomGain.gain.setValueAtTime(0, t);
+        boomGain.gain.linearRampToValueAtTime(0.9, t + 0.015);
+        boomGain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+        boom.connect(boomGain);
+        boomGain.connect(fxGain);
+        boom.start(t);
+        boom.stop(t + 0.65);
+
+        setTimeout(function () {
+          try { fxGain.disconnect(); } catch (e) {}
+        }, 1000);
+      }
+
+      // ---------- 存储 ----------
+      function saveSettings() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            v: 2,
+            enabled: isUserEnabled,
+            volume: Math.round(volume * 100)
+          }));
+        } catch (e) {}
+      }
+
+      function loadSettings() {
+        try {
+          var raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            var data = JSON.parse(raw);
+            isUserEnabled = !!data.enabled;
+            if (typeof data.volume === 'number') {
+              volume = clamp(data.volume / 100, 0, 1);
+            }
+          }
+        } catch (e) {
+          // 损坏则清除
+          try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+        }
+      }
+
+      // ---------- UI 绑定 ----------
+      function initUI() {
+        var toggleBtn = document.getElementById('audioToggle');
+        var volSlider = document.getElementById('audioVol');
+        if (!toggleBtn || !volSlider) return;
+
+        function updateUI() {
+          toggleBtn.classList.toggle('is-on', isUserEnabled);
+          volSlider.value = Math.round(volume * 100);
+        }
+
+        toggleBtn.addEventListener('click', function () {
+          hasInteracted = true;
+          isUserEnabled = !isUserEnabled;
+
+          if (isUserEnabled) {
+            initAudio();
+            if (audioCtx && audioCtx.state === 'suspended') {
+              audioCtx.resume().catch(function () {});
+            }
+            play();
+          } else {
+            stop();
+          }
+
+          saveSettings();
+          updateUI();
+        });
+
+        volSlider.addEventListener('input', function (e) {
+          var val = parseInt(e.target.value, 10) / 100;
+          setVolume(val);
+          saveSettings();
+        });
+
+        // 首次用户交互
+        function onFirstInteraction() {
+          if (hasInteracted) return;
+          hasInteracted = true;
+          if (isUserEnabled) {
+            initAudio();
+            play();
+          }
+          document.removeEventListener('pointerdown', onFirstInteraction);
+          document.removeEventListener('keydown', onFirstInteraction);
+        }
+        document.addEventListener('pointerdown', onFirstInteraction);
+        document.addEventListener('keydown', onFirstInteraction);
+
+        // 页面可见性变化：切后台暂停，回前台恢复
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden) {
+            if (isPlaying) {
+              stop(true); // preserveWasPlaying = true
+            }
+          } else {
+            if (isUserEnabled && wasPlaying && !isPlaying) {
+              play();
+            }
+          }
+        });
+
+        // 页面卸载
+        window.addEventListener('beforeunload', function () {
+          stop();
+        });
+
+        loadSettings();
+        updateUI();
+      }
+
+      // ---------- 公共 API ----------
+      window.MineBGM = {
+        play: play,
+        stop: stop,
+        setVolume: setVolume,
+        playWin: playWinFanfare,
+        playLose: playLoseSting,
+        isEnabled: function () { return isUserEnabled; }
+      };
+
+      // 自动初始化
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initUI);
+      } else {
+        initUI();
+      }
     })();
   </script>
 </body>

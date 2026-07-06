@@ -1,0 +1,2010 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="author" content="周世杰 (ZHOU SHIJIE)">
+  <meta name="copyright" content="© 2026 周世杰. 代码 MIT, 创意 CC-BY-NC 4.0.">
+  <meta name="generator" content="周世杰个人作品集 v7.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="微型生态瓶模拟器 - 治愈系放置模拟，构建稳定的水生微型生态">
+  <title>微型生态瓶 · 游戏小屋</title>
+
+  <!-- 字体：与主站一致 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,400..700&family=Manrope:wght@300..800&display=swap" rel="stylesheet">
+
+  <!-- 主页面样式 -->
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/layout.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/animations.css">
+
+  <!-- 网站图标 -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🫧</text></svg>">
+
+  <!-- 主题预载 -->
+  <script>
+    (function () {
+      var saved = localStorage.getItem('theme');
+      document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+    })();
+  </script>
+
+  <style>
+    /* ========== 顶部 sticky 导航 ========== */
+    .game-header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(251, 247, 240, 0.78);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-bottom: 1px solid rgba(176, 130, 62, 0.12);
+    }
+    [data-theme="dark"] .game-header {
+      background: rgba(26, 21, 16, 0.78);
+      border-bottom-color: rgba(212, 171, 106, 0.1);
+    }
+    .header-inner {
+      max-width: 1100px; margin: 0 auto;
+      padding: var(--spacing-md) var(--spacing-lg);
+      display: flex; align-items: center; justify-content: space-between;
+      gap: var(--spacing-md);
+    }
+    .back-link {
+      display: inline-flex; align-items: center; gap: var(--spacing-xs);
+      font-family: var(--font-family-base);
+      font-size: var(--font-size-xs); font-weight: 600;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-text-secondary);
+      padding: 8px 14px; border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-full);
+      transition: all var(--transition-base); white-space: nowrap;
+      text-decoration: none;
+    }
+    .back-link:hover {
+      color: var(--color-accent); border-color: var(--color-accent-light);
+      background: var(--color-accent-lighter); transform: translateX(-3px);
+    }
+    .back-link .arrow { color: var(--color-accent); font-weight: 700; }
+    .header-title-block { text-align: center; flex: 1; min-width: 0; }
+    .game-title {
+      font-family: var(--font-family-display);
+      font-size: clamp(20px, 3vw, 26px); font-weight: 500;
+      font-variation-settings: 'opsz' 48, 'SOFT' 50;
+      color: var(--color-text-primary); letter-spacing: -0.01em; line-height: 1.1;
+    }
+    .game-title::before {
+      content: '— 08 —'; display: block;
+      font-family: var(--font-family-base);
+      font-size: 11px; font-weight: 600; letter-spacing: 0.34em;
+      text-transform: uppercase; color: var(--color-accent); margin-bottom: 6px;
+    }
+    .theme-toggle {
+      flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: transparent; border: 1px solid var(--color-border-light);
+      color: var(--color-text-secondary); cursor: pointer;
+      transition: all var(--transition-base);
+    }
+    .theme-toggle:hover {
+      color: var(--color-accent); border-color: var(--color-accent-light);
+      background: var(--color-accent-lighter);
+    }
+
+    /* ========== 主区域 ========== */
+    .eco-main {
+      max-width: 1100px; margin: 0 auto;
+      padding: var(--spacing-2xl) var(--spacing-lg) var(--spacing-4xl);
+    }
+    .eco-intro {
+      text-align: center; margin-bottom: var(--spacing-2xl);
+    }
+    .eco-intro h1 {
+      font-family: var(--font-family-display);
+      font-size: clamp(32px, 5vw, 44px); font-weight: 500;
+      font-variation-settings: 'opsz' 96, 'SOFT' 50;
+      letter-spacing: -0.02em; line-height: 1.1;
+      background: linear-gradient(135deg, var(--color-text-primary), var(--color-primary) 60%, var(--color-accent));
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: var(--spacing-sm);
+    }
+    .eco-intro p {
+      font-size: var(--font-size-base); color: var(--color-text-secondary);
+      letter-spacing: 0.02em; line-height: var(--line-height-relaxed);
+      max-width: 640px; margin: 0 auto;
+    }
+
+    /* 画布与控制面板布局：桌面并排，手机堆叠 */
+    .eco-stage {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: var(--spacing-xl);
+      align-items: start;
+    }
+    @media (max-width: 880px) {
+      .eco-stage { grid-template-columns: 1fr; }
+    }
+
+    /* 画布容器 */
+    .canvas-wrap {
+      position: relative;
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-xl);
+      padding: var(--spacing-md);
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+    }
+    [data-theme="dark"] .canvas-wrap {
+      background: rgba(20, 16, 12, 0.6);
+    }
+    #ecoCanvas {
+      display: block; width: 100%; height: auto;
+      aspect-ratio: 4 / 5;
+      border-radius: var(--radius-lg);
+      touch-action: none;
+    }
+    /* 画布上方状态条 */
+    .status-bar {
+      display: flex; flex-wrap: wrap; gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-md);
+      font-family: var(--font-family-base);
+      font-size: 12px;
+    }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: var(--radius-full);
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border-light);
+      color: var(--color-text-secondary);
+      letter-spacing: 0.02em;
+    }
+    .status-pill .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--color-accent);
+    }
+    .status-pill.health-good { color: #2d8a4f; }
+    .status-pill.health-good .dot { background: #4caf50; }
+    .status-pill.health-warn { color: #b8860b; }
+    .status-pill.health-warn .dot { background: #ffa726; }
+    .status-pill.health-bad { color: #c0392b; }
+    .status-pill.health-bad .dot { background: #ef5350; }
+
+    /* 控制面板 */
+    .control-panel {
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-xl);
+      padding: var(--spacing-lg);
+      box-shadow: var(--shadow-md);
+      display: flex; flex-direction: column; gap: var(--spacing-lg);
+    }
+    [data-theme="dark"] .control-panel {
+      background: rgba(20, 16, 12, 0.6);
+    }
+    .panel-section h3 {
+      font-family: var(--font-family-base);
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.24em; text-transform: uppercase;
+      color: var(--color-accent);
+      margin: 0 0 var(--spacing-sm);
+    }
+    .slider-row {
+      display: flex; flex-direction: column; gap: 6px;
+      margin-bottom: var(--spacing-md);
+    }
+    .slider-row:last-child { margin-bottom: 0; }
+    .slider-label {
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: var(--font-family-base);
+      font-size: 13px; color: var(--color-text-secondary);
+    }
+    .slider-value {
+      font-family: var(--font-family-display);
+      font-size: 16px; font-weight: 600;
+      color: var(--color-text-primary);
+      font-variation-settings: 'opsz' 24;
+    }
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 4px;
+      background: var(--color-border-medium);
+      border-radius: var(--radius-full);
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--color-accent);
+      cursor: pointer;
+      border: 2px solid var(--color-bg-card);
+      box-shadow: 0 0 0 1px var(--color-accent);
+      transition: transform 0.15s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+    input[type="range"]::-moz-range-thumb {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--color-accent); cursor: pointer;
+      border: 2px solid var(--color-bg-card);
+    }
+
+    /* 投放按钮组 */
+    .spawn-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: var(--spacing-sm);
+    }
+    .spawn-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 12px 8px; border-radius: var(--radius-md);
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border-light);
+      cursor: pointer; transition: all var(--transition-base);
+      font-family: var(--font-family-base);
+      color: var(--color-text-primary);
+    }
+    .spawn-btn:hover:not(:disabled) {
+      border-color: var(--color-accent-light);
+      background: var(--color-accent-lighter);
+      transform: translateY(-2px);
+    }
+    .spawn-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .spawn-btn .icon {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+    .spawn-btn .name {
+      font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+    }
+    .spawn-btn .cost {
+      font-size: 10px; color: var(--color-text-tertiary);
+      letter-spacing: 0.04em;
+    }
+    .spawn-btn.algae .icon { background: rgba(76, 175, 80, 0.18); color: #4caf50; }
+    .spawn-btn.plankton .icon { background: rgba(255, 255, 255, 0.18); color: #b0bec5; }
+    .spawn-btn.fish .icon { background: rgba(255, 152, 0, 0.18); color: #ff9800; }
+    .spawn-btn.microbe .icon { background: rgba(122, 95, 158, 0.18); color: var(--color-primary-light); }
+
+    /* 控制按钮组 */
+    .ctrl-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+    }
+    .ctrl-btn {
+      padding: 8px 4px; border-radius: var(--radius-sm);
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border-light);
+      cursor: pointer; transition: all var(--transition-base);
+      font-family: var(--font-family-base);
+      font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+      color: var(--color-text-secondary);
+    }
+    .ctrl-btn:hover {
+      color: var(--color-accent); border-color: var(--color-accent-light);
+    }
+    .ctrl-btn.active {
+      background: var(--color-accent); color: var(--color-bg-card);
+      border-color: var(--color-accent);
+    }
+
+    /* 数值面板 */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    }
+    .stat-cell {
+      padding: 10px; border-radius: var(--radius-sm);
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border-light);
+    }
+    .stat-cell .label {
+      font-family: var(--font-family-base);
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-text-tertiary);
+      margin-bottom: 4px;
+    }
+    .stat-cell .value {
+      font-family: var(--font-family-display);
+      font-size: 18px; font-weight: 500;
+      color: var(--color-text-primary);
+      font-variation-settings: 'opsz' 24;
+      line-height: 1;
+    }
+    .stat-cell .unit {
+      font-family: var(--font-family-base);
+      font-size: 11px; color: var(--color-text-tertiary);
+      margin-left: 2px;
+    }
+    /* 物种计数条 */
+    .pop-bar {
+      height: 4px; border-radius: 2px;
+      background: var(--color-border-light);
+      overflow: hidden; margin-top: 6px;
+    }
+    .pop-bar > div {
+      height: 100%; transition: width 0.4s ease;
+    }
+    .stats-detail .stat-cell .value {
+      font-size: 16px;
+    }
+    .stat-full {
+      grid-column: 1 / -1;
+    }
+
+    /* 成就提示 toast */
+    .toast {
+      position: fixed; left: 50%; bottom: 32px;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--color-bg-card);
+      border: 1px solid var(--color-accent-light);
+      border-radius: var(--radius-lg);
+      padding: 14px 24px;
+      box-shadow: var(--shadow-lg);
+      font-family: var(--font-family-base);
+      font-size: 14px; color: var(--color-text-primary);
+      z-index: 1000; opacity: 0;
+      transition: all 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+      pointer-events: none;
+      max-width: 90vw;
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    .toast .toast-title {
+      font-family: var(--font-family-display);
+      font-size: 16px; font-weight: 600;
+      color: var(--color-accent);
+      margin-bottom: 2px;
+    }
+
+    /* 页脚 */
+    .eco-footer {
+      text-align: center; padding: var(--spacing-2xl) 0;
+      color: var(--color-text-tertiary);
+      font-family: var(--font-family-base);
+      font-size: var(--font-size-sm);
+      letter-spacing: 0.02em;
+    }
+  </style>
+</head>
+<body>
+  <header class="game-header">
+    <div class="header-inner">
+      <a href="../games.html" class="back-link" aria-label="返回游戏小屋">
+        <span class="arrow">←</span> 游戏小屋
+      </a>
+      <div class="header-title-block">
+        <div class="game-title">微型生态瓶</div>
+      </div>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换主题"></button>
+    </div>
+  </header>
+
+  <main class="eco-main">
+    <section class="eco-intro">
+      <h1>微型生态瓶模拟器</h1>
+      <p>在密封玻璃瓶中投放藻类、浮游生物与小鱼，调节光照与温度，观察食物链动态演化。无强制胜负，享受构建—观察—调节—平衡的治愈过程。</p>
+    </section>
+
+    <section class="eco-stage">
+      <!-- 左侧：画布与状态 -->
+      <div class="canvas-wrap">
+        <div class="status-bar" id="statusBar">
+          <span class="status-pill health-good"><span class="dot"></span><span id="healthText">生态健康</span></span>
+          <span class="status-pill"><span class="dot" style="background:#4caf50"></span>生态点 <strong id="ecoPoints">20</strong></span>
+          <span class="status-pill"><span class="dot" style="background:#29b6f6"></span>运行 <strong id="runtimeText">00:00</strong></span>
+        </div>
+        <canvas id="ecoCanvas" width="480" height="600"></canvas>
+      </div>
+
+      <!-- 右侧：控制面板 -->
+      <aside class="control-panel">
+        <div class="panel-section">
+          <h3>环境调节</h3>
+          <div class="slider-row">
+            <div class="slider-label">
+              <span>光照强度</span>
+              <span class="slider-value" id="lightVal">60%</span>
+            </div>
+            <input type="range" id="lightSlider" min="0" max="100" value="60">
+          </div>
+          <div class="slider-row">
+            <div class="slider-label">
+              <span>环境温度</span>
+              <span class="slider-value" id="tempVal">24°C</span>
+            </div>
+            <input type="range" id="tempSlider" min="10" max="35" value="24" step="0.5">
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h3>投放生物</h3>
+          <div class="spawn-grid">
+            <button class="spawn-btn algae" data-spawn="algae">
+              <span class="icon">●</span>
+              <span class="name">藻类</span>
+              <span class="cost">-2 点</span>
+            </button>
+            <button class="spawn-btn plankton" data-spawn="plankton">
+              <span class="icon">·</span>
+              <span class="name">浮游生物</span>
+              <span class="cost">-4 点</span>
+            </button>
+            <button class="spawn-btn fish" data-spawn="fish">
+              <span class="icon">◁</span>
+              <span class="name">小鱼</span>
+              <span class="cost">-8 点</span>
+            </button>
+            <button class="spawn-btn microbe" data-spawn="microbe">
+              <span class="icon">∼</span>
+              <span class="name">微生物</span>
+              <span class="cost">-1 点</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h3>模拟控制</h3>
+          <div class="ctrl-row">
+            <button class="ctrl-btn" id="btnPause">暂停</button>
+            <button class="ctrl-btn" id="btnSpeed">1×</button>
+            <button class="ctrl-btn" id="btnReset">重置</button>
+            <button class="ctrl-btn" id="btnSeed">初始生态</button>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h3>种群与水质</h3>
+          <div class="stats-grid">
+            <div class="stat-cell">
+              <div class="label">藻类</div>
+              <div class="value" id="cntAlgae">0</div>
+              <div class="pop-bar"><div id="barAlgae" style="background:#4caf50;width:0"></div></div>
+            </div>
+            <div class="stat-cell">
+              <div class="label">浮游</div>
+              <div class="value" id="cntPlankton">0</div>
+              <div class="pop-bar"><div id="barPlankton" style="background:#cfd8dc;width:0"></div></div>
+            </div>
+            <div class="stat-cell">
+              <div class="label">小鱼</div>
+              <div class="value" id="cntFish">0</div>
+              <div class="pop-bar"><div id="barFish" style="background:#ff9800;width:0"></div></div>
+            </div>
+            <div class="stat-cell">
+              <div class="label">微生物</div>
+              <div class="value" id="cntMicrobe">0</div>
+              <div class="pop-bar"><div id="barMicrobe" style="background:#9a82c4;width:0"></div></div>
+            </div>
+            <div class="stat-cell">
+              <div class="label">溶解氧</div>
+              <div class="value" id="valOxygen">0<span class="unit">%</span></div>
+            </div>
+            <div class="stat-cell">
+              <div class="label">水质</div>
+              <div class="value" id="valQuality">100<span class="unit">%</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <h3>详细数据</h3>
+          <div class="stats-grid stats-detail">
+            <div class="stat-cell">
+              <div class="label">营养盐</div>
+              <div class="value" id="valNutrients">0<span class="unit">%</span></div>
+            </div>
+            <div class="stat-cell">
+              <div class="label">有机物</div>
+              <div class="value" id="valOrganic">0</div>
+            </div>
+            <div class="stat-cell">
+              <div class="label">累计出生</div>
+              <div class="value" id="statBirths">0</div>
+            </div>
+            <div class="stat-cell">
+              <div class="label">累计死亡</div>
+              <div class="value" id="statDeaths">0</div>
+            </div>
+            <div class="stat-cell stat-full">
+              <div class="label">昼夜阶段</div>
+              <div class="value" id="dayPhase" style="font-size:14px">白天</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="eco-footer">
+      <p>提示：投放藻类产氧、浮游生物吃藻类、小鱼吃浮游生物、微生物分解有机物维持营养盐循环。维持三类生物数量稳定 30 秒可解锁生态点奖励。</p>
+    </footer>
+  </main>
+
+  <div class="toast" id="toast">
+    <div class="toast-title" id="toastTitle"></div>
+    <div id="toastMsg"></div>
+  </div>
+
+  <script>
+  /* ============================================================
+   * 微型生态瓶模拟器 (Micro Ecosystem Bottle)
+   * 单文件 HTML5 Canvas 治愈系放置模拟
+   *
+   * 架构分层：
+   *   CONFIG (配置)  →  State (数据)  →  Simulation (逻辑)
+   *                                    →  Renderer (渲染)
+   *                                    →  UI (DOM 交互)
+   *
+   * 核心：Lotka-Volterra 简化 + 环境阈值钟形响应
+   * ============================================================ */
+
+  // ─── 配置层：所有可调参数集中管理（零硬编码）──────────────
+  const CONFIG = {
+    // 物理尺寸（CSS 像素）
+    CANVAS_W: 480,
+    CANVAS_H: 600,
+    // 瓶子几何（贝塞尔轮廓的关键控制点）
+    BOTTLE: {
+      cx: 240,           // 中心 x
+      topY: 70,          // 瓶口顶部 y
+      neckH: 30,         // 瓶颈高度
+      neckW: 80,         // 瓶颈宽度
+      bodyTopY: 100,     // 瓶身顶部 y
+      bodyBottomY: 540,  // 瓶身底部 y
+      bodyRX: 170,       // 瓶身横向半径（最宽处）
+      waterLevel: 110,   // 水面 y
+    },
+    // 模拟步长
+    FIXED_DT: 1000 / 60,   // 60Hz 逻辑更新
+    MAX_FRAME_DELTA: 200,  // 防止切页跳帧
+    // 容量上限（性能与稳定）
+    MAX_ALGAE: 220,
+    MAX_PLANKTON: 120,
+    MAX_FISH: 30,
+    MAX_BUBBLES: 60,
+    MAX_PARTICLES: 80,
+    // 空间网格
+    GRID_CELL: 40,
+    // 物种属性
+    SPECIES: {
+      algae: {
+        name: '藻类',
+        size: 3.2,
+        maxSpeed: 14,
+        energyStart: 60,
+        energyMax: 120,
+        energyDrain: 1.2,        // 每秒耗能
+        photoRate: 8,            // 光合产能（基础）
+        reproduceEnergy: 90,
+        reproduceProb: 0.0012,   // 每帧概率
+        maxAge: 90,              // 秒
+        color: 'rgba(76, 175, 80, ',
+      },
+      plankton: {
+        name: '浮游生物',
+        size: 2.0,
+        maxSpeed: 32,
+        energyStart: 50,
+        energyMax: 100,
+        energyDrain: 4,
+        feedEff: 0.5,            // 摄食藻类效率
+        reproduceEnergy: 75,
+        reproduceProb: 0.0010,
+        maxAge: 60,
+        senseRange: 50,          // 觅食感知半径
+        color: 'rgba(220, 235, 240, ',
+      },
+      fish: {
+        name: '小鱼',
+        size: 8,
+        maxSpeed: 60,
+        energyStart: 80,
+        energyMax: 140,
+        energyDrain: 8,
+        feedEff: 0.6,
+        reproduceEnergy: 110,
+        reproduceProb: 0.0006,
+        maxAge: 120,
+        senseRange: 90,
+        color: 'rgba(255, 152, 0, ',
+      },
+    },
+    // 微生物（纯数值模拟，不可见）
+    MICROBE: {
+      maxCount: 1000,
+      decomposeRate: 0.6,     // 分解有机物速率
+      reproduceRate: 0.02,    // 有机物充足时增长率
+      drainRate: 0.5,         // 自然死亡
+      growthPerDecompose: 2,  // 每分解1单位有机物产生的微生物
+    },
+    // 环境参数
+    ENV: {
+      lightOptimal: 70,       // 最适光照（%）
+      lightSigma: 35,         // 钟形响应宽度
+      tempOptimal: 24,        // 最适温度（℃）
+      tempSigma: 5,           // 温度响应宽度
+      oxygenDrainPerOrg: 0.4, // 每个生物每秒耗氧（%）
+      oxygenAlgaeGain: 0.6,   // 每个藻类每秒产氧（%）
+      nutrientDrainPerAlgae: 0.08,
+      turbiditySettle: 0.02,  // 浑浊度沉降系数
+      nutrientHalfSat: 30,    // 营养盐半饱和常数（米氏方程）
+    },
+    // 昼夜周期
+    DAY_NIGHT: {
+      enabled: true,
+      period: 120,            // 完整周期秒数（白天+黑夜）
+      dayRatio: 0.6,          // 白天占比
+      minLightRatio: 0.2,     // 夜晚最低光照比例
+    },
+    // 经济系统
+    ECO: {
+      startPoints: 20,
+      maxPoints: 200,
+      // 稳定奖励：每 30 秒健康状态 +1 点
+      stableRewardInterval: 30,
+      stableReward: 1,
+    },
+    SPAWN_COST: { algae: 2, plankton: 4, fish: 8, microbe: 1 },
+    SPAWN_COUNT: { algae: 6, plankton: 3, fish: 1, microbe: 50 },
+  };
+
+  // ─── 工具函数 ─────────────────────────────────────────────
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  // 钟形响应函数：x 偏离 optimal 越远，返回值越接近 0
+  function bellCurve(x, optimal, sigma) {
+    const d = (x - optimal) / sigma;
+    return Math.exp(-0.5 * d * d);
+  }
+  let _uidCounter = 0;
+  const uid = () => ++_uidCounter;
+
+  // ─── 数据状态层 ───────────────────────────────────────────
+  const state = {
+    organisms: [],         // 藻类/浮游/小鱼 统一池
+    bubbles: [],           // 气泡对象池
+    particles: [],         // 死亡消散粒子
+    microbes: 0,           // 微生物计数（纯数值）
+    organicMatter: 0,      // 有机物（尸体+排泄物）积累
+    nutrients: 80,         // 营养盐（0-100）
+    oxygen: 100,           // 溶解氧（0-100）
+    turbidity: 0,          // 浑浊度（0-100）
+    // 玩家可控环境
+    light: 60,             // 0-100
+    effectiveLight: 60,    // 实际光照（含昼夜）
+    temperature: 24,       // 10-35
+    // 游戏元状态
+    ecoPoints: CONFIG.ECO.startPoints,
+    runtime: 0,            // 运行秒数
+    paused: false,
+    speedMul: 1,           // 0.5 / 1 / 2 / 4
+    stableTimer: 0,        // 健康状态累计秒数
+    health: 'good',        // good / warn / bad
+    achievements: new Set(),
+    // 物种历史（用于波动率判定）
+    popHistory: [],        // [{t, algae, plankton, fish}]
+    // 统计数据
+    stats: {
+      totalDeaths: 0,
+      totalBirths: 0,
+    },
+  };
+
+  // ─── Organism 基类（统一接口）──────────────────────────────
+  class Organism {
+    constructor(type, x, y) {
+      const cfg = CONFIG.SPECIES[type];
+      this.id = uid();
+      this.type = type;
+      this.cfg = cfg;
+      this.x = x; this.y = y;
+      const ang = Math.random() * Math.PI * 2;
+      this.vx = Math.cos(ang) * cfg.maxSpeed * 0.3;
+      this.vy = Math.sin(ang) * cfg.maxSpeed * 0.3;
+      this.size = cfg.size * rand(0.85, 1.15);
+      this.energy = cfg.energyStart;
+      this.age = 0;
+      this.state = 'alive';
+      this.wobble = Math.random() * Math.PI * 2;   // 摆尾相位
+      this.targetAng = ang;
+    }
+    update(dt) {
+      if (this.state !== 'alive') return;
+      this.age += dt;
+      this.energy -= this.cfg.energyDrain * dt;
+      // 老死或饿死
+      if (this.age > this.cfg.maxAge || this.energy <= 0) {
+        this.die();
+        return;
+      }
+      // 运动逻辑（按类型分支）
+      this.move(dt);
+      // 瓶壁约束：软反弹（保持在瓶身椭圆内）
+      this.constrainToBottle();
+    }
+    move(dt) {
+      const cfg = this.cfg;
+      if (this.type === 'algae') {
+        // 藻类：布朗运动 + 缓慢上浮（光合作用趋光）
+        this.vx += rand(-1, 1) * 8 * dt;
+        this.vy += rand(-1, 1) * 8 * dt - 4 * dt; // 微弱上浮
+        const sp = Math.hypot(this.vx, this.vy);
+        if (sp > cfg.maxSpeed) {
+          this.vx = this.vx / sp * cfg.maxSpeed;
+          this.vy = this.vy / sp * cfg.maxSpeed;
+        }
+      } else if (this.type === 'plankton') {
+        // 浮游：饥饿时追逐藻类，饱腹时随机缓动
+        const hungerRatio = this.energy / cfg.energyMax;
+        if (hungerRatio < 0.7) {
+          const prey = sim.findNearest(this.x, this.y, 'algae', cfg.senseRange);
+          if (prey) {
+            const ang = Math.atan2(prey.y - this.y, prey.x - this.x);
+            this.targetAng = ang;
+            const speedMul = 0.8 + (1 - hungerRatio) * 0.8;
+            const tvx = Math.cos(ang) * cfg.maxSpeed * speedMul;
+            const tvy = Math.sin(ang) * cfg.maxSpeed * speedMul;
+            this.vx = lerp(this.vx, tvx, 0.08);
+            this.vy = lerp(this.vy, tvy, 0.08);
+          } else {
+            if (Math.random() < 0.06) {
+              this.targetAng = Math.random() * Math.PI * 2;
+            }
+            const tvx = Math.cos(this.targetAng) * cfg.maxSpeed * 0.7;
+            const tvy = Math.sin(this.targetAng) * cfg.maxSpeed * 0.7;
+            this.vx = lerp(this.vx, tvx, 0.05);
+            this.vy = lerp(this.vy, tvy, 0.05);
+          }
+        } else {
+          if (Math.random() < 0.03) {
+            this.targetAng = Math.random() * Math.PI * 2;
+          }
+          const tvx = Math.cos(this.targetAng) * cfg.maxSpeed * 0.5;
+          const tvy = Math.sin(this.targetAng) * cfg.maxSpeed * 0.5;
+          this.vx = lerp(this.vx, tvx, 0.04);
+          this.vy = lerp(this.vy, tvy, 0.04);
+        }
+      } else if (this.type === 'fish') {
+        // 小鱼：巡航 + 追逐最近浮游生物（感知范围与摄食范围统一用 senseRange）
+        const prey = sim.findNearest(this.x, this.y, 'plankton', cfg.senseRange);
+        if (prey) {
+          const ang = Math.atan2(prey.y - this.y, prey.x - this.x);
+          this.targetAng = ang;
+          const tvx = Math.cos(ang) * cfg.maxSpeed * 1.3;
+          const tvy = Math.sin(ang) * cfg.maxSpeed * 1.3;
+          this.vx = lerp(this.vx, tvx, 0.08);
+          this.vy = lerp(this.vy, tvy, 0.08);
+        } else {
+          if (Math.random() < 0.02) {
+            this.targetAng += rand(-0.6, 0.6);
+          }
+          const tvx = Math.cos(this.targetAng) * cfg.maxSpeed * 0.6;
+          const tvy = Math.sin(this.targetAng) * cfg.maxSpeed * 0.6;
+          this.vx = lerp(this.vx, tvx, 0.04);
+          this.vy = lerp(this.vy, tvy, 0.04);
+        }
+        this.wobble += dt * 8;
+      }
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+    }
+    constrainToBottle() {
+      const b = CONFIG.BOTTLE;
+      // 简化：仅在瓶身椭圆区域约束
+      if (this.y < b.waterLevel) {
+        this.y = b.waterLevel;
+        this.vy = Math.abs(this.vy) * 0.5;
+      }
+      if (this.y > b.bodyBottomY - 8) {
+        this.y = b.bodyBottomY - 8;
+        this.vy = -Math.abs(this.vy) * 0.5;
+      }
+      // 椭圆水平约束：根据 y 计算当前最大半宽
+      const yt = clamp((this.y - b.bodyTopY) / (b.bodyBottomY - b.bodyTopY), 0, 1);
+      // 椭圆方程：x = cx ± rx * sin(π * yt)
+      const halfW = b.bodyRX * Math.sin(Math.PI * yt) - this.size - 4;
+      if (halfW < 0) return;
+      if (this.x < b.cx - halfW) {
+        this.x = b.cx - halfW;
+        this.vx = Math.abs(this.vx) * 0.5;
+      } else if (this.x > b.cx + halfW) {
+        this.x = b.cx + halfW;
+        this.vx = -Math.abs(this.vx) * 0.5;
+      }
+    }
+    die() {
+      if (this.state === 'dead') return;
+      this.state = 'dead';
+      // 转化为有机物
+      state.organicMatter += this.size * 1.5;
+      // 死亡粒子
+      sim.spawnDeathParticles(this.x, this.y, this.type);
+    }
+  }
+
+  // ─── 模拟逻辑层 ───────────────────────────────────────────
+  const sim = {
+    // 空间网格（每帧重建，用于 O(n) 邻近查询）
+    grid: new Map(),
+    gridKey(x, y) {
+      const cx = Math.floor(x / CONFIG.GRID_CELL);
+      const cy = Math.floor(y / CONFIG.GRID_CELL);
+      return cx + ',' + cy;
+    },
+    rebuildGrid() {
+      this.grid.clear();
+      for (const o of state.organisms) {
+        if (o.state !== 'alive') continue;
+        const k = this.gridKey(o.x, o.y);
+        let arr = this.grid.get(k);
+        if (!arr) { arr = []; this.grid.set(k, arr); }
+        arr.push(o);
+      }
+    },
+    findNearest(x, y, type, maxR) {
+      let best = null, bestD = maxR * maxR;
+      const cx = Math.floor(x / CONFIG.GRID_CELL);
+      const cy = Math.floor(y / CONFIG.GRID_CELL);
+      // 搜索 3x3 网格
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const arr = this.grid.get((cx + dx) + ',' + (cy + dy));
+          if (!arr) continue;
+          for (const o of arr) {
+            if (o.type !== type || o.state !== 'alive') continue;
+            const d = (o.x - x) * (o.x - x) + (o.y - y) * (o.y - y);
+            if (d < bestD) { bestD = d; best = o; }
+          }
+        }
+      }
+      return best;
+    },
+    // 投放生物
+    spawn(type, count, x, y) {
+      // 微生物是纯数值模拟，直接累加计数
+      if (type === 'microbe') {
+        state.microbes = clamp(state.microbes + count, 0, CONFIG.MICROBE.maxCount);
+        return;
+      }
+      const caps = { algae: CONFIG.MAX_ALGAE, plankton: CONFIG.MAX_PLANKTON, fish: CONFIG.MAX_FISH };
+      const cur = this.countByType(type);
+      const room = Math.min(count, caps[type] - cur);
+      for (let i = 0; i < room; i++) {
+        const px = x != null ? x + rand(-20, 20) : rand(CONFIG.BOTTLE.cx - 100, CONFIG.BOTTLE.cx + 100);
+        const py = y != null ? y + rand(-20, 20) : rand(CONFIG.BOTTLE.bodyTopY + 30, CONFIG.BOTTLE.bodyBottomY - 20);
+        state.organisms.push(new Organism(type, px, py));
+      }
+    },
+    spawnDeathParticles(x, y, type) {
+      const color = CONFIG.SPECIES[type].color;
+      const count = type === 'fish' ? 10 : (type === 'plankton' ? 5 : 6);
+      for (let i = 0; i < count; i++) {
+        if (state.particles.length >= CONFIG.MAX_PARTICLES) break;
+        const ang = Math.random() * Math.PI * 2;
+        const speed = rand(10, 25);
+        state.particles.push({
+          x, y,
+          vx: Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed - 5,
+          life: 1.0, maxLife: 1.0,
+          size: rand(1, 3),
+          color: color + '0.85)',
+          gravity: 8,
+        });
+      }
+    },
+    spawnBirthParticles(x, y, type) {
+      const color = CONFIG.SPECIES[type].color;
+      const count = type === 'fish' ? 6 : 4;
+      for (let i = 0; i < count; i++) {
+        if (state.particles.length >= CONFIG.MAX_PARTICLES) break;
+        const ang = Math.random() * Math.PI * 2;
+        const speed = rand(5, 15);
+        state.particles.push({
+          x, y,
+          vx: Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed - 8,
+          life: 0.8, maxLife: 0.8,
+          size: rand(1.5, 2.5),
+          color: color + '0.9)',
+          gravity: -2,
+        });
+      }
+    },
+    spawnBubble(x, y) {
+      if (state.bubbles.length >= CONFIG.MAX_BUBBLES) return;
+      state.bubbles.push({
+        x, y,
+        vy: -rand(20, 45),
+        size: rand(1.5, 4),
+        wobble: Math.random() * Math.PI * 2,
+        life: 1.0,
+      });
+    },
+    countByType(type) {
+      let n = 0;
+      for (const o of state.organisms) {
+        if (o.state === 'alive' && o.type === type) n++;
+      }
+      return n;
+    },
+    // 主更新：每固定步长调用
+    update(dt) {
+      // 1. 环境因子
+      const baseLight = state.light;
+      // 昼夜周期调节
+      let dayLightMul = 1;
+      if (CONFIG.DAY_NIGHT.enabled) {
+        const cycleT = (state.runtime % CONFIG.DAY_NIGHT.period) / CONFIG.DAY_NIGHT.period;
+        const dayLen = CONFIG.DAY_NIGHT.dayRatio;
+        if (cycleT < dayLen) {
+          const dayT = cycleT / dayLen;
+          dayLightMul = CONFIG.DAY_NIGHT.minLightRatio + (1 - CONFIG.DAY_NIGHT.minLightRatio) * Math.sin(Math.PI * dayT);
+        } else {
+          const nightT = (cycleT - dayLen) / (1 - dayLen);
+          dayLightMul = CONFIG.DAY_NIGHT.minLightRatio + (1 - CONFIG.DAY_NIGHT.minLightRatio) * (1 - nightT) * 0.3;
+        }
+        state.effectiveLight = clamp(baseLight * dayLightMul, 0, 100);
+      } else {
+        state.effectiveLight = baseLight;
+      }
+      const lightFactor = bellCurve(state.effectiveLight, CONFIG.ENV.lightOptimal, CONFIG.ENV.lightSigma);
+      const tempFactor = bellCurve(state.temperature, CONFIG.ENV.tempOptimal, CONFIG.ENV.tempSigma);
+      // 营养盐限制因子（米氏方程）
+      const nutrientFactor = state.nutrients / (CONFIG.ENV.nutrientHalfSat + state.nutrients);
+      // 极端温度触发批量死亡
+      const tempDead = (state.temperature < 12 || state.temperature > 33);
+
+      // 2. 重建空间网格
+      this.rebuildGrid();
+
+      // 3. 更新所有生物
+      const algaeList = [];
+      const planktonList = [];
+      const fishList = [];
+      let deathCount = 0;
+      for (const o of state.organisms) {
+        if (o.state !== 'alive') continue;
+        o.update(dt);
+        if (o.state !== 'alive') { deathCount++; continue; }
+        // 温度极端死亡概率
+        if (tempDead && Math.random() < 0.003) {
+          o.die();
+          deathCount++;
+          continue;
+        }
+        // 按类型分组处理代谢
+        if (o.type === 'algae') {
+          // 藻类：光合产能（受光照、温度、营养盐三重限制）
+          const photoGain = CONFIG.SPECIES.algae.photoRate * lightFactor * tempFactor * nutrientFactor * dt * 3;
+          o.energy += photoGain;
+          if (o.energy > o.cfg.energyMax) o.energy = o.cfg.energyMax;
+          algaeList.push(o);
+          // 产气泡（光合强时多）
+          if (Math.random() < 0.0008 * lightFactor * nutrientFactor) {
+            this.spawnBubble(o.x, o.y);
+          }
+        } else if (o.type === 'plankton') {
+          // 浮游：摄食藻类
+          const prey = this.findNearest(o.x, o.y, 'algae', CONFIG.SPECIES.plankton.senseRange);
+          if (prey) {
+            const d = Math.hypot(prey.x - o.x, prey.y - o.y);
+            if (d < o.size + prey.size + 2) {
+              // 命中：摄食
+              o.energy += prey.cfg.energyMax * CONFIG.SPECIES.plankton.feedEff;
+              if (o.energy > o.cfg.energyMax) o.energy = o.cfg.energyMax;
+              prey.die();
+              deathCount++;
+            }
+          }
+          // 缺氧惩罚
+          if (state.oxygen < 20) o.energy -= 5 * dt;
+          planktonList.push(o);
+        } else if (o.type === 'fish') {
+          // 小鱼：摄食浮游
+          const prey = this.findNearest(o.x, o.y, 'plankton', CONFIG.SPECIES.fish.senseRange);
+          if (prey) {
+            const d = Math.hypot(prey.x - o.x, prey.y - o.y);
+            if (d < o.size + prey.size + 3) {
+              o.energy += prey.cfg.energyMax * CONFIG.SPECIES.fish.feedEff;
+              if (o.energy > o.cfg.energyMax) o.energy = o.cfg.energyMax;
+              prey.die();
+              deathCount++;
+            }
+          }
+          if (state.oxygen < 30) o.energy -= 6 * dt;
+          fishList.push(o);
+        }
+      }
+
+      // 4. 繁殖（基于能量与概率）—— 用已计数的 list 长度做容量判断，避免 O(n²)
+      const caps = { algae: CONFIG.MAX_ALGAE, plankton: CONFIG.MAX_PLANKTON, fish: CONFIG.MAX_FISH };
+      const counts = { algae: algaeList.length, plankton: planktonList.length, fish: fishList.length };
+      let birthCount = 0;
+      const reproCheck = (o, type) => {
+        if (o.energy > o.cfg.reproduceEnergy && Math.random() < o.cfg.reproduceProb * dt * 60 * tempFactor) {
+          if (counts[type] < caps[type]) {
+            o.energy *= 0.55;
+            const newborn = new Organism(type, o.x + rand(-8, 8), o.y + rand(-8, 8));
+            state.organisms.push(newborn);
+            counts[type]++;
+            birthCount++;
+            // 繁殖粒子特效
+            this.spawnBirthParticles(o.x, o.y, type);
+          }
+        }
+      };
+      for (const o of algaeList) reproCheck(o, 'algae');
+      for (const o of planktonList) reproCheck(o, 'plankton');
+      for (const o of fishList) reproCheck(o, 'fish');
+
+      // 5. 清理死亡生物（按需清理：死亡数多或总数大时清理）
+      if (deathCount > 0 || state.organisms.length > 200) {
+        state.organisms = state.organisms.filter(o => o.state === 'alive');
+      }
+      // 统计累计
+      state.stats.totalDeaths += deathCount;
+      state.stats.totalBirths += birthCount;
+
+      // 6. 微生物分解（纯数值）
+      const microbeCfg = CONFIG.MICROBE;
+      if (state.organicMatter > 0.5) {
+        const decomposed = Math.min(state.organicMatter, microbeCfg.decomposeRate * state.microbes * 0.001 * dt + 0.05 * dt);
+        state.organicMatter -= decomposed;
+        state.nutrients = clamp(state.nutrients + decomposed * 1.5, 0, 100);
+        // 微生物繁殖（更合理的增长）
+        state.microbes = clamp(
+          state.microbes * (1 + microbeCfg.reproduceRate * dt * (state.organicMatter / 50)) + decomposed * microbeCfg.growthPerDecompose,
+          0, microbeCfg.maxCount
+        );
+      } else {
+        state.microbes = clamp(state.microbes * (1 - microbeCfg.drainRate * dt * 0.1), 0, microbeCfg.maxCount);
+      }
+
+      // 7. 溶解氧更新
+      const algaeCount = algaeList.length;
+      const totalBio = algaeCount + planktonList.length + fishList.length;
+      state.oxygen += (CONFIG.ENV.oxygenAlgaeGain * algaeCount * lightFactor - CONFIG.ENV.oxygenDrainPerOrg * totalBio) * dt * 0.5;
+      state.oxygen = clamp(state.oxygen, 0, 100);
+
+      // 8. 营养盐消耗（藻类）
+      state.nutrients = clamp(state.nutrients - CONFIG.ENV.nutrientDrainPerAlgae * algaeCount * dt, 0, 100);
+
+      // 9. 浑浊度（有机物 + 浮游生物）
+      const targetTurb = clamp(state.organicMatter * 0.4 + planktonList.length * 0.4, 0, 100);
+      state.turbidity += (targetTurb - state.turbidity) * CONFIG.ENV.turbiditySettle;
+
+      // 10. 气泡更新
+      for (let i = state.bubbles.length - 1; i >= 0; i--) {
+        const b = state.bubbles[i];
+        b.y += b.vy * dt;
+        b.wobble += dt * 3;
+        b.x += Math.sin(b.wobble) * 8 * dt;
+        b.life -= dt * 0.3;
+        if (b.y < CONFIG.BOTTLE.waterLevel || b.life <= 0) {
+          state.bubbles[i] = state.bubbles[state.bubbles.length - 1];
+          state.bubbles.pop();
+        }
+      }
+
+      // 11. 粒子更新
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        const grav = p.gravity != null ? p.gravity : 8;
+        p.vy += grav * dt;
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+        p.life -= dt;
+        if (p.life <= 0) {
+          state.particles[i] = state.particles[state.particles.length - 1];
+          state.particles.pop();
+        }
+      }
+
+      // 12. 运行时间 + 稳定性检测
+      state.runtime += dt;
+      // 每 5 秒采样一次种群
+      if (state.popHistory.length === 0 || state.runtime - state.popHistory[state.popHistory.length - 1].t > 5) {
+        state.popHistory.push({ t: state.runtime, algae: algaeCount, plankton: planktonList.length, fish: fishList.length });
+        if (state.popHistory.length > 12) state.popHistory.shift();
+      }
+      // 健康判定
+      this.updateHealth(algaeCount, planktonList.length, fishList.length);
+      // 稳定奖励
+      if (state.health === 'good') {
+        state.stableTimer += dt;
+        if (state.stableTimer >= CONFIG.ECO.stableRewardInterval) {
+          state.stableTimer = 0;
+          state.ecoPoints = clamp(state.ecoPoints + CONFIG.ECO.stableReward, 0, CONFIG.ECO.maxPoints);
+          ui.toast('生态稳定奖励', '生态系统持续健康运行 +1 生态点');
+          this.checkAchievements();
+        }
+      } else {
+        state.stableTimer = 0;
+      }
+
+      // 成就检查
+      this.checkAchievements();
+    },
+    updateHealth(algae, plankton, fish) {
+      // 综合水质与生物平衡
+      const ox = state.oxygen;
+      const hasAllSpecies = algae > 0 && plankton > 0 && fish > 0;
+      // 波动率（最近样本）
+      let vol = 0;
+      if (state.popHistory.length >= 4) {
+        const h = state.popHistory;
+        const recent = h.slice(-3);
+        for (const key of ['algae', 'plankton', 'fish']) {
+          const vals = recent.map(s => s[key]);
+          const avg = (vals[0] + vals[1] + vals[2]) / 3;
+          if (avg > 0) {
+            const dev = Math.abs(vals[2] - vals[0]) / avg;
+            vol = Math.max(vol, dev);
+          }
+        }
+      }
+      if (ox > 50 && hasAllSpecies && vol < 0.3 && state.turbidity < 50) {
+        state.health = 'good';
+      } else if (ox > 25 && (algae > 0 || plankton > 0) && vol < 0.6) {
+        state.health = 'warn';
+      } else {
+        state.health = 'bad';
+      }
+    },
+    checkAchievements() {
+      const add = (key, title, msg) => {
+        if (state.achievements.has(key)) return;
+        state.achievements.add(key);
+        ui.toast(title, msg);
+      };
+      if (state.runtime > 10 && this.countByType('algae') > 5 && this.countByType('plankton') > 2 && this.countByType('fish') > 0) {
+        add('first_balance', '成就：初次平衡', '三类生物共存，建立完整食物链');
+      }
+      if (state.runtime > 600) {
+        add('ten_min', '成就：长期演化', '生态系统持续运行 10 分钟');
+      }
+      if (state.ecoPoints >= 50) {
+        add('points50', '成就：生态积蓄', '累积 50 生态点');
+      }
+    },
+    reset() {
+      state.organisms = [];
+      state.bubbles = [];
+      state.particles = [];
+      state.microbes = 0;
+      state.organicMatter = 0;
+      state.nutrients = 80;
+      state.oxygen = 100;
+      state.turbidity = 0;
+      state.effectiveLight = state.light;
+      state.ecoPoints = CONFIG.ECO.startPoints;
+      state.runtime = 0;
+      state.stableTimer = 0;
+      state.popHistory = [];
+      state.health = 'good';
+      state.achievements = new Set();
+      state.stats = { totalDeaths: 0, totalBirths: 0 };
+      _uidCounter = 0;
+    },
+    // 一键投放初始生态
+    seedInitial() {
+      this.spawn('algae', 20);
+      this.spawn('plankton', 8);
+      this.spawn('fish', 2);
+      state.microbes = 100;
+      state.organicMatter = 15;
+      state.nutrients = 60;
+    },
+  };
+
+  // ─── 渲染层：分层绘制管线 ─────────────────────────────────
+  const renderer = {
+    canvas: document.getElementById('ecoCanvas'),
+    ctx: null,
+    dpr: 1,
+    bottleCache: null,    // 离屏缓存的瓶身
+    bottleCacheCtx: null,
+    init() {
+      this.ctx = this.canvas.getContext('2d');
+      this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+      this.resize();
+      this.buildBottleCache();
+    },
+    resize() {
+      const w = CONFIG.CANVAS_W, h = CONFIG.CANVAS_H;
+      this.canvas.width = w * this.dpr;
+      this.canvas.height = h * this.dpr;
+      this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    },
+    // 静态瓶身预绘制到离屏 canvas
+    buildBottleCache() {
+      this.bottleCache = document.createElement('canvas');
+      this.bottleCache.width = CONFIG.CANVAS_W * this.dpr;
+      this.bottleCache.height = CONFIG.CANVAS_H * this.dpr;
+      const c = this.bottleCache.getContext('2d');
+      c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      this.drawBottleStatic(c);
+      this.bottleCacheCtx = c;
+    },
+    // 瓶身路径（贝塞尔轮廓）
+    bottlePath(c) {
+      const b = CONFIG.BOTTLE;
+      c.beginPath();
+      // 瓶口左
+      c.moveTo(b.cx - b.neckW / 2, b.topY);
+      // 瓶口顶
+      c.lineTo(b.cx - b.neckW / 2, b.topY - 4);
+      c.quadraticCurveTo(b.cx, b.topY - 12, b.cx + b.neckW / 2, b.topY - 4);
+      c.lineTo(b.cx + b.neckW / 2, b.topY);
+      // 瓶颈右侧
+      c.lineTo(b.cx + b.neckW / 2, b.topY + b.neckH);
+      // 瓶颈→瓶身右
+      c.bezierCurveTo(
+        b.cx + b.neckW / 2 + 20, b.bodyTopY - 10,
+        b.cx + b.bodyRX, b.bodyTopY + 30,
+        b.cx + b.bodyRX, b.bodyTopY + (b.bodyBottomY - b.bodyTopY) * 0.35
+      );
+      // 瓶身右下
+      c.bezierCurveTo(
+        b.cx + b.bodyRX, b.bodyBottomY - 20,
+        b.cx + b.bodyRX * 0.6, b.bodyBottomY,
+        b.cx, b.bodyBottomY
+      );
+      // 瓶身左下
+      c.bezierCurveTo(
+        b.cx - b.bodyRX * 0.6, b.bodyBottomY,
+        b.cx - b.bodyRX, b.bodyBottomY - 20,
+        b.cx - b.bodyRX, b.bodyTopY + (b.bodyBottomY - b.bodyTopY) * 0.35
+      );
+      // 瓶颈→瓶身左
+      c.bezierCurveTo(
+        b.cx - b.bodyRX, b.bodyTopY + 30,
+        b.cx - b.neckW / 2 - 20, b.bodyTopY - 10,
+        b.cx - b.neckW / 2, b.topY + b.neckH
+      );
+      c.closePath();
+    },
+    drawBottleStatic(c) {
+      const b = CONFIG.BOTTLE;
+      // 玻璃描边（不填充内部，避免覆盖水体与生物）
+      this.bottlePath(c);
+      c.save();
+      c.lineWidth = 2.5;
+      c.strokeStyle = 'rgba(180, 220, 240, 0.55)';
+      c.stroke();
+      // 玻璃内侧细高光（贴近左缘）
+      c.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(b.cx - b.bodyRX * 0.75, b.bodyTopY + 60);
+      c.bezierCurveTo(
+        b.cx - b.bodyRX * 0.9, b.bodyTopY + 120,
+        b.cx - b.bodyRX * 0.85, b.bodyBottomY - 80,
+        b.cx - b.bodyRX * 0.55, b.bodyBottomY - 30
+      );
+      c.stroke();
+      c.restore();
+      // 瓶底椭圆阴影
+      c.save();
+      c.fillStyle = 'rgba(0, 0, 0, 0.25)';
+      c.beginPath();
+      c.ellipse(b.cx, b.bodyBottomY + 6, b.bodyRX * 0.5, 8, 0, 0, Math.PI * 2);
+      c.fill();
+      c.restore();
+    },
+    // 计算当前水体颜色（基于水质动态）
+    waterColor() {
+      // 清澈蓝绿 → 富营养化墨绿 → 污染灰褐
+      const t = clamp(state.turbidity / 100, 0, 1);
+      const ox = state.oxygen / 100;
+      // 基础清澈色
+      const r1 = 110, g1 = 180, b1 = 200;
+      // 富营养（绿）
+      const r2 = 80, g2 = 140, b2 = 90;
+      // 污染（灰褐）
+      const r3 = 90, g3 = 95, b3 = 80;
+      let r, g, b;
+      if (t < 0.5) {
+        const k = t / 0.5;
+        r = lerp(r1, r2, k); g = lerp(g1, g2, k); b = lerp(b1, b2, k);
+      } else {
+        const k = (t - 0.5) / 0.5;
+        r = lerp(r2, r3, k); g = lerp(g2, g3, k); b = lerp(b2, b3, k);
+      }
+      // 低氧偏暗
+      r *= 0.6 + ox * 0.4;
+      g *= 0.6 + ox * 0.4;
+      b *= 0.6 + ox * 0.4;
+      return { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
+    },
+    render() {
+      const c = this.ctx;
+      const w = CONFIG.CANVAS_W, h = CONFIG.CANVAS_H;
+      // 1. 深空背景
+      const bgGrad = c.createLinearGradient(0, 0, 0, h);
+      bgGrad.addColorStop(0, '#0a0f18');
+      bgGrad.addColorStop(1, '#050810');
+      c.fillStyle = bgGrad;
+      c.fillRect(0, 0, w, h);
+
+      // 2. 水体（在瓶身路径内填充）
+      const wc = this.waterColor();
+      c.save();
+      this.bottlePath(c);
+      c.clip();
+      // 水体渐变（顶部亮、底部暗）
+      const wGrad = c.createLinearGradient(0, CONFIG.BOTTLE.waterLevel, 0, CONFIG.BOTTLE.bodyBottomY);
+      wGrad.addColorStop(0, `rgba(${wc.r}, ${wc.g}, ${wc.b}, 0.85)`);
+      wGrad.addColorStop(1, `rgba(${Math.round(wc.r * 0.4)}, ${Math.round(wc.g * 0.4)}, ${Math.round(wc.b * 0.4)}, 0.95)`);
+      c.fillStyle = wGrad;
+      c.fillRect(0, 0, w, h);
+
+      // 3. 丁达尔光束（从顶部向下，光照强时明显）
+      const lightIntensity = state.light / 100;
+      if (lightIntensity > 0.1) {
+        c.save();
+        c.globalCompositeOperation = 'lighter';
+        const beamAlpha = lightIntensity * 0.25 * (1 - clamp(state.turbidity / 80, 0, 1));
+        const beamGrad = c.createLinearGradient(CONFIG.BOTTLE.cx, CONFIG.BOTTLE.waterLevel, CONFIG.BOTTLE.cx, CONFIG.BOTTLE.bodyBottomY);
+        beamGrad.addColorStop(0, `rgba(255, 240, 200, ${beamAlpha})`);
+        beamGrad.addColorStop(0.7, `rgba(255, 240, 200, ${beamAlpha * 0.3})`);
+        beamGrad.addColorStop(1, 'rgba(255, 240, 200, 0)');
+        c.fillStyle = beamGrad;
+        c.beginPath();
+        c.moveTo(CONFIG.BOTTLE.cx - 30, CONFIG.BOTTLE.waterLevel);
+        c.lineTo(CONFIG.BOTTLE.cx + 30, CONFIG.BOTTLE.waterLevel);
+        c.lineTo(CONFIG.BOTTLE.cx + 120, CONFIG.BOTTLE.bodyBottomY);
+        c.lineTo(CONFIG.BOTTLE.cx - 120, CONFIG.BOTTLE.bodyBottomY);
+        c.closePath();
+        c.fill();
+        c.restore();
+      }
+
+      // 4-6. 生物绘制（单次遍历分类）
+      const algaeArr = [], planktonArr = [], fishArr = [];
+      for (const o of state.organisms) {
+        if (o.state !== 'alive') continue;
+        if (o.type === 'algae') algaeArr.push(o);
+        else if (o.type === 'plankton') planktonArr.push(o);
+        else if (o.type === 'fish') fishArr.push(o);
+      }
+
+      // 4. 藻类（叠加发光）
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      const algaeColor = CONFIG.SPECIES.algae.color;
+      for (const o of algaeArr) {
+        const alpha = clamp(o.energy / o.cfg.energyMax, 0.3, 0.9);
+        c.fillStyle = algaeColor + alpha + ')';
+        c.beginPath();
+        c.arc(o.x, o.y, o.size, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = algaeColor + (alpha * 0.3) + ')';
+        c.beginPath();
+        c.arc(o.x, o.y, o.size * 2.2, 0, Math.PI * 2);
+        c.fill();
+      }
+      c.restore();
+
+      // 5. 浮游生物（批量绘制）
+      c.save();
+      c.fillStyle = 'rgba(230, 240, 245, 0.85)';
+      c.beginPath();
+      for (const o of planktonArr) {
+        c.moveTo(o.x + o.size, o.y);
+        c.arc(o.x, o.y, o.size, 0, Math.PI * 2);
+      }
+      c.fill();
+      c.restore();
+
+      // 6. 小鱼（矢量路径）
+      for (const o of fishArr) {
+        this.drawFish(c, o);
+      }
+
+      // 7. 气泡
+      c.save();
+      for (const b of state.bubbles) {
+        const alpha = clamp(b.life, 0, 1) * 0.7;
+        const grad = c.createRadialGradient(b.x - b.size * 0.3, b.y - b.size * 0.3, 0, b.x, b.y, b.size);
+        grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+        grad.addColorStop(0.7, `rgba(200, 230, 245, ${alpha * 0.4})`);
+        grad.addColorStop(1, `rgba(200, 230, 245, 0)`);
+        c.fillStyle = grad;
+        c.beginPath();
+        c.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+        c.fill();
+        // 描边
+        c.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
+        c.lineWidth = 0.6;
+        c.stroke();
+      }
+      c.restore();
+
+      // 8. 死亡粒子
+      c.save();
+      for (const p of state.particles) {
+        const a = clamp(p.life / p.maxLife, 0, 1);
+        c.globalAlpha = a;
+        c.fillStyle = p.color;
+        c.beginPath();
+        c.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        c.fill();
+      }
+      c.globalAlpha = 1;
+      c.restore();
+
+      // 9. 水面波纹
+      c.save();
+      const wl = CONFIG.BOTTLE.waterLevel;
+      c.strokeStyle = `rgba(${wc.r + 40}, ${wc.g + 40}, ${wc.b + 40}, 0.6)`;
+      c.lineWidth = 1;
+      const time = performance.now() * 0.001;
+      c.beginPath();
+      for (let x = CONFIG.BOTTLE.cx - 100; x <= CONFIG.BOTTLE.cx + 100; x += 4) {
+        const y = wl + Math.sin(x * 0.1 + time * 2) * 1.2;
+        if (x === CONFIG.BOTTLE.cx - 100) c.moveTo(x, y);
+        else c.lineTo(x, y);
+      }
+      c.stroke();
+      c.restore();
+
+      c.restore(); // 解除 clip
+
+      // 10. 贴上静态瓶身
+      c.drawImage(this.bottleCache, 0, 0, w, h);
+
+      // 11. 昼夜叠加层（夜晚时整体偏暗偏蓝）
+      if (CONFIG.DAY_NIGHT.enabled) {
+        const dayFactor = state.effectiveLight / state.light;
+        if (dayFactor < 0.8) {
+          c.save();
+          c.globalAlpha = (1 - dayFactor) * 0.4;
+          const nightGrad = c.createLinearGradient(0, 0, 0, h);
+          nightGrad.addColorStop(0, 'rgba(10, 20, 60, 0.6)');
+          nightGrad.addColorStop(1, 'rgba(5, 10, 30, 0.4)');
+          c.fillStyle = nightGrad;
+          c.fillRect(0, 0, w, h);
+          c.restore();
+          // 星星（夜晚）
+          if (dayFactor < 0.5) {
+            c.save();
+            c.fillStyle = `rgba(255, 255, 255, ${(0.5 - dayFactor) * 1.2})`;
+            const starSeed = 12345;
+            for (let i = 0; i < 25; i++) {
+              const sx = ((starSeed * (i + 1) * 7919) % w);
+              const sy = ((starSeed * (i + 1) * 104729) % (CONFIG.BOTTLE.bodyTopY - 20));
+              const sr = 0.5 + (i % 3) * 0.5;
+              const twinkle = 0.6 + 0.4 * Math.sin(performance.now() * 0.002 + i);
+              c.globalAlpha = twinkle * (0.5 - dayFactor) * 1.5;
+              c.beginPath();
+              c.arc(sx, sy, sr, 0, Math.PI * 2);
+              c.fill();
+            }
+            c.restore();
+          }
+        }
+      }
+
+      // 12. 生态失衡警告边框
+      if (state.health === 'bad') {
+        const warnPulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.006);
+        c.save();
+        c.strokeStyle = `rgba(239, 83, 80, ${0.3 + warnPulse * 0.4})`;
+        c.lineWidth = 4 + warnPulse * 2;
+        c.strokeRect(2, 2, w - 4, h - 4);
+        c.restore();
+      } else if (state.health === 'warn') {
+        const warnPulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.004);
+        c.save();
+        c.strokeStyle = `rgba(255, 167, 38, ${0.2 + warnPulse * 0.3})`;
+        c.lineWidth = 3;
+        c.strokeRect(2, 2, w - 4, h - 4);
+        c.restore();
+      }
+    },
+    drawFish(c, o) {
+      const cfg = o.cfg;
+      c.save();
+      c.translate(o.x, o.y);
+      const ang = Math.atan2(o.vy, o.vx);
+      c.rotate(ang);
+      // 摆尾
+      const tail = Math.sin(o.wobble) * 0.4;
+      // 鱼身
+      const alpha = clamp(o.energy / cfg.energyMax, 0.5, 1);
+      c.fillStyle = `rgba(255, 152, 0, ${alpha})`;
+      c.beginPath();
+      c.moveTo(o.size, 0);
+      c.quadraticCurveTo(o.size * 0.5, -o.size * 0.55, -o.size * 0.5, -o.size * 0.35);
+      c.quadraticCurveTo(-o.size * 0.9, -o.size * 0.2 + tail * o.size, -o.size * 1.2, tail * o.size * 0.5);
+      c.quadraticCurveTo(-o.size * 0.9, o.size * 0.2 + tail * o.size, -o.size * 0.5, o.size * 0.35);
+      c.quadraticCurveTo(o.size * 0.5, o.size * 0.55, o.size, 0);
+      c.closePath();
+      c.fill();
+      // 眼睛
+      c.fillStyle = 'rgba(20, 20, 20, 0.8)';
+      c.beginPath();
+      c.arc(o.size * 0.55, -o.size * 0.15, 1.4, 0, Math.PI * 2);
+      c.fill();
+      c.restore();
+    },
+  };
+
+  // ─── UI 交互层 ───────────────────────────────────────────
+  const ui = {
+    toastTimer: null,
+    statsTimer: 0,
+    dom: {},
+    init() {
+      // 缓存DOM引用，避免重复查询
+      this.dom = {
+        cntAlgae: document.getElementById('cntAlgae'),
+        cntPlankton: document.getElementById('cntPlankton'),
+        cntFish: document.getElementById('cntFish'),
+        cntMicrobe: document.getElementById('cntMicrobe'),
+        barAlgae: document.getElementById('barAlgae'),
+        barPlankton: document.getElementById('barPlankton'),
+        barFish: document.getElementById('barFish'),
+        barMicrobe: document.getElementById('barMicrobe'),
+        valOxygen: document.getElementById('valOxygen'),
+        valQuality: document.getElementById('valQuality'),
+        valNutrients: document.getElementById('valNutrients'),
+        valOrganic: document.getElementById('valOrganic'),
+        statBirths: document.getElementById('statBirths'),
+        statDeaths: document.getElementById('statDeaths'),
+        dayPhase: document.getElementById('dayPhase'),
+        ecoPoints: document.getElementById('ecoPoints'),
+        runtimeText: document.getElementById('runtimeText'),
+        healthText: document.getElementById('healthText'),
+        healthPill: document.getElementById('healthText').closest('.status-pill'),
+        lightVal: document.getElementById('lightVal'),
+        tempVal: document.getElementById('tempVal'),
+        toastTitle: document.getElementById('toastTitle'),
+        toastMsg: document.getElementById('toastMsg'),
+        toast: document.getElementById('toast'),
+      };
+      // 滑块
+      const lightSlider = document.getElementById('lightSlider');
+      const tempSlider = document.getElementById('tempSlider');
+      lightSlider.addEventListener('input', () => {
+        state.light = parseFloat(lightSlider.value);
+        this.dom.lightVal.textContent = Math.round(state.light) + '%';
+      });
+      tempSlider.addEventListener('input', () => {
+        state.temperature = parseFloat(tempSlider.value);
+        this.dom.tempVal.textContent = state.temperature.toFixed(1) + '°C';
+      });
+      // 投放按钮
+      document.querySelectorAll('.spawn-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const type = btn.dataset.spawn;
+          const cost = CONFIG.SPAWN_COST[type];
+          if (state.ecoPoints < cost) {
+            this.toast('生态点不足', `投放${CONFIG.SPECIES[type] ? CONFIG.SPECIES[type].name : '微生物'}需要 ${cost} 点`);
+            return;
+          }
+          state.ecoPoints -= cost;
+          sim.spawn(type, CONFIG.SPAWN_COUNT[type]);
+        });
+      });
+      // 控制按钮
+      document.getElementById('btnPause').addEventListener('click', (e) => {
+        state.paused = !state.paused;
+        e.target.textContent = state.paused ? '继续' : '暂停';
+        e.target.classList.toggle('active', state.paused);
+      });
+      document.getElementById('btnSpeed').addEventListener('click', (e) => {
+        const speeds = [0.5, 1, 2, 4];
+        const idx = speeds.indexOf(state.speedMul);
+        state.speedMul = speeds[(idx + 1) % speeds.length];
+        e.target.textContent = state.speedMul + '×';
+        e.target.classList.toggle('active', state.speedMul !== 1);
+      });
+      document.getElementById('btnReset').addEventListener('click', () => {
+        if (confirm('确定重置生态瓶？所有生物将被清空。')) {
+          sim.reset();
+        }
+      });
+      document.getElementById('btnSeed').addEventListener('click', () => {
+        if (state.ecoPoints >= 15) {
+          state.ecoPoints -= 15;
+          sim.seedInitial();
+          this.toast('初始生态已投放', '藻类 20 + 浮游 8 + 小鱼 2 + 微生物 100');
+        } else {
+          this.toast('生态点不足', '一键投放初始生态需要 15 点');
+        }
+      });
+      // 主题切换
+      this.initThemeToggle();
+      // Canvas 点击/触摸：投放藻类（点哪投哪）
+      let lastTap = 0;
+      let tapCount = 0;
+      renderer.canvas.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        const rect = renderer.canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (CONFIG.CANVAS_W / rect.width);
+        const y = (e.clientY - rect.top) * (CONFIG.CANVAS_H / rect.height);
+        // 在瓶身内点击：投放藻类（消耗点数）
+        if (y > CONFIG.BOTTLE.waterLevel && y < CONFIG.BOTTLE.bodyBottomY &&
+            Math.abs(x - CONFIG.BOTTLE.cx) < CONFIG.BOTTLE.bodyRX) {
+          // 双击检测：投放浮游生物
+          const now = Date.now();
+          if (now - lastTap < 300) {
+            tapCount++;
+            if (tapCount >= 2) {
+              if (state.ecoPoints >= CONFIG.SPAWN_COST.plankton) {
+                state.ecoPoints -= CONFIG.SPAWN_COST.plankton;
+                sim.spawn('plankton', 2, x, y);
+              }
+              tapCount = 0;
+              lastTap = 0;
+              return;
+            }
+          } else {
+            tapCount = 1;
+          }
+          lastTap = now;
+          // 单击投放藻类
+          if (state.ecoPoints >= CONFIG.SPAWN_COST.algae) {
+            state.ecoPoints -= CONFIG.SPAWN_COST.algae;
+            sim.spawn('algae', 4, x, y);
+          }
+        }
+      });
+      // 触摸滑动：调节光照（上下滑）和温度（左右滑）
+      let touchStartX = 0, touchStartY = 0;
+      let touchStartLight = 0, touchStartTemp = 0;
+      let isTouching = false;
+      renderer.canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+          // 双指触摸：暂停/继续
+          state.paused = !state.paused;
+          const btnPause = document.getElementById('btnPause');
+          btnPause.textContent = state.paused ? '继续' : '暂停';
+          btnPause.classList.toggle('active', state.paused);
+          e.preventDefault();
+          return;
+        }
+        if (e.touches.length === 1) {
+          isTouching = true;
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+          touchStartLight = state.light;
+          touchStartTemp = state.temperature;
+        }
+      }, { passive: false });
+      renderer.canvas.addEventListener('touchmove', (e) => {
+        if (!isTouching || e.touches.length !== 1) return;
+        e.preventDefault();
+        const rect = renderer.canvas.getBoundingClientRect();
+        const dx = e.touches[0].clientX - touchStartX;
+        const dy = e.touches[0].clientY - touchStartY;
+        // 垂直滑动距离大：调节光照
+        if (Math.abs(dy) > Math.abs(dx)) {
+          const lightDelta = -dy / rect.height * 100;
+          state.light = clamp(touchStartLight + lightDelta, 0, 100);
+          document.getElementById('lightSlider').value = state.light;
+          this.dom.lightVal.textContent = Math.round(state.light) + '%';
+        } else {
+          // 水平滑动：调节温度
+          const tempDelta = dx / rect.width * 25;
+          state.temperature = clamp(touchStartTemp + tempDelta, 10, 35);
+          document.getElementById('tempSlider').value = state.temperature;
+          this.dom.tempVal.textContent = state.temperature.toFixed(1) + '°C';
+        }
+      }, { passive: false });
+      renderer.canvas.addEventListener('touchend', () => {
+        isTouching = false;
+      });
+      // 键盘快捷键
+      document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        switch (e.code) {
+          case 'Space':
+            e.preventDefault();
+            state.paused = !state.paused;
+            const btnPause = document.getElementById('btnPause');
+            btnPause.textContent = state.paused ? '继续' : '暂停';
+            btnPause.classList.toggle('active', state.paused);
+            break;
+          case 'KeyR':
+            if (confirm('确定重置生态瓶？所有生物将被清空。')) {
+              sim.reset();
+            }
+            break;
+          case 'KeyS':
+            if (state.ecoPoints >= 15) {
+              state.ecoPoints -= 15;
+              sim.seedInitial();
+              this.toast('初始生态已投放', '藻类 20 + 浮游 8 + 小鱼 2 + 微生物 100');
+            } else {
+              this.toast('生态点不足', '一键投放初始生态需要 15 点');
+            }
+            break;
+          case 'KeyD':
+            const speeds = [0.5, 1, 2, 4];
+            const idx = speeds.indexOf(state.speedMul);
+            state.speedMul = speeds[(idx + 1) % speeds.length];
+            const btnSpeed = document.getElementById('btnSpeed');
+            btnSpeed.textContent = state.speedMul + '×';
+            btnSpeed.classList.toggle('active', state.speedMul !== 1);
+            break;
+        }
+      });
+      // 页面隐藏时自动暂停
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          state._wasPaused = state.paused;
+          state.paused = true;
+        } else if (state._wasPaused === false) {
+          state.paused = false;
+        }
+      });
+    },
+    initThemeToggle() {
+      const toggle = document.getElementById('themeToggle');
+      const SUN = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>';
+      const MOON = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>';
+      const apply = () => {
+        const t = document.documentElement.getAttribute('data-theme');
+        toggle.innerHTML = t === 'dark' ? SUN : MOON;
+      };
+      apply();
+      toggle.addEventListener('click', () => {
+        const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+        const next = cur === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        apply();
+      });
+    },
+    updateStats(delta) {
+      // 投放按钮可用性：每帧检查（依赖生态点，需即时反馈）
+      document.querySelectorAll('.spawn-btn').forEach(btn => {
+        const type = btn.dataset.spawn;
+        btn.disabled = state.ecoPoints < CONFIG.SPAWN_COST[type];
+      });
+      // 数值面板：节流到每 250ms 写一次 DOM，避免 60Hz 频繁重排
+      this.statsTimer += delta || 0;
+      if (this.statsTimer < 250) return;
+      this.statsTimer = 0;
+      const d = this.dom;
+      const algae = sim.countByType('algae');
+      const plankton = sim.countByType('plankton');
+      const fish = sim.countByType('fish');
+      const microbe = Math.round(state.microbes);
+      d.cntAlgae.textContent = algae;
+      d.cntPlankton.textContent = plankton;
+      d.cntFish.textContent = fish;
+      d.cntMicrobe.textContent = microbe;
+      d.barAlgae.style.width = clamp(algae / CONFIG.MAX_ALGAE * 100, 0, 100) + '%';
+      d.barPlankton.style.width = clamp(plankton / CONFIG.MAX_PLANKTON * 100, 0, 100) + '%';
+      d.barFish.style.width = clamp(fish / CONFIG.MAX_FISH * 100, 0, 100) + '%';
+      d.barMicrobe.style.width = clamp(microbe / CONFIG.MICROBE.maxCount * 100, 0, 100) + '%';
+      d.valOxygen.innerHTML = Math.round(state.oxygen) + '<span class="unit">%</span>';
+      const quality = Math.round(clamp(100 - state.turbidity * 0.6 - (100 - state.oxygen) * 0.4, 0, 100));
+      d.valQuality.innerHTML = quality + '<span class="unit">%</span>';
+      d.ecoPoints.textContent = state.ecoPoints;
+      // 运行时间
+      const mm = Math.floor(state.runtime / 60).toString().padStart(2, '0');
+      const ss = Math.floor(state.runtime % 60).toString().padStart(2, '0');
+      d.runtimeText.textContent = mm + ':' + ss;
+      // 健康状态
+      const pill = d.healthPill;
+      pill.classList.remove('health-good', 'health-warn', 'health-bad');
+      if (state.health === 'good') {
+        pill.classList.add('health-good');
+        d.healthText.textContent = '生态健康';
+      } else if (state.health === 'warn') {
+        pill.classList.add('health-warn');
+        d.healthText.textContent = '生态失衡';
+      } else {
+        pill.classList.add('health-bad');
+        d.healthText.textContent = '生态崩溃';
+      }
+      // 详细数据
+      d.valNutrients.innerHTML = Math.round(state.nutrients) + '<span class="unit">%</span>';
+      d.valOrganic.textContent = Math.round(state.organicMatter);
+      d.statBirths.textContent = state.stats.totalBirths;
+      d.statDeaths.textContent = state.stats.totalDeaths;
+      // 昼夜阶段
+      if (CONFIG.DAY_NIGHT.enabled) {
+        const cycleT = (state.runtime % CONFIG.DAY_NIGHT.period) / CONFIG.DAY_NIGHT.period;
+        const dayLen = CONFIG.DAY_NIGHT.dayRatio;
+        let phase;
+        if (cycleT < dayLen * 0.25) phase = '🌅 清晨';
+        else if (cycleT < dayLen * 0.75) phase = '☀️ 白天';
+        else if (cycleT < dayLen) phase = '🌇 黄昏';
+        else phase = '🌙 夜晚';
+        d.dayPhase.textContent = phase;
+      } else {
+        d.dayPhase.textContent = '☀️ 白天';
+      }
+    },
+    toast(title, msg) {
+      const d = this.dom;
+      d.toastTitle.textContent = title;
+      d.toastMsg.textContent = msg;
+      d.toast.classList.add('show');
+      clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => d.toast.classList.remove('show'), 3000);
+    },
+  };
+
+  // ─── 存档系统 ─────────────────────────────────────────────
+  const storage = {
+    KEY: 'eco_bottle_save_v2',
+    save() {
+      try {
+        const data = {
+          version: 2,
+          saveTime: Date.now(),
+          organisms: state.organisms.filter(o => o.state === 'alive').map(o => ({
+            t: o.type, x: o.x, y: o.y, vx: o.vx, vy: o.vy, e: o.energy, a: o.age, w: o.wobble
+          })),
+          microbes: state.microbes,
+          organicMatter: state.organicMatter,
+          nutrients: state.nutrients,
+          oxygen: state.oxygen,
+          turbidity: state.turbidity,
+          light: state.light,
+          temperature: state.temperature,
+          ecoPoints: state.ecoPoints,
+          runtime: state.runtime,
+          achievements: Array.from(state.achievements),
+          stats: state.stats,
+        };
+        const json = JSON.stringify(data);
+        localStorage.setItem(this.KEY, json);
+        return true;
+      } catch (e) {
+        // 容量超限或隐私模式：尝试清理旧版本存档
+        try {
+          localStorage.removeItem('eco_bottle_save_v1');
+        } catch (e2) {}
+        return false;
+      }
+    },
+    load() {
+      try {
+        const raw = localStorage.getItem(this.KEY);
+        if (!raw) {
+          // 尝试加载旧版本存档
+          return this.loadV1();
+        }
+        const d = JSON.parse(raw);
+        // 版本兼容处理
+        if (d.version !== 2) {
+          return this.migrateAndLoad(d);
+        }
+        sim.reset();
+        state.microbes = d.microbes || 0;
+        state.organicMatter = d.organicMatter || 0;
+        state.nutrients = d.nutrients || 80;
+        state.oxygen = d.oxygen || 100;
+        state.turbidity = d.turbidity || 0;
+        state.light = d.light || 60;
+        state.effectiveLight = state.light;
+        state.temperature = d.temperature || 24;
+        state.ecoPoints = d.ecoPoints || CONFIG.ECO.startPoints;
+        state.runtime = d.runtime || 0;
+        state.achievements = new Set(d.achievements || []);
+        state.stats = d.stats || { totalDeaths: 0, totalBirths: 0 };
+        for (const o of (d.organisms || [])) {
+          if (!o.t || !CONFIG.SPECIES[o.t]) continue;
+          const org = new Organism(o.t, o.x, o.y);
+          org.vx = o.vx || 0; org.vy = o.vy || 0;
+          org.energy = o.e || CONFIG.SPECIES[o.t].energyStart;
+          org.age = o.a || 0;
+          org.wobble = o.w || 0;
+          state.organisms.push(org);
+        }
+        // 同步滑块
+        document.getElementById('lightSlider').value = state.light;
+        document.getElementById('tempSlider').value = state.temperature;
+        ui.dom.lightVal.textContent = Math.round(state.light) + '%';
+        ui.dom.tempVal.textContent = state.temperature.toFixed(1) + '°C';
+        return true;
+      } catch (e) {
+        // 存档损坏：清除损坏存档
+        try { localStorage.removeItem(this.KEY); } catch (e2) {}
+        return false;
+      }
+    },
+    loadV1() {
+      try {
+        const raw = localStorage.getItem('eco_bottle_save_v1');
+        if (!raw) return false;
+        const d = JSON.parse(raw);
+        sim.reset();
+        state.microbes = d.microbes || 0;
+        state.organicMatter = d.organicMatter || 0;
+        state.nutrients = d.nutrients || 80;
+        state.oxygen = d.oxygen || 100;
+        state.turbidity = d.turbidity || 0;
+        state.light = d.light || 60;
+        state.effectiveLight = state.light;
+        state.temperature = d.temperature || 24;
+        state.ecoPoints = d.ecoPoints || CONFIG.ECO.startPoints;
+        state.runtime = d.runtime || 0;
+        state.achievements = new Set(d.achievements || []);
+        for (const o of (d.organisms || [])) {
+          if (!o.t || !CONFIG.SPECIES[o.t]) continue;
+          const org = new Organism(o.t, o.x, o.y);
+          org.vx = o.vx || 0; org.vy = o.vy || 0;
+          org.energy = o.e || CONFIG.SPECIES[o.t].energyStart;
+          org.age = o.a || 0;
+          org.wobble = o.w || 0;
+          state.organisms.push(org);
+        }
+        document.getElementById('lightSlider').value = state.light;
+        document.getElementById('tempSlider').value = state.temperature;
+        ui.dom.lightVal.textContent = Math.round(state.light) + '%';
+        ui.dom.tempVal.textContent = state.temperature.toFixed(1) + '°C';
+        // 保存为v2格式
+        this.save();
+        localStorage.removeItem('eco_bottle_save_v1');
+        return true;
+      } catch (e) {
+        return false;
+      }
+    },
+    migrateAndLoad(d) {
+      // 未知版本，当作新游戏
+      return false;
+    },
+  };
+
+  // ─── 主循环：固定步长 + 渲染 ──────────────────────────────
+  let lastTime = 0;
+  let accumulator = 0;
+  let saveTimer = 0;
+  function loop(timestamp) {
+    if (lastTime === 0) lastTime = timestamp;
+    const delta = Math.min(timestamp - lastTime, CONFIG.MAX_FRAME_DELTA);
+    lastTime = timestamp;
+    if (!state.paused) {
+      accumulator += delta * state.speedMul;
+      // 多步推进（speedMul 高时一次循环多步）
+      let steps = 0;
+      while (accumulator >= CONFIG.FIXED_DT && steps < 8) {
+        sim.update(CONFIG.FIXED_DT / 1000);
+        accumulator -= CONFIG.FIXED_DT;
+        steps++;
+      }
+      // 自动存档（每 30 秒）
+      saveTimer += delta;
+      if (saveTimer >= 30000) {
+        saveTimer = 0;
+        storage.save();
+      }
+    }
+    renderer.render();
+    ui.updateStats(delta);
+    requestAnimationFrame(loop);
+  }
+
+  // ─── 启动 ─────────────────────────────────────────────────
+  renderer.init();
+  ui.init();
+  // 尝试读档，无档则投放初始生态
+  if (!storage.load()) {
+    sim.seedInitial();
+  }
+  // 窗口尺寸变化时重建缓存
+  window.addEventListener('resize', () => {
+    renderer.resize();
+    renderer.buildBottleCache();
+  });
+  // 页面关闭时存档
+  window.addEventListener('beforeunload', () => storage.save());
+  requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

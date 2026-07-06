@@ -125,6 +125,8 @@ body {
   min-height: 100vh;
   overflow-x: hidden; overflow-y: auto;
   user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
 
@@ -341,6 +343,38 @@ body { overflow-wrap: break-word; }
   font-size: 11px;
   color: var(--green);
 }
+
+.overall-progress {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+}
+.overall-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-surface);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.overall-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.overall-progress-text {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  font-weight: 600;
+}
+
 .level-back {
   padding: 8px 28px;
   border: 1px solid var(--border);
@@ -401,6 +435,8 @@ body { overflow-wrap: break-word; }
   flex: 1;
   position: relative;
   overflow: hidden;
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 /* 拼图容器 */
@@ -433,6 +469,13 @@ body { overflow-wrap: break-word; }
   background-repeat: no-repeat;
 }
 .slot-cell.filled { border-color: var(--green); border-style: solid; background: transparent; }
+.slot-cell.highlight {
+  border-color: var(--gold);
+  border-style: solid;
+  background: rgba(212,165,116,0.15);
+  box-shadow: 0 0 12px rgba(212,165,116,0.3), inset 0 0 12px rgba(212,165,116,0.1);
+  transition: all 0.15s ease;
+}
 
 /* 拼图碎片 */
 .piece {
@@ -553,6 +596,16 @@ body { overflow-wrap: break-word; }
   color: var(--gold);
   margin-top: 12px;
   text-shadow: 0 0 20px rgba(212,165,116,0.4);
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.1s ease, color 0.3s;
+}
+#memory-overlay .memory-countdown.pulse {
+  animation: countdown-pulse 0.3s ease-out;
+}
+@keyframes countdown-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
 }
 #memory-overlay .memory-hint {
   font-size: 12px;
@@ -718,6 +771,13 @@ body { overflow-wrap: break-word; }
     <!-- 选关界面 -->
     <div id="scene-level-select" class="scene">
       <h2>选择关卡</h2>
+      <div class="overall-progress" id="overall-progress">
+        <span>总进度</span>
+        <div class="overall-progress-bar">
+          <div class="overall-progress-fill" id="overall-progress-fill"></div>
+        </div>
+        <span class="overall-progress-text" id="overall-progress-text">0%</span>
+      </div>
       <div class="level-grid" id="level-grid"></div>
       <input type="file" id="custom-file" accept="image/*" style="display:none;">
       <button class="custom-upload-btn" id="btn-custom-upload">📷 上传本地图片挑战</button>
@@ -806,9 +866,12 @@ body { overflow-wrap: break-word; }
   var hudTimer    = document.getElementById('hud-timer');
   var hudProgress = document.getElementById('hud-progress');
   var levelGrid   = document.getElementById('level-grid');
+  var overallProgressFill = document.getElementById('overall-progress-fill');
+  var overallProgressText = document.getElementById('overall-progress-text');
   var modeSelector = document.getElementById('mode-selector');
   var modeDesc     = document.getElementById('mode-desc');
   var customFile   = document.getElementById('custom-file');
+  var highlightedSlot = null;
 
   // ==================== 全局状态 ====================
   var gameMode = 'linear';
@@ -823,6 +886,7 @@ body { overflow-wrap: break-word; }
   var totalPieces = 0;
   var snappedCount = 0;
   var gameStartTime = 0;
+  var pausedElapsed = 0;
   var timerInterval = null;
   var memoryTimer = null;
   var isPlaying = false;
@@ -903,6 +967,11 @@ body { overflow-wrap: break-word; }
     document.removeEventListener('pointermove', onDocPointerMove);
     document.removeEventListener('pointerup', onDocPointerUp);
     document.removeEventListener('pointercancel', onDocPointerUp);
+    // 清除吸附高亮
+    if (highlightedSlot) {
+      highlightedSlot.el.classList.remove('highlight');
+      highlightedSlot = null;
+    }
     // 重置状态
     dragInfo = null;
     isPlaying = false;
@@ -910,6 +979,7 @@ body { overflow-wrap: break-word; }
     pieces = [];
     slots = [];
     snappedCount = 0;
+    pausedElapsed = 0;
   }
 
   // ==================== 粒子特效 ====================
@@ -935,20 +1005,21 @@ body { overflow-wrap: break-word; }
 
   // ==================== 计时器 ====================
   function startTimer() {
-    gameStartTime = Date.now();
+    gameStartTime = Date.now() - pausedElapsed * 1000;
     updateTimerDisplay();
     timerInterval = setInterval(updateTimerDisplay, 200);
     allTimers.push(timerInterval);
   }
   function updateTimerDisplay() {
     if (!isPlaying && !isAutoSolving) return;
-    var elapsed = Math.floor((Date.now() - gameStartTime) / 1000);
+    var elapsed = getElapsed();
     var m = Math.floor(elapsed / 60);
     var s = elapsed % 60;
     hudTimer.textContent = '\u23F1 ' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
   }
   function stopTimer() {
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    pausedElapsed = getElapsed();
   }
   function getElapsed() {
     return Math.floor((Date.now() - gameStartTime) / 1000);
@@ -980,13 +1051,17 @@ body { overflow-wrap: break-word; }
   function buildLevelGrid() {
     levelGrid.innerHTML = '';
     var progress = getLinearProgress();
+    var completedCount = 0;
     LEVELS.forEach(function(lv) {
       var cell = document.createElement('div');
       cell.className = 'level-cell';
       var unlocked = gameMode === 'free' || lv.id <= progress;
       if (!unlocked) cell.classList.add('locked');
       var best = getBestScore(lv.id);
-      if (best !== null) cell.classList.add('completed');
+      if (best !== null) {
+        cell.classList.add('completed');
+        completedCount++;
+      }
 
       var iconHtml = unlocked ? '' : '<span class="lock-icon">\uD83D\uDD12</span>';
       var numText = lv.id === 0 ? '\u6559' : String(lv.id);
@@ -999,6 +1074,10 @@ body { overflow-wrap: break-word; }
       }
       levelGrid.appendChild(cell);
     });
+
+    var percent = Math.floor((completedCount / LEVELS.length) * 100);
+    overallProgressFill.style.width = percent + '%';
+    overallProgressText.textContent = percent + '%';
   }
 
   // ==================== 开始关卡 ====================
@@ -1056,6 +1135,37 @@ body { overflow-wrap: break-word; }
     memoryImg.style.opacity = '0'; // 加载完成前隐藏，避免看到旧图
 
     var memoryStarted = false; // 防止重复启动
+    var memoryEndTime = 0;
+    var memoryRafId = null;
+    var lastDisplayedSec = -1;
+
+    function updateMemoryCountdown() {
+      var now = Date.now();
+      var remaining = Math.max(0, (memoryEndTime - now) / 1000);
+      var sec = Math.ceil(remaining);
+
+      if (sec !== lastDisplayedSec) {
+        lastDisplayedSec = sec;
+        memoryCountdown.textContent = String(sec);
+        if (sec <= 1) {
+          memoryCountdown.style.color = 'var(--red)';
+        }
+        memoryCountdown.classList.remove('pulse');
+        void memoryCountdown.offsetWidth;
+        memoryCountdown.classList.add('pulse');
+      }
+
+      if (remaining <= 0) {
+        memoryRafId = null;
+        memoryOverlay.classList.add('hidden');
+        clearGridPreview();
+        startPuzzlePhase(imgUrl);
+        return;
+      }
+      memoryRafId = requestAnimationFrame(updateMemoryCountdown);
+      registerAnimFrame(memoryRafId);
+    }
+
     function beginMemoryCountdown() {
       if (memoryStarted) return;
       memoryStarted = true;
@@ -1063,23 +1173,13 @@ body { overflow-wrap: break-word; }
       memoryImg.style.opacity = '1';
       memoryCountdown.textContent = String(countdownSecs);
       memoryCountdown.style.color = 'var(--gold)';
+      lastDisplayedSec = countdownSecs;
       // 预览阶段：网格显示完整大图
       showGridPreview(imgUrl);
 
-      var countdown = countdownSecs;
-      memoryTimer = setInterval(function() {
-        countdown--;
-        memoryCountdown.textContent = String(countdown);
-        if (countdown <= 1) memoryCountdown.style.color = 'var(--red)';
-        if (countdown <= 0) {
-          clearInterval(memoryTimer);
-          memoryTimer = null;
-          memoryOverlay.classList.add('hidden');
-          clearGridPreview();
-          startPuzzlePhase(imgUrl);
-        }
-      }, 1000);
-      allTimers.push(memoryTimer);
+      memoryEndTime = Date.now() + countdownSecs * 1000;
+      memoryRafId = requestAnimationFrame(updateMemoryCountdown);
+      registerAnimFrame(memoryRafId);
     }
 
     memoryImg.onload = beginMemoryCountdown;
@@ -1093,9 +1193,9 @@ body { overflow-wrap: break-word; }
 
     // 点击图片可跳过记忆阶段，直接开始拼图
     var skipHandler = function() {
-      if (memoryStarted && memoryTimer) {
-        clearInterval(memoryTimer);
-        memoryTimer = null;
+      if (memoryStarted && memoryRafId) {
+        cancelAnimationFrame(memoryRafId);
+        memoryRafId = null;
         memoryOverlay.classList.add('hidden');
         clearGridPreview();
         startPuzzlePhase(imgUrl);
@@ -1158,16 +1258,24 @@ body { overflow-wrap: break-word; }
     var placeCellH = Math.min(rightH / placeRows, pieceH + 30);
 
     var isSmall = cellSize < 70;
+    var placedPositions = [];
 
     positions.forEach(function(pos, idx) {
       var gCol = idx % placeCols;
       var gRow = Math.floor(idx / placeCols);
       var baseX = rightX + gCol * placeCellW + 4;
       var baseY = gRow * placeCellH + 4;
-      var jitterX = (Math.random() - 0.5) * (placeCellW - pieceW - 6);
-      var jitterY = (Math.random() - 0.5) * (placeCellH - pieceH - 6);
-      var left = Math.max(rightX, baseX + jitterX);
-      var top = Math.max(0, Math.min(containerH - pieceH - 2, baseY + jitterY));
+      var maxJitterX = Math.max(0, (placeCellW - pieceW - 6) / 2);
+      var maxJitterY = Math.max(0, (placeCellH - pieceH - 6) / 2);
+      var jitterX = (Math.random() - 0.5) * 2 * maxJitterX;
+      var jitterY = (Math.random() - 0.5) * 2 * maxJitterY;
+      var left = baseX + jitterX;
+      var top = baseY + jitterY;
+
+      left = Math.max(rightX, Math.min(containerW - pieceW - 4, left));
+      top = Math.max(4, Math.min(containerH - pieceH - 4, top));
+
+      placedPositions.push({ left: left, top: top });
 
       // 创建碎片 DOM
       var el = document.createElement('div');
@@ -1228,6 +1336,58 @@ body { overflow-wrap: break-word; }
     };
   }
 
+  // 获取碎片对应的正确 slot
+  function getCorrectSlotForPiece(pieceData) {
+    for (var i = 0; i < slots.length; i++) {
+      if (slots[i].row === pieceData.correctRow && slots[i].col === pieceData.correctCol) {
+        return slots[i];
+      }
+    }
+    return null;
+  }
+
+  // 检测碎片是否在吸附范围内，用于实时高亮
+  function updateSnapHighlight(pieceData, pieceLeft, pieceTop) {
+    var targetSlot = getCorrectSlotForPiece(pieceData);
+    if (!targetSlot) {
+      clearSnapHighlight();
+      return;
+    }
+
+    var pieceCenterX = pieceLeft + cellSize / 2;
+    var pieceCenterY = pieceTop + cellSize / 2;
+    var slotCenter = getSlotCenterInContainer(targetSlot);
+    var slotLeft = slotCenter.x - cellSize / 2;
+    var slotTop = slotCenter.y - cellSize / 2;
+
+    var dx = pieceCenterX - slotCenter.x;
+    var dy = pieceCenterY - slotCenter.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+
+    var overlapX = Math.min(pieceLeft + cellSize, slotLeft + cellSize) - Math.max(pieceLeft, slotLeft);
+    var overlapY = Math.min(pieceTop + cellSize, slotTop + cellSize) - Math.max(pieceTop, slotTop);
+    var intersect = overlapX > 0 && overlapY > 0;
+
+    var proximityThreshold = Math.max(cellSize * 0.6, 55);
+
+    if (intersect || dist <= proximityThreshold) {
+      if (highlightedSlot !== targetSlot) {
+        clearSnapHighlight();
+        targetSlot.el.classList.add('highlight');
+        highlightedSlot = targetSlot;
+      }
+    } else {
+      clearSnapHighlight();
+    }
+  }
+
+  function clearSnapHighlight() {
+    if (highlightedSlot) {
+      highlightedSlot.el.classList.remove('highlight');
+      highlightedSlot = null;
+    }
+  }
+
   // ==================== 拖拽逻辑（事件绑定到 document） ====================
   function onPiecePointerDown(e) {
     if (dragInfo) return;
@@ -1281,16 +1441,16 @@ body { overflow-wrap: break-word; }
     var newLeft = clientXInContainer - dragInfo.offsetX;
     var newTop = clientYInContainer - dragInfo.offsetY;
 
-    // 限制在 puzzle-container 范围内，避免拖出视口
     var containerW = puzzleContainer.clientWidth || 800;
     var containerH = puzzleContainer.clientHeight || 406;
     newLeft = Math.max(0, Math.min(containerW - cellSize, newLeft));
     newTop = Math.max(0, Math.min(containerH - cellSize, newTop));
 
-    // GPU 加速位移
     var dx = newLeft - dragInfo.startLeft;
     var dy = newTop - dragInfo.startTop;
     dragInfo.el.style.transform = 'translate3d(' + dx + 'px, ' + dy + 'px, 0)';
+
+    updateSnapHighlight(dragInfo.pieceData, newLeft, newTop);
   }
 
   function onDocPointerUp(e) {
@@ -1328,6 +1488,9 @@ body { overflow-wrap: break-word; }
     el.style.top = newTop + 'px';
     el.style.transform = '';
     void el.offsetWidth; // 强制重排，确保位置立即生效
+
+    // 清除吸附高亮
+    clearSnapHighlight();
 
     // 吸附判定
     checkSnap(pieceData, newLeft, newTop);
@@ -1461,6 +1624,7 @@ body { overflow-wrap: break-word; }
     if (!isPlaying || isAutoSolving) return;
     isAutoSolving = true;
     isPlaying = false;
+    stopTimer();
     autoSolveOverlay.classList.add('active');
 
     var unsnapped = pieces.filter(function(p) { return !p.snapped; });
@@ -1515,6 +1679,7 @@ body { overflow-wrap: break-word; }
       onLevelComplete();
     } else {
       isPlaying = true;
+      startTimer();
     }
   }
 
@@ -1549,8 +1714,7 @@ body { overflow-wrap: break-word; }
 
   // ==================== 重置关卡 ====================
   function resetLevel() {
-    if (isAutoSolving) return;
-    if (!currentLevel) return; // 防御：无当前关卡则不重置
+    if (!currentLevel) return;
     _cleanup();
     startLevel(currentLevel.id, isCustomImage);
   }
@@ -1653,6 +1817,9 @@ body { overflow-wrap: break-word; }
     if (e.key === 'Escape' && scenes.playing.classList.contains('active')) {
       _cleanup();
       showScene('menu');
+    }
+    if ((e.key === 'r' || e.key === 'R') && scenes.playing.classList.contains('active')) {
+      resetLevel();
     }
   });
 

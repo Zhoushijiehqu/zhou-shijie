@@ -303,6 +303,36 @@ window.ProfileData = {
       file: 'games/gravity.html',
       accent: 'primary',
       available: true
+    },
+    {
+      name: '微型生态瓶',
+      slug: 'eco',
+      desc: '治愈系放置模拟。在密封玻璃瓶中投放藻类、浮游生物与小鱼，调节光照温度，观察食物链动态演化，维持生态平衡。',
+      tags: ['模拟', '放置', '治愈'],
+      techStack: ['HTML', 'Canvas', 'JS'],
+      file: 'games/eco.html',
+      accent: 'accent',
+      available: true
+    },
+    {
+      name: '3D折叠数字魔方',
+      slug: 'cube2048',
+      desc: '三维 2048。在可自由旋转的立方体六面上合成数字，方块跨面滑动合并，全局规划空间布局，挑战 2048 及更高数字。',
+      tags: ['解谜', '3D', 'Three.js'],
+      techStack: ['HTML', 'Three.js', 'JS'],
+      file: 'games/cube2048.html',
+      accent: 'primary',
+      available: true
+    },
+    {
+      name: '节奏线条生成器',
+      slug: 'rhythm',
+      desc: '音乐驱动的视觉创作工具。点击爆发粒子、滑动绘制流动线条、长按生成环形波纹，配合节拍加成，音乐结束导出专属抽象画。',
+      tags: ['音乐', '创作', 'Canvas'],
+      techStack: ['HTML', 'Web Audio', 'JS'],
+      file: 'games/rhythm.html',
+      accent: 'accent',
+      available: true
     }
   ],
 

@@ -323,6 +323,111 @@
         gap: var(--spacing-md);
       }
     }
+
+    /* ========== 背景音乐控制 ========== */
+    .audio-controls {
+      display: flex;
+      justify-content: center;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .audio-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px;
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      font-family: var(--font-family-base);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--color-text-secondary);
+      transition: all var(--transition-base);
+      user-select: none;
+    }
+
+    .audio-toggle:hover {
+      border-color: var(--color-accent-light);
+      color: var(--color-text-primary);
+      transform: translateY(-1px);
+    }
+
+    .audio-toggle:active {
+      transform: scale(0.97);
+    }
+
+    .audio-toggle.is-on {
+      color: var(--color-accent);
+      border-color: var(--color-accent-light);
+      background: var(--color-accent-lighter);
+    }
+
+    .audio-ico {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .audio-toggle .audio-ico-on { display: none; }
+    .audio-toggle .audio-ico-off { display: inline; }
+    .audio-toggle.is-on .audio-ico-on { display: inline; }
+    .audio-toggle.is-on .audio-ico-off { display: none; }
+
+    .audio-vol {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-full);
+    }
+
+    .audio-vol-label {
+      font-family: var(--font-family-base);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--color-text-tertiary);
+    }
+
+    .audio-vol input[type="range"] {
+      width: 80px;
+      height: 4px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: var(--color-border-medium);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .audio-vol input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      cursor: pointer;
+      transition: transform var(--transition-fast);
+    }
+
+    .audio-vol input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .audio-vol input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      cursor: pointer;
+      border: none;
+    }
   </style>
 </head>
 <body>
@@ -361,6 +466,19 @@
         <div class="info-item">
           <span class="info-label">状态</span>
           <span class="info-value status-text" id="status">就绪</span>
+        </div>
+      </div>
+
+      <!-- 背景音乐控制 -->
+      <div class="audio-controls">
+        <button class="audio-toggle" id="audioToggle" aria-label="背景音乐开关" title="背景音乐">
+          <span class="audio-ico audio-ico-on">🔊</span>
+          <span class="audio-ico audio-ico-off">🔇</span>
+          <span class="audio-label">背景音乐</span>
+        </button>
+        <div class="audio-vol" id="audioVolWrap">
+          <span class="audio-vol-label">音量</span>
+          <input type="range" id="audioVol" min="0" max="100" value="35" aria-label="音量调节">
         </div>
       </div>
 
@@ -482,6 +600,7 @@
       var bonusCountdown = BONUS_INTERVAL;  // 下次生成倒计时（毫秒）
       var bonusEaten = 0;                    // 已吃大球计数
       var floatTexts = [];                   // 飘字动画队列 { x, y, text, color, bornTime, ttl }
+      var particles = [];                    // 粒子效果队列 { x, y, vx, vy, life, maxLife, color, size }
       var lastFrameTs = 0;                   // 上一帧时间戳，用于计算 dt
       var rafId = null;                      // requestAnimationFrame 句柄
 
@@ -520,6 +639,10 @@
 
       // ----- 初始化一局新游戏 -----
       function resetGame() {
+        // 清除可能存在的倒计时
+        if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+        // 清除游戏循环定时器
+        if (timer) { clearTimeout(timer); timer = null; }
         // 蛇初始 3 节，位于画布中央，向右移动
         var mid = Math.floor(GRID / 2);
         snake = [
@@ -537,6 +660,7 @@
         bonusCountdown = BONUS_INTERVAL;
         bonusEaten = 0;
         floatTexts = [];
+        particles = [];
         placeFood();
         updateHUD();
         state = 'ready';
@@ -616,6 +740,8 @@
         if (ateFood) {
           score += 1;
           foodEaten += 1;
+          spawnParticles(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, colors().accent, 10);
+          if (window.SnakeBGM) { try { window.SnakeBGM.playEat(); } catch (e) {} }
           // 每吃 5 个食物加速 8ms，最快 70ms
           if (foodEaten % SPEED_UP_EVERY === 0 && currentSpeed > MIN_SPEED) {
             currentSpeed = Math.max(MIN_SPEED, currentSpeed - SPEED_STEP);
@@ -634,6 +760,7 @@
             '+' + BONUS_SCORE,
             cssVar('--color-accent')
           );
+          if (window.SnakeBGM) { try { window.SnakeBGM.playBonus(); } catch (e) {} }
           bonusBall = null;
           bonusCountdown = BONUS_INTERVAL;
           updateHUD();
@@ -726,6 +853,48 @@
           x: x, y: y, text: text, color: color,
           bornTime: performance.now(), ttl: 1000
         });
+      }
+
+      // 粒子效果（吃到食物时迸发）
+      function spawnParticles(x, y, color, count) {
+        for (var i = 0; i < count; i++) {
+          var angle = Math.random() * Math.PI * 2;
+          var speed = 1 + Math.random() * 3;
+          particles.push({
+            x: x, y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1, maxLife: 1,
+            color: color,
+            size: 2 + Math.random() * 3
+          });
+        }
+      }
+
+      function updateParticles(dt) {
+        for (var i = particles.length - 1; i >= 0; i--) {
+          var p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.05;
+          p.life -= dt / 600;
+          if (p.life <= 0) particles.splice(i, 1);
+        }
+      }
+
+      function drawParticles() {
+        for (var i = 0; i < particles.length; i++) {
+          var p = particles[i];
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, p.life);
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
       }
 
       // 清理过期飘字
@@ -839,6 +1008,9 @@
 
         // 飘字动画（始终绘制于覆盖层之上）
         drawFloatTexts();
+
+        // 粒子效果
+        drawParticles();
       }
 
       // 圆角矩形辅助函数（兼容老 API）
@@ -895,12 +1067,14 @@
       function gameOver() {
         state = 'over';
         if (timer) { clearTimeout(timer); timer = null; }
+        if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
         // 取消 rAF 主循环：游戏结束后不再重绘，节省 CPU
         if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
         if (score > highScore) {
           highScore = score;
           saveHighScore(highScore);
         }
+        if (window.SnakeBGM) { try { window.SnakeBGM.playGameOver(); } catch (e) {} }
         updateHUD();
         setStatus('结束', true);
         startBtn.textContent = '再来一局';
@@ -912,13 +1086,14 @@
         if (state === 'ready' || state === 'over') {
           // 开始新一局
           resetGame();
-          state = 'playing';
-          setStatus('进行中');
-          startBtn.textContent = '暂停';
-          if (timer) clearTimeout(timer);
-          timer = setTimeout(loop, currentSpeed);
-          // 重启 rAF 主循环（上一局 gameOver 时已取消）
-          if (!rafId) rafId = requestAnimationFrame(animLoop);
+          startCountdown(function () {
+            state = 'playing';
+            setStatus('进行中');
+            startBtn.textContent = '暂停';
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(loop, currentSpeed);
+            if (!rafId) rafId = requestAnimationFrame(animLoop);
+          });
         } else if (state === 'playing') {
           // 暂停
           state = 'paused';
@@ -938,10 +1113,84 @@
       function restart() {
         if (timer) { clearTimeout(timer); timer = null; }
         resetGame();
-        state = 'playing';
-        setStatus('进行中');
-        startBtn.textContent = '暂停';
-        timer = setTimeout(loop, currentSpeed);
+        startCountdown(function () {
+          state = 'playing';
+          setStatus('进行中');
+          startBtn.textContent = '暂停';
+          timer = setTimeout(loop, currentSpeed);
+          if (!rafId) rafId = requestAnimationFrame(animLoop);
+        });
+      }
+
+      var countdownVal = 0;
+      var countdownTimer = null;
+      function startCountdown(callback) {
+        countdownVal = 3;
+        drawCountdown();
+        countdownTimer = setInterval(function () {
+          countdownVal--;
+          if (countdownVal <= 0) {
+            clearInterval(countdownTimer);
+            countdownTimer = null;
+            draw();
+            callback();
+          } else {
+            drawCountdown();
+          }
+        }, 700);
+      }
+      function drawCountdown() {
+        var c = colors();
+        ctx.fillStyle = c.bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = c.grid;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        for (var i = 1; i < GRID; i++) {
+          var p = i * CELL;
+          ctx.moveTo(p, 0); ctx.lineTo(p, canvas.height);
+          ctx.moveTo(0, p); ctx.lineTo(canvas.width, p);
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        for (var s = 0; s < snake.length; s++) {
+          var seg = snake[s];
+          var isHead = s === 0;
+          var rx = seg.x * CELL + PAD;
+          var ry = seg.y * CELL + PAD;
+          var rw = CELL - PAD * 2;
+          var radius = Math.max(3, CELL / 4);
+          ctx.fillStyle = isHead ? c.primaryLight : c.primary;
+          roundRect(ctx, rx, ry, rw, rw, radius);
+          ctx.fill();
+        }
+        if (snake.length > 0) drawEyes(snake[0]);
+        if (food.x >= 0) {
+          var fx = food.x * CELL + CELL / 2;
+          var fy = food.y * CELL + CELL / 2;
+          ctx.save();
+          ctx.shadowColor = c.accent;
+          ctx.shadowBlur = 12;
+          ctx.fillStyle = c.accent;
+          ctx.beginPath();
+          ctx.arc(fx, fy, CELL / 2 - PAD - 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = c.accent;
+        ctx.font = '700 72px ' + getComputedStyle(document.body).fontFamily;
+        ctx.shadowColor = c.accent;
+        ctx.shadowBlur = 30;
+        ctx.fillText(countdownVal, canvas.width / 2, canvas.height / 2);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = c.textSecondary;
+        ctx.font = '500 16px ' + getComputedStyle(document.body).fontFamily;
+        ctx.fillText('准备开始', canvas.width / 2, canvas.height / 2 + 60);
       }
 
       // ----- 键盘控制 -----
@@ -975,6 +1224,32 @@
       // ----- 按钮事件 -----
       startBtn.addEventListener('click', startOrToggle);
       restartBtn.addEventListener('click', restart);
+
+      // ----- 移动端滑动控制 -----
+      var touchStartX = 0, touchStartY = 0;
+      var touchMinSwipe = 30;
+      canvas.addEventListener('touchstart', function (e) {
+        if (e.touches.length > 0) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      }, { passive: true });
+      canvas.addEventListener('touchmove', function (e) {
+        e.preventDefault();
+      }, { passive: false });
+      canvas.addEventListener('touchend', function (e) {
+        if (e.changedTouches.length > 0) {
+          var dx = e.changedTouches[0].clientX - touchStartX;
+          var dy = e.changedTouches[0].clientY - touchStartY;
+          var absX = Math.abs(dx), absY = Math.abs(dy);
+          if (Math.max(absX, absY) < touchMinSwipe) return;
+          if (absX > absY) {
+            setDirection(dx > 0 ? 1 : -1, 0);
+          } else {
+            setDirection(0, dy > 0 ? 1 : -1);
+          }
+        }
+      });
 
       // ----- 动画循环（requestAnimationFrame）：负责奖励球计时与平滑绘制 -----
       // 蛇身位移仍由 setTimeout(loop) 驱动；rAF 只负责大球动画、飘字、每帧重绘
@@ -1010,6 +1285,7 @@
 
         // 飘字按真实时间清理（不受暂停影响）
         updateFloatTexts();
+        updateParticles(dt);
 
         // 每帧重绘，保证大球呼吸 / 闪烁 / 缩小动画流畅
         draw();
@@ -1027,6 +1303,760 @@
       // ----- 启动 -----
       resetGame();
       rafId = requestAnimationFrame(animLoop);
+    })();
+
+    /* ============================================================
+     * 背景音乐系统 - 纯代码生成（Web Audio API）
+     * 风格：C大调 · 活泼轻快 · 8-bit复古 · 100BPM · 16小节曲式
+     * ============================================================ */
+    (function bgmSystem() {
+      // ---------- 配置 ----------
+      var STORAGE_KEY = 'snake_bgm_v1';
+      var BPM = 100;
+      var BEAT = 60 / BPM;
+
+      // 完整音符频率表（含升降号，C2 - C6）
+      var NOTE_FREQS = {
+        'C2': 65.41,  'Cs2': 69.30,  'D2': 73.42,  'Eb2': 77.78,  'E2': 82.41,
+        'F2': 87.31,  'Fs2': 92.50,  'G2': 98.00,  'Ab2': 103.83, 'A2': 110.00,
+        'Bb2': 116.54, 'B2': 123.47,
+        'C3': 130.81, 'Cs3': 138.59, 'D3': 146.83, 'Eb3': 155.56, 'E3': 164.81,
+        'F3': 174.61, 'Fs3': 185.00, 'G3': 196.00, 'Ab3': 207.65, 'A3': 220.00,
+        'Bb3': 233.08, 'B3': 246.94,
+        'C4': 261.63, 'Cs4': 277.18, 'D4': 293.66, 'Eb4': 311.13, 'E4': 329.63,
+        'F4': 349.23, 'Fs4': 369.99, 'G4': 392.00, 'Ab4': 415.30, 'A4': 440.00,
+        'Bb4': 466.16, 'B4': 493.88,
+        'C5': 523.25, 'Cs5': 554.37, 'D5': 587.33, 'Eb5': 622.25, 'E5': 659.25,
+        'F5': 698.46, 'Fs5': 739.99, 'G5': 783.99, 'Ab5': 830.61, 'A5': 880.00,
+        'Bb5': 932.33, 'B5': 987.77,
+        'C6': 1046.50
+      };
+
+      function freqOf(name) {
+        return NOTE_FREQS[name] || 261.63;
+      }
+
+      // 和弦进行：C - G - Am - F (经典流行 I-V-vi-IV)
+      // 16小节完整曲式：A(4) + A'(4) + B(4) + A''(4)
+      var CHORDS = [
+        // === A段：主题呈示 (第1-4小节) ===
+        ['C4', 'E4', 'G4'], // 0: C
+        ['G3', 'B3', 'D4'], // 1: G
+        ['A3', 'C4', 'E4'], // 2: Am
+        ['F3', 'A3', 'C4'], // 3: F
+        // === A'段：主题变奏 (第5-8小节) ===
+        ['C4', 'E4', 'G4'], // 4: C
+        ['G3', 'B3', 'D4'], // 5: G
+        ['A3', 'C4', 'E4'], // 6: Am
+        ['F3', 'A3', 'C4'], // 7: F
+        // === B段：对比发展 (第9-12小节) ===
+        ['D3', 'F3', 'A3'], // 8: Dm (下属方向)
+        ['G3', 'B3', 'D4'], // 9: G
+        ['E3', 'Gs3', 'B3'],// 10: E7 (属七张力)
+        ['A3', 'C4', 'E4'], // 11: Am
+        // === A''段：主题再现 (第13-16小节) ===
+        ['F3', 'A3', 'C4'], // 12: F
+        ['C4', 'E4', 'G4'], // 13: C
+        ['G3', 'B3', 'D4'], // 14: G
+        ['C4', 'E4', 'G4']  // 15: C (终止主和弦)
+      ];
+
+      // 琶音模式：每和弦一个8分音符型
+      var ARP_PATTERNS = [
+        [0, 1, 2, 1, 0, 1, 2, 1],
+        [2, 1, 0, 1, 2, 1, 0, 1],
+        [0, 2, 1, 2, 0, 2, 1, 2],
+        [1, 0, 1, 2, 1, 0, 1, 2],
+        [0, 1, 2, 1, 0, 1, 2, 1],
+        [2, 1, 0, 1, 2, 1, 0, 1],
+        [0, 2, 1, 2, 0, 2, 1, 2],
+        [1, 0, 1, 2, 1, 0, 1, 2],
+        [0, 1, 2, 0, 1, 2, 0, 2],
+        [2, 1, 0, 2, 1, 0, 2, 0],
+        [0, 2, 0, 1, 2, 1, 0, 1],
+        [1, 2, 1, 0, 1, 2, 1, 0],
+        [0, 1, 2, 1, 0, 1, 2, 1],
+        [2, 1, 0, 1, 2, 1, 0, 1],
+        [0, 2, 1, 2, 0, 2, 1, 2],
+        [0, 1, 2, 1, 0, 1, 2, 0]
+      ];
+
+      // 低音线（16小节，每拍一个，带跳跃感）
+      var BASSLINE = [
+        // A段
+        ['C3', 1], ['G2', 1], ['C3', 1], ['E3', 1], // C
+        ['G2', 1], ['D3', 1], ['G2', 1], ['B2', 1], // G
+        ['A2', 1], ['E3', 1], ['A2', 1], ['C3', 1], // Am
+        ['F2', 1], ['C3', 1], ['F2', 1], ['A2', 1], // F
+        // A'段 (稍有变化)
+        ['C3', 1], ['G2', 1], ['E3', 1], ['G3', 1], // C
+        ['G2', 1], ['B2', 1], ['D3', 1], ['G3', 1], // G
+        ['A2', 1], ['C3', 1], ['E3', 1], ['A3', 1], // Am
+        ['F2', 1], ['A2', 1], ['C3', 1], ['F3', 1], // F
+        // B段
+        ['D2', 1], ['A2', 1], ['D3', 1], ['F3', 1], // Dm
+        ['G2', 1], ['D3', 1], ['G2', 1], ['B2', 1], // G
+        ['E2', 1], ['B2', 1], ['E3', 1], ['Gs3', 1],// E7
+        ['A2', 1], ['E3', 1], ['A2', 1], ['C3', 1], // Am
+        // A''段
+        ['F2', 1], ['C3', 1], ['F2', 1], ['A2', 1], // F
+        ['C3', 1], ['E3', 1], ['G3', 1], ['C4', 1], // C
+        ['G2', 1], ['B2', 1], ['D3', 1], ['G3', 1], // G
+        ['C3', 1], ['G2', 1], ['C3', 2]              // C (终止音)
+      ];
+
+      // 主旋律（16小节，活泼跳跃的8-bit风格）
+      var MELODY = [
+        // === A段：主题呈示 (第1-4小节) ===
+        // 第1小节 C
+        ['C5', 0.5], ['E5', 0.5], ['G5', 0.5], ['E5', 0.5],
+        ['C5', 0.5], ['E5', 0.5], ['G4', 1],
+        // 第2小节 G
+        ['D5', 0.5], ['G5', 0.5], ['B5', 0.5], ['G5', 0.5],
+        ['D5', 0.5], ['F5', 0.5], ['G4', 1],
+        // 第3小节 Am
+        ['A4', 0.5], ['C5', 0.5], ['E5', 0.5], ['C5', 0.5],
+        ['A4', 0.5], ['B4', 0.5], ['C5', 1],
+        // 第4小节 F
+        ['F4', 0.5], ['A4', 0.5], ['C5', 0.5], ['A4', 0.5],
+        ['F4', 0.5], ['G4', 0.5], ['A4', 1],
+
+        // === A'段：主题变奏 (第5-8小节) ===
+        // 第5小节 C (高八度装饰)
+        ['C5', 0.25], ['E5', 0.25], ['G5', 0.25], ['E5', 0.25],
+        ['C5', 0.25], ['E5', 0.25], ['G5', 0.5], ['E5', 0.5],
+        // 第6小节 G
+        ['G5', 0.25], ['B5', 0.25], ['D6', 0.25], ['B5', 0.25],
+        ['G5', 0.5], ['D5', 0.5], ['G4', 1],
+        // 第7小节 Am
+        ['A4', 0.5], ['E5', 0.5], ['A5', 0.5], ['E5', 0.5],
+        ['C5', 0.5], ['A4', 0.5], ['E4', 1],
+        // 第8小节 F
+        ['F4', 0.5], ['C5', 0.5], ['F5', 0.5], ['C5', 0.5],
+        ['A4', 0.5], ['F4', 0.5], [null, 1],
+
+        // === B段：对比发展 (第9-12小节) ===
+        // 第9小节 Dm
+        ['D5', 1], ['F5', 0.5], ['A5', 0.5],
+        ['G5', 0.5], ['F5', 0.5], ['E5', 1],
+        // 第10小节 G
+        ['B4', 0.5], ['D5', 0.5], ['G5', 0.5], ['D5', 0.5],
+        ['B4', 1], [null, 1],
+        // 第11小节 E7 (张力)
+        ['E5', 0.5], ['Gs5', 0.5], ['B5', 0.5], ['A5', 0.5],
+        ['Gs5', 0.5], ['E5', 0.5], [null, 1],
+        // 第12小节 Am (解决)
+        ['A4', 0.5], ['C5', 0.5], ['E5', 0.5], ['G5', 0.5],
+        ['E5', 1], [null, 1],
+
+        // === A''段：主题再现 (第13-16小节) ===
+        // 第13小节 F
+        ['F4', 0.5], ['A4', 0.5], ['C5', 0.5], ['E5', 0.5],
+        ['D5', 0.5], ['C5', 0.5], ['A4', 1],
+        // 第14小节 C (再现主题)
+        ['C5', 0.5], ['E5', 0.5], ['G5', 0.5], ['E5', 0.5],
+        ['C5', 0.5], ['G4', 0.5], ['C4', 1],
+        // 第15小节 G
+        ['D5', 0.5], ['G5', 0.5], ['B5', 0.5], ['G5', 0.5],
+        ['D5', 0.5], ['G4', 0.5], [null, 1],
+        // 第16小节 C (终止)
+        ['C5', 1], ['E5', 0.5], ['G5', 0.5],
+        ['C6', 1.5], [null, 0.5]
+      ];
+
+      // 打击乐：8-bit风格鼓点（底鼓+踩镲）
+      var KICK_PATTERN = [1, 0, 0.5, 0]; // 底鼓：第1、3拍
+      var HAT_PATTERN  = [0.3, 0.3, 0.3, 0.3]; // 踩镲：每拍都有
+
+      // 各层默认音量配置
+      var LAYER_GAIN = {
+        drone: 0.12,
+        bass: 0.22,
+        arp: 0.12,
+        melody: 0.24,
+        perc: 0.15
+      };
+
+      // ---------- 状态 ----------
+      var audioCtx = null;
+      var masterGain = null;
+
+      var droneGain = null;
+      var bassGain = null;
+      var arpGain = null;
+      var melodyGain = null;
+      var percGain = null;
+
+      var isPlaying = false;
+      var wasPlaying = false;
+      var isUserEnabled = false;
+      var hasInteracted = false;
+      var volume = 0.35;
+
+      var nextNoteTime = 0;
+      var currentChordIdx = 0;
+      var arpStep = 0;
+      var bassStep = 0;
+      var bassTimeInBar = 0;
+      var melodyIdx = 0;
+      var melodyTimeInBar = 0;
+      var totalBeats = 0;
+      var schedulerTimer = null;
+      var LOOKAHEAD = 25;
+      var SCHEDULE_AHEAD = 0.1;
+      var TICK = BEAT * 0.25;
+
+      var droneOscs = [];
+      var droneLfo = null;
+
+      // ---------- 工具 ----------
+      function now() {
+        return audioCtx ? audioCtx.currentTime : 0;
+      }
+
+      function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+      // ---------- 初始化 ----------
+      function initAudio() {
+        if (audioCtx) return true;
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+          console.warn('Web Audio API 不支持');
+          return false;
+        }
+
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 0;
+        masterGain.connect(audioCtx.destination);
+
+        droneGain = audioCtx.createGain();
+        droneGain.gain.value = LAYER_GAIN.drone;
+        droneGain.connect(masterGain);
+
+        bassGain = audioCtx.createGain();
+        bassGain.gain.value = LAYER_GAIN.bass;
+        bassGain.connect(masterGain);
+
+        arpGain = audioCtx.createGain();
+        arpGain.gain.value = LAYER_GAIN.arp;
+        arpGain.connect(masterGain);
+
+        melodyGain = audioCtx.createGain();
+        melodyGain.gain.value = LAYER_GAIN.melody;
+        melodyGain.connect(masterGain);
+
+        percGain = audioCtx.createGain();
+        percGain.gain.value = LAYER_GAIN.perc;
+        percGain.connect(masterGain);
+
+        return true;
+      }
+
+      // ---------- 单音符播放 ----------
+      function playNote(freq, startTime, duration, type, destGain, attack, release, peakGain) {
+        if (!audioCtx) return;
+        attack = attack || 0.01;
+        release = release || 0.08;
+        peakGain = peakGain == null ? 1 : peakGain;
+
+        var osc = audioCtx.createOscillator();
+        osc.type = type;
+        osc.frequency.value = freq;
+
+        var gain = audioCtx.createGain();
+        var st = Math.max(startTime, now());
+        gain.gain.setValueAtTime(0, st);
+        gain.gain.linearRampToValueAtTime(peakGain, st + attack);
+        var sustainEnd = st + duration - release;
+        if (sustainEnd < st + attack) sustainEnd = st + attack;
+        gain.gain.setValueAtTime(peakGain, sustainEnd);
+        gain.gain.linearRampToValueAtTime(0.001, st + duration);
+
+        osc.connect(gain);
+        gain.connect(destGain);
+
+        osc.start(st);
+        osc.stop(st + duration + 0.03);
+
+        osc.onended = function () {
+          try { osc.disconnect(); } catch (e) {}
+          try { gain.disconnect(); } catch (e) {}
+        };
+      }
+
+      // ---------- 打击乐：8-bit底鼓 ----------
+      function playKick(startTime, intensity) {
+        if (!audioCtx) return;
+        intensity = intensity || 1;
+
+        var osc = audioCtx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(120, startTime);
+        osc.frequency.exponentialRampToValueAtTime(45, startTime + 0.1);
+
+        var gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(intensity * 0.7, startTime + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
+
+        osc.connect(gain);
+        gain.connect(percGain);
+        osc.start(startTime);
+        osc.stop(startTime + 0.2);
+
+        osc.onended = function () {
+          try { osc.disconnect(); } catch (e) {}
+          try { gain.disconnect(); } catch (e) {}
+        };
+      }
+
+      // ---------- 打击乐：踩镲（白噪声）----------
+      function playHat(startTime, intensity) {
+        if (!audioCtx) return;
+        intensity = intensity || 0.3;
+
+        var bufferSize = audioCtx.sampleRate * 0.05;
+        var buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        var data = buffer.getChannelData(0);
+        for (var i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+
+        var noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        var highpass = audioCtx.createBiquadFilter();
+        highpass.type = 'highpass';
+        highpass.frequency.value = 7000;
+
+        var gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(intensity * 0.5, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.04);
+
+        noise.connect(highpass);
+        highpass.connect(gain);
+        gain.connect(percGain);
+        noise.start(startTime);
+        noise.stop(startTime + 0.05);
+
+        noise.onended = function () {
+          try { noise.disconnect(); } catch (e) {}
+          try { highpass.disconnect(); } catch (e) {}
+          try { gain.disconnect(); } catch (e) {}
+        };
+      }
+
+      // ---------- 持续音铺底 ----------
+      function startDrone() {
+        if (!audioCtx || droneOscs.length > 0) return;
+
+        var chord = CHORDS[currentChordIdx];
+        var rootF = freqOf(chord[0]);
+
+        var t = now();
+        droneGain.gain.cancelScheduledValues(t);
+        droneGain.gain.setValueAtTime(0, t);
+        droneGain.gain.linearRampToValueAtTime(LAYER_GAIN.drone, t + 1.0);
+
+        var osc1 = audioCtx.createOscillator();
+        osc1.type = 'triangle';
+        osc1.frequency.value = rootF / 2;
+
+        var osc2 = audioCtx.createOscillator();
+        osc2.type = 'triangle';
+        osc2.frequency.value = rootF * 1.5 / 2;
+
+        var lfoOsc = audioCtx.createOscillator();
+        lfoOsc.type = 'sine';
+        lfoOsc.frequency.value = 0.15;
+        var lfoGain = audioCtx.createGain();
+        lfoGain.gain.value = 0.05;
+        lfoOsc.connect(lfoGain);
+        lfoGain.connect(droneGain.gain);
+
+        osc1.connect(droneGain);
+        osc2.connect(droneGain);
+
+        osc1.start(t);
+        osc2.start(t);
+        lfoOsc.start(t);
+
+        droneOscs = [osc1, osc2];
+        droneLfo = lfoOsc;
+      }
+
+      function stopDrone() {
+        if (droneOscs.length === 0 || !audioCtx) return;
+        var t = now();
+        for (var i = 0; i < droneOscs.length; i++) {
+          try {
+            droneOscs[i].frequency.cancelScheduledValues(t);
+            var cur = droneOscs[i].frequency.value;
+            droneOscs[i].frequency.setValueAtTime(cur, t);
+            droneOscs[i].frequency.linearRampToValueAtTime(cur * 0.5, t + 1.2);
+          } catch (e) {}
+        }
+        var curGain = droneGain.gain.value;
+        droneGain.gain.cancelScheduledValues(t);
+        droneGain.gain.setValueAtTime(curGain, t);
+        droneGain.gain.linearRampToValueAtTime(0, t + 1.0);
+
+        var toStop = droneOscs.slice();
+        var lfo = droneLfo;
+        setTimeout(function () {
+          for (var i = 0; i < toStop.length; i++) {
+            try { toStop[i].stop(); } catch (e) {}
+            try { toStop[i].disconnect(); } catch (e) {}
+          }
+          if (lfo) { try { lfo.stop(); lfo.disconnect(); } catch (e) {} }
+        }, 1300);
+        droneOscs = [];
+        droneLfo = null;
+      }
+
+      function updateDroneChord() {
+        if (droneOscs.length === 0 || !audioCtx) return;
+        var chord = CHORDS[currentChordIdx];
+        var rootF = freqOf(chord[0]);
+        var t = now();
+        droneOscs[0].frequency.linearRampToValueAtTime(rootF / 2, t + 0.4);
+        droneOscs[1].frequency.linearRampToValueAtTime(rootF * 1.5 / 2, t + 0.4);
+      }
+
+      // ---------- 调度器 ----------
+      function scheduler() {
+        if (!isPlaying || !audioCtx) return;
+
+        while (nextNoteTime < now() + SCHEDULE_AHEAD) {
+          var t = nextNoteTime;
+          var beatFloat = totalBeats;
+          var beatFloor = Math.floor(beatFloat);
+          var inBeatPos = beatFloat - beatFloor;
+          var barBeat = beatFloor % 4;
+          var barIdx = Math.floor(beatFloor / 4) % CHORDS.length;
+          var tickInBeat = Math.round(inBeatPos / (TICK / BEAT));
+
+          // ----- 低音线调度（按时长调度，与旋律逻辑一致）-----
+          if (bassStep < BASSLINE.length) {
+            if (bassTimeInBar <= 0.001) {
+              var bassNote = BASSLINE[bassStep];
+              if (bassNote) {
+                var bfreq = freqOf(bassNote[0]);
+                playNote(bfreq, t, BEAT * bassNote[1] * 0.8, 'square', bassGain, 0.01, 0.1, 1);
+              }
+              bassTimeInBar = bassNote[1];
+              bassStep++;
+              if (bassStep >= BASSLINE.length) bassStep = 0;
+            }
+            bassTimeInBar -= TICK / BEAT;
+            if (bassTimeInBar < 0) bassTimeInBar = 0;
+          }
+
+          // ----- 每拍触发 -----
+          if (tickInBeat === 0) {
+            // 底鼓
+            var kickIntensity = KICK_PATTERN[barBeat % KICK_PATTERN.length];
+            if (kickIntensity > 0.05) {
+              playKick(t, kickIntensity);
+            }
+            // 踩镲
+            var hatIntensity = HAT_PATTERN[barBeat % HAT_PATTERN.length];
+            if (hatIntensity > 0.05) {
+              playHat(t, hatIntensity);
+            }
+
+            // 每小节换和弦
+            if (barBeat === 0) {
+              currentChordIdx = barIdx % CHORDS.length;
+              updateDroneChord();
+            }
+          }
+
+          // ----- 8分音符触发：踩镲反拍 + 琶音 -----
+          if (tickInBeat === 2) {
+            // 反拍踩镲（轻一点）
+            playHat(t, 0.2);
+
+            // 琶音
+            var chord = CHORDS[currentChordIdx];
+            var patIdx = currentChordIdx % ARP_PATTERNS.length;
+            var pattern = ARP_PATTERNS[patIdx];
+            var noteIdx = pattern[arpStep % pattern.length];
+            var noteName = chord[noteIdx];
+            var arpFreq = freqOf(noteName) * 2;
+            playNote(arpFreq, t, BEAT * 0.3, 'square', arpGain, 0.005, 0.06, 1);
+            arpStep++;
+          }
+
+          // ----- 旋律调度 -----
+          if (melodyIdx < MELODY.length) {
+            var mNote = MELODY[melodyIdx];
+            if (melodyTimeInBar <= 0.001) {
+              if (mNote[0]) {
+                var mFreq = freqOf(mNote[0]);
+                var mDur = BEAT * mNote[1];
+                playNote(mFreq, t, mDur * 0.9, 'square', melodyGain, 0.01, 0.12, 1);
+              }
+              melodyTimeInBar = mNote[1];
+            }
+            melodyTimeInBar -= TICK / BEAT;
+            if (melodyTimeInBar <= 0.001) {
+              melodyTimeInBar = 0;
+              melodyIdx++;
+              if (melodyIdx >= MELODY.length) {
+                melodyIdx = 0;
+                melodyTimeInBar = 0;
+              }
+            }
+          }
+
+          // 推进时间
+          nextNoteTime += TICK;
+          totalBeats += TICK / BEAT;
+        }
+
+        schedulerTimer = setTimeout(scheduler, LOOKAHEAD);
+      }
+
+      // ---------- 播放 / 停止 ----------
+      function play() {
+        if (isPlaying) return;
+        if (!initAudio()) return;
+
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(function () {});
+        }
+
+        isPlaying = true;
+        wasPlaying = true;
+
+        currentChordIdx = 0;
+        arpStep = 0;
+        bassStep = 0;
+        bassTimeInBar = 0;
+        melodyIdx = 0;
+        melodyTimeInBar = 0;
+        totalBeats = 0;
+        nextNoteTime = now() + 0.1;
+
+        startDrone();
+
+        var t = now();
+        masterGain.gain.cancelScheduledValues(t);
+        masterGain.gain.setValueAtTime(0, t);
+        masterGain.gain.linearRampToValueAtTime(volume, t + 1.0);
+
+        scheduler();
+      }
+
+      function stop(preserveWasPlaying) {
+        if (!isPlaying) return;
+        isPlaying = false;
+        if (!preserveWasPlaying) {
+          wasPlaying = false;
+        }
+
+        if (schedulerTimer) {
+          clearTimeout(schedulerTimer);
+          schedulerTimer = null;
+        }
+
+        stopDrone();
+
+        if (audioCtx && masterGain) {
+          var t = now();
+          var cur = masterGain.gain.value;
+          masterGain.gain.cancelScheduledValues(t);
+          masterGain.gain.setValueAtTime(cur, t);
+          masterGain.gain.linearRampToValueAtTime(0, t + 0.6);
+        }
+      }
+
+      function setVolume(v) {
+        volume = clamp(v, 0, 1);
+        if (masterGain && audioCtx && isPlaying) {
+          var t = now();
+          masterGain.gain.cancelScheduledValues(t);
+          masterGain.gain.linearRampToValueAtTime(volume, t + 0.1);
+        }
+      }
+
+      // ---------- 吃食物音效 ----------
+      function playEat() {
+        if (!isUserEnabled) return;
+        if (!initAudio()) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+
+        var t = now();
+        var fxGain = audioCtx.createGain();
+        fxGain.gain.value = 0.5;
+        fxGain.connect(masterGain);
+
+        playNote(freqOf('C5'), t, 0.08, 'square', fxGain, 0.005, 0.05, 1);
+        playNote(freqOf('E5'), t + 0.06, 0.1, 'square', fxGain, 0.005, 0.06, 0.8);
+
+        setTimeout(function () {
+          try { fxGain.disconnect(); } catch (e) {}
+        }, 300);
+      }
+
+      // ---------- 奖励球音效 ----------
+      function playBonus() {
+        if (!isUserEnabled) return;
+        if (!initAudio()) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+
+        var t = now();
+        var fxGain = audioCtx.createGain();
+        fxGain.gain.value = 0.6;
+        fxGain.connect(masterGain);
+
+        var notes = ['C5', 'E5', 'G5', 'C6'];
+        for (var i = 0; i < notes.length; i++) {
+          playNote(freqOf(notes[i]), t + i * 0.07, 0.15, 'square', fxGain, 0.005, 0.08, 1);
+        }
+
+        setTimeout(function () {
+          try { fxGain.disconnect(); } catch (e) {}
+        }, 500);
+      }
+
+      // ---------- 游戏结束音效 ----------
+      function playGameOver() {
+        if (!isUserEnabled) return;
+        if (!initAudio()) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+
+        var t = now();
+        var fxGain = audioCtx.createGain();
+        fxGain.gain.value = 0.6;
+        fxGain.connect(masterGain);
+
+        var notes = ['G4', 'E4', 'C4', 'A3'];
+        for (var i = 0; i < notes.length; i++) {
+          playNote(freqOf(notes[i]), t + i * 0.15, 0.3, 'sawtooth', fxGain, 0.01, 0.15, 0.7);
+        }
+
+        setTimeout(function () {
+          try { fxGain.disconnect(); } catch (e) {}
+        }, 800);
+      }
+
+      // ---------- 存储 ----------
+      function saveSettings() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            v: 1,
+            enabled: isUserEnabled,
+            volume: Math.round(volume * 100)
+          }));
+        } catch (e) {}
+      }
+
+      function loadSettings() {
+        try {
+          var raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            var data = JSON.parse(raw);
+            isUserEnabled = !!data.enabled;
+            if (typeof data.volume === 'number') {
+              volume = clamp(data.volume / 100, 0, 1);
+            }
+          }
+        } catch (e) {
+          try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+        }
+      }
+
+      // ---------- UI 绑定 ----------
+      function initUI() {
+        var toggleBtn = document.getElementById('audioToggle');
+        var volSlider = document.getElementById('audioVol');
+        if (!toggleBtn || !volSlider) return;
+
+        function updateUI() {
+          toggleBtn.classList.toggle('is-on', isUserEnabled);
+          volSlider.value = Math.round(volume * 100);
+        }
+
+        toggleBtn.addEventListener('click', function () {
+          hasInteracted = true;
+          isUserEnabled = !isUserEnabled;
+
+          if (isUserEnabled) {
+            initAudio();
+            if (audioCtx && audioCtx.state === 'suspended') {
+              audioCtx.resume().catch(function () {});
+            }
+            play();
+          } else {
+            stop();
+          }
+
+          saveSettings();
+          updateUI();
+        });
+
+        volSlider.addEventListener('input', function (e) {
+          var val = parseInt(e.target.value, 10) / 100;
+          setVolume(val);
+          saveSettings();
+        });
+
+        // 首次用户交互自动播放
+        function onFirstInteraction() {
+          if (hasInteracted) return;
+          hasInteracted = true;
+          if (isUserEnabled) {
+            initAudio();
+            play();
+          }
+          document.removeEventListener('pointerdown', onFirstInteraction);
+          document.removeEventListener('keydown', onFirstInteraction);
+        }
+        document.addEventListener('pointerdown', onFirstInteraction);
+        document.addEventListener('keydown', onFirstInteraction);
+
+        // 页面可见性变化
+        document.addEventListener('visibilitychange', function () {
+          if (document.hidden) {
+            if (isPlaying) {
+              stop(true);
+            }
+          } else {
+            if (isUserEnabled && wasPlaying && !isPlaying) {
+              play();
+            }
+          }
+        });
+
+        // 页面卸载
+        window.addEventListener('beforeunload', function () {
+          stop();
+        });
+
+        loadSettings();
+        updateUI();
+      }
+
+      // ---------- 公共 API ----------
+      window.SnakeBGM = {
+        play: play,
+        stop: stop,
+        setVolume: setVolume,
+        playEat: playEat,
+        playBonus: playBonus,
+        playGameOver: playGameOver,
+        isEnabled: function () { return isUserEnabled; }
+      };
+
+      // 自动初始化
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initUI);
+      } else {
+        initUI();
+      }
     })();
   </script>
 </body>

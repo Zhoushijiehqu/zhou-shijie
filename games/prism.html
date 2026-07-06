@@ -328,6 +328,11 @@ body { overflow-wrap: break-word; }
   padding: 6px 12px; background: rgba(var(--color-bg-primary-rgb, 26,26,46), 0.85);
   border: 1px solid var(--border); border-radius: var(--radius-full); backdrop-filter: blur(8px);
 }
+.hud-progress {
+  font-size: 12px; color: var(--text-muted); letter-spacing: 1px;
+  padding: 6px 12px; background: rgba(var(--color-bg-primary-rgb, 26,26,46), 0.85);
+  border: 1px solid var(--border); border-radius: var(--radius-full); backdrop-filter: blur(8px);
+}
 .hud-hint {
   position: absolute; top: 50px; left: 50%; transform: translateX(-50%);
   padding: 8px 18px; background: rgba(0,229,255,0.1);
@@ -410,6 +415,7 @@ body { overflow-wrap: break-word; }
       <div class="hud-left">
         <button class="hud-btn" id="btn-back-menu">← 菜单</button>
         <span class="hud-level" id="hud-level-text">第 1 关</span>
+        <span class="hud-progress" id="hud-progress-text">0/0</span>
       </div>
       <div class="hud-right">
         <button class="hud-btn" id="btn-auto-solve">💡 看答案</button>
@@ -476,6 +482,7 @@ body { overflow-wrap: break-word; }
   const gameHUD = document.getElementById('game-hud');
   const hudHint = document.getElementById('hud-hint');
   const hudLevelText = document.getElementById('hud-level-text');
+  const hudProgressText = document.getElementById('hud-progress-text');
   const winModal = document.getElementById('win-modal');
   const winMsg = document.getElementById('win-msg');
   const autoSolveIndicator = document.getElementById('auto-solve-indicator');
@@ -887,8 +894,8 @@ body { overflow-wrap: break-word; }
         { id: 's0', type: 'SPLITTER', x: 180, y: 225, angle: 0, targetAngle: -3.0209 },
         { id: 's1', type: 'SPLITTER', x: 320, y: 130, angle: 0, targetAngle: 0.451 },
         { id: 's2', type: 'SPLITTER', x: 320, y: 320, angle: 0, targetAngle: -1.617 },
-        { id: 'p0', type: 'PRISM', x: 480, y: 80, angle: 0, targetAngle: -2.7369, size: 32 },
-        { id: 'p1', type: 'PRISM', x: 480, y: 370, angle: 0, targetAngle: -1.6779, size: 32 },
+        { id: 'pm0', type: 'MIRROR', x: 480, y: 80, angle: 0, static: true, width: 100 },
+        { id: 'pm1', type: 'MIRROR', x: 480, y: 370, angle: 0, static: true, width: 100 },
         { id: 'm0', type: 'MIRROR', x: 600, y: 180, angle: 0, targetAngle: 0.6372 },
         { id: 'm1', type: 'MIRROR', x: 600, y: 270, angle: 0, targetAngle: -0.0282 }
       ],
@@ -950,6 +957,10 @@ body { overflow-wrap: break-word; }
   let autoSolveStartTime = 0;
   let autoSolveStartAngles = [];
   let autoSolveDeltas = [];
+  let cachedSegments = null;
+  let cachedAngles = null;
+  let particles = [];
+  let winParticlesActive = false;
 
   // ============ Math Helpers ============
   function vec2(x, y) { return { x, y }; }
@@ -1113,13 +1124,14 @@ body { overflow-wrap: break-word; }
       case 'PRISM': {
         const verts = getPrismVerts(hitComp);
         const internalDir = refractSimple(direction, hitNormal, 1.5);
+        const internalStart = { x: hitPoint.x + internalDir.x * offsetDist, y: hitPoint.y + internalDir.y * offsetDist };
         let exitPoint = null;
         let exitNormal = null;
         let exitDist = Infinity;
         for (let i = 0; i < 3; i++) {
           if (i === hitEdgeIdx) continue;
           const a = verts[i], b = verts[(i + 1) % 3];
-          const exitHit = raySegmentIntersect(hitPoint, internalDir, a, b);
+          const exitHit = raySegmentIntersect(internalStart, internalDir, a, b);
           if (exitHit && exitHit.dist > EPSILON && exitHit.dist < exitDist) {
             exitDist = exitHit.dist;
             exitPoint = exitHit.point;
@@ -1128,8 +1140,8 @@ body { overflow-wrap: break-word; }
         }
         if (!exitPoint) {
           const size = hitComp.size || 44;
-          exitPoint = { x: hitPoint.x + direction.x * size * 0.7, y: hitPoint.y + direction.y * size * 0.7 };
-          exitNormal = { x: -direction.x, y: -direction.y };
+          exitPoint = { x: internalStart.x + internalDir.x * size * 0.7, y: internalStart.y + internalDir.y * size * 0.7 };
+          exitNormal = { x: -internalDir.x, y: -internalDir.y };
         }
         const exitDir = refractSimple(internalDir, exitNormal, 1 / 1.5);
         const exitOrigin = { x: exitPoint.x + exitDir.x * offsetDist, y: exitPoint.y + exitDir.y * offsetDist };
@@ -1152,6 +1164,74 @@ body { overflow-wrap: break-word; }
         break;
       }
     }
+  }
+
+  // ============ Particle System ============
+  function spawnWinParticles() {
+    const lv = levels[currentLevel];
+    for (const t of lv.targets) {
+      for (let i = 0; i < 20; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1 + Math.random() * 3;
+        particles.push({
+          x: t.x, y: t.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 1,
+          decay: 0.01 + Math.random() * 0.015,
+          size: 2 + Math.random() * 3,
+          color: t.color
+        });
+      }
+    }
+    for (let i = 0; i < 40; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * 4;
+      particles.push({
+        x: VW / 2, y: VH / 2,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1,
+        decay: 0.008 + Math.random() * 0.01,
+        size: 3 + Math.random() * 4,
+        color: ['#ffffff', '#00e5ff', '#ffd700'][Math.floor(Math.random() * 3)]
+      });
+    }
+    winParticlesActive = true;
+  }
+
+  function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.05;
+      p.life -= p.decay;
+      if (p.life <= 0) {
+        particles.splice(i, 1);
+      }
+    }
+    if (particles.length === 0 && winParticlesActive) {
+      winParticlesActive = false;
+    }
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function getComponentsAngleSignature() {
+    return components.map(c => c.angle.toFixed(5)).join(',');
   }
 
   // ============ Rendering ============
@@ -1191,26 +1271,21 @@ body { overflow-wrap: break-word; }
     for (const [color, segs] of Object.entries(groups)) {
       const c = colorMap[color] || 'rgba(255,255,255,0.7)';
       const g = glowMap[color] || 'rgba(255,255,255,0.3)';
+      const path = new Path2D();
+      for (const seg of segs) {
+        path.moveTo(seg.from.x, seg.from.y);
+        path.lineTo(seg.to.x, seg.to.y);
+      }
       ctx.save();
       ctx.shadowColor = g;
       ctx.shadowBlur = 10;
       ctx.strokeStyle = c;
       ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      for (const seg of segs) {
-        ctx.moveTo(seg.from.x, seg.from.y);
-        ctx.lineTo(seg.to.x, seg.to.y);
-      }
-      ctx.stroke();
+      ctx.stroke(path);
       ctx.restore();
       ctx.strokeStyle = c;
       ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      for (const seg of segs) {
-        ctx.moveTo(seg.from.x, seg.from.y);
-        ctx.lineTo(seg.to.x, seg.to.y);
-      }
-      ctx.stroke();
+      ctx.stroke(path);
     }
   }
 
@@ -1257,6 +1332,7 @@ body { overflow-wrap: break-word; }
 
   function drawComponent(comp) {
     const isStatic = comp.static === true;
+    const isDragging = dragging === comp;
     ctx.save();
     if (comp.type === 'MIRROR' || comp.type === 'SPLITTER') {
       const ep = getMirrorEndpoints(comp);
@@ -1267,8 +1343,13 @@ body { overflow-wrap: break-word; }
       const dotColor = isStatic ? '#555555' : (isSplitter ? '#00e5ff' : '#ffffff');
       const labelColor = isStatic ? 'rgba(120,120,120,0.4)' : (isSplitter ? 'rgba(0,229,255,0.6)' : 'rgba(255,255,255,0.5)');
 
-      ctx.shadowColor = glowColor;
-      ctx.shadowBlur = isStatic ? 3 : 8;
+      if (isDragging) {
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = 16;
+      } else {
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = isStatic ? 3 : 8;
+      }
       ctx.strokeStyle = baseColor;
       ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(ep.a.x, ep.a.y); ctx.lineTo(ep.b.x, ep.b.y); ctx.stroke();
@@ -1298,8 +1379,13 @@ body { overflow-wrap: break-word; }
       const dotC = isStaticPrism ? '#777777' : '#b388ff';
       const labelC = isStaticPrism ? 'rgba(120,120,120,0.4)' : 'rgba(179,136,255,0.6)';
 
-      ctx.shadowColor = glowC;
-      ctx.shadowBlur = isStaticPrism ? 3 : 10;
+      if (isDragging) {
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = 18;
+      } else {
+        ctx.shadowColor = glowC;
+        ctx.shadowBlur = isStaticPrism ? 3 : 10;
+      }
       ctx.fillStyle = fillC;
       ctx.beginPath();
       ctx.moveTo(verts[0].x, verts[0].y);
@@ -1338,10 +1424,18 @@ body { overflow-wrap: break-word; }
     drawGrid();
 
     const lv = levels[currentLevel];
-    const allSegments = [];
-    for (const em of lv.emitters) {
-      const dir = { x: Math.cos(em.angle), y: Math.sin(em.angle) };
-      castRay({ x: em.x, y: em.y }, dir, em.color, 0, allSegments);
+    const angleSig = getComponentsAngleSignature();
+    let allSegments;
+    if (cachedSegments && cachedAngles === angleSig) {
+      allSegments = cachedSegments;
+    } else {
+      allSegments = [];
+      for (const em of lv.emitters) {
+        const dir = { x: Math.cos(em.angle), y: Math.sin(em.angle) };
+        castRay({ x: em.x, y: em.y }, dir, em.color, 0, allSegments);
+      }
+      cachedSegments = allSegments;
+      cachedAngles = angleSig;
     }
 
     drawBeams(allSegments);
@@ -1373,6 +1467,9 @@ body { overflow-wrap: break-word; }
     for (const em of lv.emitters) drawEmitter(em);
     for (const comp of components) drawComponent(comp);
 
+    drawParticles();
+    updateParticles();
+
     if (gameState === 'playing' && litTargets.size === lv.targets.length && lv.targets.length > 0) {
       handleWin();
     }
@@ -1387,6 +1484,7 @@ body { overflow-wrap: break-word; }
       progress.highestUnlocked = currentLevel + 1;
     }
     saveProgress(progress);
+    spawnWinParticles();
     winMsg.textContent = currentLevel < 29
       ? `第 ${currentLevel + 1} 关 · ${LEVEL_NAMES[currentLevel]} 完成`
       : '恭喜！你已完成全部 30 个关卡！';
@@ -1414,13 +1512,39 @@ body { overflow-wrap: break-word; }
   function findComponentAt(pos) {
     for (const comp of components) {
       if (comp.static) continue;
-      const dx = pos.x - comp.x;
-      const dy = pos.y - comp.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      // 动态计算点击抓取半径：平面镜和分光片为其宽度的一半加富余，确保整面镜面任意位置均可响应点击
-      const radiusBasis = comp.type === 'PRISM' ? (comp.size || 44) : (comp.width || DEFAULT_MIRROR_WIDTH);
-      const hitRadius = comp.type === 'PRISM' ? radiusBasis * 0.9 : (radiusBasis / 2 + 12);
-      if (dist < hitRadius) return comp;
+      if (comp.type === 'PRISM') {
+        const verts = getPrismVerts(comp);
+        let inside = true;
+        for (let i = 0; i < 3; i++) {
+          const a = verts[i], b = verts[(i + 1) % 3];
+          const edge = { x: b.x - a.x, y: b.y - a.y };
+          const vp = { x: pos.x - a.x, y: pos.y - a.y };
+          const cross = edge.x * vp.y - edge.y * vp.x;
+          if (cross > 0) { inside = false; break; }
+        }
+        if (inside) return comp;
+        const dx = pos.x - comp.x;
+        const dy = pos.y - comp.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < (comp.size || 44) * 0.8) return comp;
+      } else {
+        const ep = getMirrorEndpoints(comp);
+        const ax = ep.b.x - ep.a.x;
+        const ay = ep.b.y - ep.a.y;
+        const px = pos.x - ep.a.x;
+        const py = pos.y - ep.a.y;
+        const segLen2 = ax * ax + ay * ay;
+        let proj = segLen2 > 0.001 ? (px * ax + py * ay) / segLen2 : 0;
+        proj = Math.max(0, Math.min(1, proj));
+        const cx = ep.a.x + proj * ax;
+        const cy = ep.a.y + proj * ay;
+        const dist = Math.sqrt((pos.x - cx) * (pos.x - cx) + (pos.y - cy) * (pos.y - cy));
+        if (dist < 14) return comp;
+        const dx = pos.x - comp.x;
+        const dy = pos.y - comp.y;
+        const distCenter = Math.sqrt(dx * dx + dy * dy);
+        if (distCenter < 20) return comp;
+      }
     }
     return null;
   }
@@ -1439,9 +1563,12 @@ body { overflow-wrap: break-word; }
     if (!dragging) return;
     try { canvas.releasePointerCapture(e.pointerId); } catch(ex) {}
     dragging = null;
+    canvas.style.cursor = 'default';
     document.removeEventListener('pointermove', onPointerMove);
     document.removeEventListener('pointerup', onPointerUp);
     document.removeEventListener('pointercancel', onPointerUp);
+    cachedSegments = null;
+    cachedAngles = null;
   }
 
   canvas.addEventListener('pointerdown', function(e) {
@@ -1453,12 +1580,22 @@ body { overflow-wrap: break-word; }
       dragging = comp;
       dragStartAngle = Math.atan2(pos.y - comp.y, pos.x - comp.x);
       dragCompStartAngle = comp.angle;
+      canvas.style.cursor = 'grabbing';
       canvas.setPointerCapture(e.pointerId);
       document.addEventListener('pointermove', onPointerMove);
       document.addEventListener('pointerup', onPointerUp);
       document.addEventListener('pointercancel', onPointerUp);
+      cachedSegments = null;
+      cachedAngles = null;
       e.preventDefault();
     }
+  });
+
+  canvas.addEventListener('pointermove', function(e) {
+    if (gameState !== 'playing' || dragging) return;
+    const pos = getCanvasPos(e);
+    const comp = findComponentAt(pos);
+    canvas.style.cursor = comp ? 'grab' : 'default';
   });
 
   canvas.addEventListener('touchmove', function(e) {
@@ -1539,6 +1676,12 @@ body { overflow-wrap: break-word; }
     winModal.classList.remove('active');
     gameHUD.style.display = 'flex';
     hudLevelText.textContent = `第 ${idx + 1} 关 · ${LEVEL_NAMES[idx]}`;
+    const clearedCount = Object.keys(progress.cleared).length;
+    hudProgressText.textContent = `进度 ${clearedCount}/${levels.length}`;
+    cachedSegments = null;
+    cachedAngles = null;
+    particles = [];
+    winParticlesActive = false;
     if (lv.hint) {
       hudHint.style.display = 'block';
       hudHint.textContent = lv.hint;
@@ -1631,6 +1774,50 @@ body { overflow-wrap: break-word; }
   });
   settingMode.addEventListener('change', () => { gameMode = settingMode.value; saveSettings(); });
 
+  // ============ Keyboard Shortcuts ============
+  document.addEventListener('keydown', function(e) {
+    if (gameState === 'playing' || gameState === 'won' || gameState === 'autoSolving') {
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        startLevel(currentLevel);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (winModal.classList.contains('active')) {
+          winModal.classList.remove('active');
+        }
+        showMenu();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (currentLevel > 0) {
+          if (gameMode === 'free' || currentLevel <= progress.highestUnlocked) {
+            startLevel(currentLevel - 1);
+          }
+        }
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (currentLevel < levels.length - 1) {
+          if (gameMode === 'free' || currentLevel + 1 <= progress.highestUnlocked) {
+            startLevel(currentLevel + 1);
+          }
+        }
+      }
+    } else if (gameState === 'levelSelect') {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        showMenu();
+      }
+    } else if (gameState === 'settings') {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        showMenu();
+      }
+    } else if (gameState === 'menu') {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+      }
+    }
+  });
+
   // ============ Viewport Scaling (适配顶部 sticky header) ============
   function resizeViewport() {
     const maxW = window.innerWidth - 40;
@@ -1642,6 +1829,14 @@ body { overflow-wrap: break-word; }
   }
   window.addEventListener('resize', resizeViewport);
   resizeViewport();
+
+  // ============ Cleanup ============
+  window.addEventListener('beforeunload', function() {
+    if (animationId) {
+      cancelAnimationFrame(animationId);
+      animationId = null;
+    }
+  });
 
   // ============ Init ============
   loadSettings();

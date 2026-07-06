@@ -1089,14 +1089,20 @@ var App = {
   // ---- LEVEL SELECT GRID ----
   _renderLevelGrid: function() {
     var self = this;
-    var html = '';
+    var total = 20;
+    var completed = self.completedLevels.length;
+    var progress = Math.min(100, Math.round((completed / total) * 100));
+    var html = '<div style="width:100%;max-width:640px;margin-bottom:8px;text-align:center;">';
+    html += '<span style="font-size:0.85rem;color:var(--text-muted);letter-spacing:0.06em;">';
+    html += '已通关 ' + completed + ' / ' + total + ' · ' + progress + '%';
+    html += '</span></div>';
     for (var i = 1; i <= 20; i++) {
       var level = levels[i]; // levels[1] = id:1
       var locked = (self.mode === 'linear' && i > self.maxUnlocked);
-      var completed = self.completedLevels.indexOf(i) !== -1;
+      var isCompleted = self.completedLevels.indexOf(i) !== -1;
       var cls = 'level-card';
       if (locked) cls += ' locked';
-      if (completed) cls += ' completed';
+      if (isCompleted) cls += ' completed';
       html += '<div class="' + cls + '" data-index="' + i + '">';
       html += '<span class="level-num">' + i + '</span>';
       html += '<span class="level-card-name">' + level.title + '</span>';
@@ -1319,14 +1325,6 @@ var App = {
     var triggerEl = this.gameState.elements.get(triggerId);
     if (!triggerEl || !triggerEl.visible) return;
 
-    var triggerDom = triggerEl.dom;
-    var triggerRect = triggerDom.getBoundingClientRect();
-    // trigger 中心点（屏幕坐标）
-    var tcx = triggerRect.left + triggerRect.width / 2;
-    var tcy = triggerRect.top + triggerRect.height / 2;
-    // trigger 等效半径（取宽高较大值的一半，作为命中半径）
-    var triggerRadius = Math.max(triggerRect.width, triggerRect.height) / 2;
-
     for (var i = 0; i < level.rules.length; i++) {
       var rule = level.rules[i];
       if (rule.trigger !== triggerId) continue;
@@ -1334,16 +1332,22 @@ var App = {
       var targetEl = this.gameState.elements.get(rule.target);
       if (!targetEl || !targetEl.visible) continue;
 
-      var targetDom = targetEl.dom;
-      var targetRect = targetDom.getBoundingClientRect();
-      // target 中心点
-      var tcx2 = targetRect.left + targetRect.width / 2;
-      var tcy2 = targetRect.top + targetRect.height / 2;
-      var targetRadius = Math.max(targetRect.width, targetRect.height) / 2;
+      // 使用视口内逻辑坐标（800x450坐标系）计算，避免缩放影响判定
+      var tcx = triggerEl.x;
+      var tcy = triggerEl.y;
+      var triggerRadius = (triggerEl.fontSize || 40) * 0.8;
 
-      // 条件 1：边界框是否相交（任意重叠）
-      var overlapX = Math.max(0, Math.min(triggerRect.right, targetRect.right) - Math.max(triggerRect.left, targetRect.left));
-      var overlapY = Math.max(0, Math.min(triggerRect.bottom, targetRect.bottom) - Math.max(triggerRect.top, targetRect.top));
+      var tcx2 = targetEl.x;
+      var tcy2 = targetEl.y;
+      var targetRadius = (targetEl.fontSize || 48) * 0.8;
+
+      // 条件 1：边界框是否相交（基于逻辑坐标和字体大小估算）
+      var triggerHalfW = triggerRadius;
+      var triggerHalfH = triggerRadius;
+      var targetHalfW = targetRadius;
+      var targetHalfH = targetRadius;
+      var overlapX = Math.max(0, Math.min(tcx + triggerHalfW, tcx2 + targetHalfW) - Math.max(tcx - triggerHalfW, tcx2 - targetHalfW));
+      var overlapY = Math.max(0, Math.min(tcy + triggerHalfH, tcy2 + targetHalfH) - Math.max(tcy - triggerHalfH, tcy2 - targetHalfH));
       var intersect = overlapX > 0 && overlapY > 0;
 
       // 条件 2：中心距离 ≤ 两半径之和 + 80px 余量（靠近即触发，大范围）
@@ -1357,17 +1361,17 @@ var App = {
       if (rule.extraTarget) {
         var extraEl = this.gameState.elements.get(rule.extraTarget);
         if (!extraEl || !extraEl.visible) continue;
-        var extraDom = extraEl.dom;
-        var extraRect = extraDom.getBoundingClientRect();
-        var ecx = extraRect.left + extraRect.width / 2;
-        var ecy = extraRect.top + extraRect.height / 2;
-        var extraRadius = Math.max(extraRect.width, extraRect.height) / 2;
+        var ecx = extraEl.x;
+        var ecy = extraEl.y;
+        var extraRadius = (extraEl.fontSize || 44) * 0.8;
         // extra 用更宽松的余量（+100px）
         var exCenterDist = Math.sqrt((tcx - ecx) * (tcx - ecx) + (tcy - ecy) * (tcy - ecy));
         var exThreshold = triggerRadius + extraRadius + 100;
         // extra 也检查边界框相交
-        var exOX = Math.max(0, Math.min(triggerRect.right, extraRect.right) - Math.max(triggerRect.left, extraRect.left));
-        var exOY = Math.max(0, Math.min(triggerRect.bottom, extraRect.bottom) - Math.max(triggerRect.top, extraRect.top));
+        var exHalfW = extraRadius;
+        var exHalfH = extraRadius;
+        var exOX = Math.max(0, Math.min(tcx + triggerHalfW, ecx + exHalfW) - Math.max(tcx - triggerHalfW, ecx - exHalfW));
+        var exOY = Math.max(0, Math.min(tcy + triggerHalfH, ecy + exHalfH) - Math.max(tcy - triggerHalfH, ecy - exHalfH));
         var exIntersect = exOX > 0 && exOY > 0;
         if (!exIntersect && exCenterDist > exThreshold) continue;
       }
@@ -1577,13 +1581,13 @@ var App = {
       elData.x += speed;
       elData.dom.style.left = elData.x + 'px';
 
-      var rabbitRect = elData.dom.getBoundingClientRect();
-      var stumpRect = stumpEl.dom.getBoundingClientRect();
-      var overlapX = Math.max(0, Math.min(rabbitRect.right, stumpRect.right) - Math.max(rabbitRect.left, stumpRect.left));
-      var overlapY = Math.max(0, Math.min(rabbitRect.bottom, stumpRect.bottom) - Math.max(rabbitRect.top, stumpRect.top));
-      var rabbitArea = rabbitRect.width * rabbitRect.height;
+      var rabbitRadius = (elData.fontSize || 40) * 0.6;
+      var stumpRadius = (stumpEl.fontSize || 52) * 0.6;
+      var dx = elData.x - stumpEl.x;
+      var dy = elData.y - stumpEl.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (rabbitArea > 0 && (overlapX * overlapY) / rabbitArea > 0.25) {
+      if (dist < rabbitRadius + stumpRadius) {
         elData.dom.textContent = '倒';
         elData.dom.style.transform = 'translate(-50%, -50%) rotate(90deg)';
         elData.dom.style.opacity = '0.6';
@@ -1610,11 +1614,16 @@ var App = {
     var earthEl = gs.elements.get('env_earth');
     if (!skyEl || !earthEl) return;
 
-    var personRect = elData.dom.getBoundingClientRect();
-    var skyRect = skyEl.dom.getBoundingClientRect();
-    var earthRect = earthEl.dom.getBoundingClientRect();
+    var personHalfH = elData.fontSize * 0.6;
+    var skyHalfH = (skyEl.fontSize || 48) * 0.5;
+    var earthHalfH = (earthEl.fontSize || 48) * 0.5;
 
-    if (personRect.top <= skyRect.bottom && personRect.bottom >= earthRect.top) {
+    var personTop = elData.y - personHalfH;
+    var personBottom = elData.y + personHalfH;
+    var skyBottom = skyEl.y + skyHalfH;
+    var earthTop = earthEl.y - earthHalfH;
+
+    if (personTop <= skyBottom && personBottom >= earthTop) {
       gs.flags.set('touchingBoth', true);
       this._spawnParticles(elData.x, elData.y);
       if (gs.level.checkWin(gs)) this._onWin();
@@ -1992,6 +2001,23 @@ var App = {
 // ---- BOOT ----
 document.addEventListener('DOMContentLoaded', function() {
   App.init();
+});
+
+// ---- 键盘快捷键 ----
+document.addEventListener('keydown', function(e) {
+  if (!App || !App.gameState) return;
+  if (e.key === 'r' || e.key === 'R') {
+    if (App.currentLevelIndex >= 0) {
+      App._loadLevel(App.currentLevelIndex);
+      e.preventDefault();
+    }
+  } else if (e.key === 'Escape') {
+    if (App.scenes && App.scenes.gameplay && App.scenes.gameplay.classList.contains('active')) {
+      App._cleanup();
+      App._showScene('levelSelect');
+      e.preventDefault();
+    }
+  }
 });
 </script>
 </body>

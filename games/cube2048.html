@@ -19,10 +19,18 @@
 
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧊</text></svg>">
 
+  <!-- PWA：manifest + 主题色 -->
+  <link rel="manifest" href="../manifest.webmanifest">
+  <meta name="theme-color" content="#d4ab6a">
+
   <script>
     (function () {
-      var saved = localStorage.getItem('theme');
-      document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      try {
+        var saved = localStorage.getItem('theme');
+        document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
     })();
   </script>
 
@@ -398,6 +406,13 @@
             <span class="v" id="speedVal" style="font-size:13px;min-width:32px;text-align:right;">1.0×</span>
           </div>
           <div class="opt-row">
+            <span class="opt-label">色盲</span>
+            <div class="seg" id="cbSeg">
+              <button data-cb="off" class="active">关</button>
+              <button data-cb="on">开</button>
+            </div>
+          </div>
+          <div class="opt-row">
             <span class="opt-label">音效</span>
             <div class="seg" id="soundSeg">
               <button data-sound="on" class="active">开</button>
@@ -418,10 +433,14 @@
           <div class="btn-row" style="margin-top: 10px;">
             <button class="btn" id="undoBtn">撤销</button>
             <button class="btn" id="resetViewBtn">重置视角</button>
+            <button class="btn" id="btnShot" aria-label="截图">📷</button>
+            <button class="btn" id="btnFullscreen" aria-label="全屏" title="全屏">⛶</button>
           </div>
           <div class="btn-row" style="margin-top: 8px;">
-            <button class="btn" id="screenshotBtn">截图</button>
             <button class="btn primary" id="restartBtn">重新开始</button>
+          </div>
+          <div class="btn-row" style="margin-top: 8px;">
+            <button class="btn" id="btnDaily" title="每日挑战（同一天所有人方块序列相同，仅一次）">🏆 今日挑战</button>
           </div>
         </div>
 
@@ -448,7 +467,7 @@
   </main>
 
   <!-- 弹窗 -->
-  <div class="modal-mask" id="modalMask">
+  <div class="modal-mask" id="modalMask" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal">
       <h2 id="modalTitle">游戏结束</h2>
       <p id="modalText">已无可合并数字</p>
@@ -461,6 +480,8 @@
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <script src="../assets/js/game-utils.js"></script>
 
   <!-- Three.js 模块 -->
   <script type="importmap">
@@ -603,7 +624,9 @@
       slideMode: false,   // 滑动模式（触屏拖拽滑动）
       skin: 'classic',
       soundOn: true,
-      speedMul: 1.0
+      speedMul: 1.0,
+      colorblind: false,
+      dailySeed: null     // 每日挑战种子（非 null 时启用种子化生成）
     };
     const KEY_SAVE = 'cube2048_save_v2';
     const KEY_BEST = 'cube2048_best_v2';
@@ -630,11 +653,23 @@
       return cells;
     }
 
+    // ----- 每日挑战种子化伪随机（mulberry32）-----
+    let _seedState = 0;
+    function setDailySeed(seed) { state.dailySeed = seed; _seedState = (seed >>> 0) || 1; }
+    function clearDailySeed() { state.dailySeed = null; }
+    function seededRand() {
+      _seedState = (_seedState + 0x6D2B79F5) | 0;
+      let t = Math.imul(_seedState ^ (_seedState >>> 15), 1 | _seedState);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+    function pickRand() { return state.dailySeed ? seededRand() : Math.random(); }
+
     function spawnBlock() {
       const cells = emptyCells();
       if (!cells.length) return null;
-      const [f,r,c] = cells[Math.floor(Math.random()*cells.length)];
-      const value = Math.random() < 0.9 ? 2 : 4;
+      const [f,r,c] = cells[Math.floor(pickRand()*cells.length)];
+      const value = pickRand() < 0.9 ? 2 : 4;
       const b = { id: state.nextId++, value, face: f, r, c, merged: false, consumed: false, mesh: null, spawnT: 0 };
       state.board[f][r][c] = b;
       state.blocks.push(b);
@@ -756,7 +791,7 @@
               result.push(blocks[i]);
               renderer.queueMergeFx(blocks[i]);
               mergePairs.push({ consumed: blocks[i+1], survivor: blocks[i] });
-              audio.play('merge');
+              audio.play('merge', blocks[i].value);
               i++;
             } else {
               result.push(blocks[i]);
@@ -796,7 +831,7 @@
           else if (dr > 0) for (let c=0;c<G;c++) edgeCells.push([f,G-1,c]);
           else if (dc < 0) for (let r=0;r<G;r++) edgeCells.push([f,r,0]);
           else for (let r=0;r<G;r++) edgeCells.push([f,r,G-1]);
-          for (const [r,c] of edgeCells) {
+          for (const [, r, c] of edgeCells) {
             const b = state.board[f][r][c];
             if (!b || b.consumed || b.merged) continue;
             const key = b.id;
@@ -818,7 +853,7 @@
               moved = true;
               renderer.queueMergeFx(target);
               renderer.killBlock(b, target);
-              audio.play('merge');
+              audio.play('merge', target.value);
             }
           }
         }
@@ -875,6 +910,7 @@
             state.won = true;
             audio.play('win');
             ui.showModal('win');
+            if (window.GameUtils) GameUtils.celebrate();
             return;
           }
         }
@@ -900,12 +936,31 @@
         audio.play('over');
         storage.saveStats();
         storage.saveLeaderboard();
+        // 成绩历史曲线（项13）+ 每日挑战记录（项11）
+        if (window.GameUtils) {
+          GameUtils.recordScore('cube2048', state.score);
+          if (state.dailySeed) {
+            const ok = GameUtils.recordDaily('cube2048', state.score);
+            if (ok) GameUtils._toast('🏆 今日挑战成绩已记录：' + state.score + ' 分', 2500);
+            clearDailySeed();
+          }
+        }
+        ui.renderLeaderboard(); // 刷新侧栏排行榜，避免弹窗弹出时排行榜仍是旧数据
         ui.showModal('over');
       },
 
       updateMaxEver() {
         for (const b of state.blocks) {
           if (b.value > state.maxEver) state.maxEver = b.value;
+        }
+        // 成就触发：maxEver 为历史最高数字，是“是否合成过某数字”的真实指标
+        if (window.GameUtils) {
+          if (!GameUtils.isUnlocked('cube_512') && state.maxEver >= 512) {
+            GameUtils.unlock('cube_512', '立体合成', '魔方合成 512');
+          }
+          if (!GameUtils.isUnlocked('cube_2048') && state.maxEver >= 2048) {
+            GameUtils.unlock('cube_2048', '三千世界', '魔方合成 2048');
+          }
         }
       },
 
@@ -929,6 +984,7 @@
       },
 
       undo() {
+        if (state.over) { ui.toast('游戏已结束，无法撤销'); return; }
         if (!state.snapshot) { ui.toast('无可撤销操作'); return; }
         renderer.clearAll();
         state.board = newBoard();
@@ -961,7 +1017,7 @@
     const renderer = {
       scene: null, camera: null, ctrl: null, three: null, threeRenderer: null,
       texCache: {}, matCache: {}, meshPool: [], mergeFx: [], particles: [],
-      cubeBody: null, bodyMeshes: [], blockGeo: null,
+      cubeBody: null, bodyMeshes: [], blockGeo: null, gridTex: null,
 
       init() {
         const canvas = document.getElementById('cubeCanvas');
@@ -994,11 +1050,16 @@
 
         this.resize();
         window.addEventListener('resize', () => this.resize());
+        if (typeof ResizeObserver !== 'undefined') {
+          const ro = new ResizeObserver(() => this.resize());
+          ro.observe(canvas);
+        }
       },
 
       resize() {
         const canvas = document.getElementById('cubeCanvas');
         const w = canvas.clientWidth, h = canvas.clientHeight;
+        if (w === 0 || h === 0) return;
         this.threeRenderer.setSize(w, h, false);
         this.camera.aspect = w / h;
         this.camera.updateProjectionMatrix();
@@ -1013,8 +1074,9 @@
         // 底板
         const panelGeo = new T.PlaneGeometry(size, size);
         const panelMat = new T.MeshBasicMaterial({ color: isLight ? 0xc8cee0 : 0x1a2138, transparent: true, opacity: isLight ? 0.5 : 0.55, side: T.DoubleSide });
-        const grid = this.makeGridTexture();
-        const gridMat = new T.MeshBasicMaterial({ map: grid, transparent: true, opacity: 0.4, side: T.DoubleSide });
+        if (this.gridTex) this.gridTex.dispose();
+        this.gridTex = this.makeGridTexture();
+        const gridMat = new T.MeshBasicMaterial({ map: this.gridTex, transparent: true, opacity: 0.4, side: T.DoubleSide });
         for (let f = 0; f < 6; f++) {
           const face = FACES[f];
           const panel = new T.Mesh(panelGeo, panelMat);
@@ -1032,6 +1094,7 @@
         // 棱边
         const boxGeo = new T.BoxGeometry(size, size, size);
         const edges = new T.EdgesGeometry(boxGeo);
+        boxGeo.dispose(); // EdgesGeometry 已拷贝数据，原 BoxGeometry 可释放
         const lineMat = new T.LineBasicMaterial({ color: 0x6a7ab0, transparent: true, opacity: 0.7 });
         const edgeLines = new T.LineSegments(edges, lineMat);
         this.scene.add(edgeLines);
@@ -1055,9 +1118,9 @@
         const blockSize = 0.88 * (4 / G);
         if (this.blockGeo) this.blockGeo.dispose();
         this.blockGeo = new T.BoxGeometry(blockSize, blockSize, CONFIG.BLOCK_THICK);
-        // 清空 mesh pool（旧几何体失效）
+        // 清空 mesh pool：旧几何体已 dispose，需从场景移除残留 mesh
         for (const m of this.meshPool) {
-          if (m.geometry) m.geometry.dispose();
+          this.scene.remove(m);
         }
         this.meshPool = [];
       },
@@ -1093,7 +1156,7 @@
 
       // 数字纹理（按值+皮肤缓存复用）
       getTexture(value) {
-        const key = state.skin + '_' + value;
+        const key = state.skin + '_' + value + (state.colorblind ? '_cb' : '');
         if (this.texCache[key]) return this.texCache[key];
         const c = document.createElement('canvas');
         c.width = c.height = 128;
@@ -1104,6 +1167,10 @@
         this.roundRect(ctx, 4, 4, 120, 120, 16); ctx.fill();
         ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 3;
         this.roundRect(ctx, 6, 6, 116, 116, 14); ctx.stroke();
+        // 色盲模式：底色后、文字前叠加半透明纹理图案，不遮挡数字
+        if (state.colorblind) {
+          this.drawColorblindPattern(ctx, value);
+        }
         const dark = CONFIG.TEXT_DARK.includes(value) && state.skin === 'classic';
         ctx.fillStyle = dark ? '#776e65' : '#f9f6f2';
         const fs = value < 100 ? 64 : value < 1000 ? 52 : value < 10000 ? 42 : 34;
@@ -1114,6 +1181,132 @@
         tex.anisotropy = 4;
         this.texCache[key] = tex;
         return tex;
+      },
+
+      // 色盲模式：按数值叠加可区分的纹理图案（半透明，不遮挡数字）
+      drawColorblindPattern(ctx, value) {
+        const patterns = {
+          4: 'hstripes', 8: 'vstripes', 16: 'dstripes1', 32: 'dstripes2',
+          64: 'dots', 128: 'grid', 256: 'checker', 512: 'rings',
+          1024: 'cross', 2048: 'stars'
+        };
+        const p = patterns[value];
+        ctx.save();
+        // 裁剪到圆角方块区域内，避免纹理溢出
+        this.roundRect(ctx, 4, 4, 120, 120, 16);
+        ctx.clip();
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = '#000';
+        ctx.fillStyle = '#000';
+        ctx.lineWidth = 2;
+        const a = 4, b = 124, mid = 64;
+        if (!p) {
+          // 更高值：组合纹理（网格 + 点阵）
+          if (value > 2048) {
+            for (let x = a; x <= b; x += 14) {
+              ctx.beginPath(); ctx.moveTo(x, a); ctx.lineTo(x, b); ctx.stroke();
+            }
+            for (let y = a; y <= b; y += 14) {
+              ctx.beginPath(); ctx.moveTo(a, y); ctx.lineTo(b, y); ctx.stroke();
+            }
+            for (let x = a + 7; x <= b; x += 14) {
+              for (let y = a + 7; y <= b; y += 14) {
+                ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+              }
+            }
+          }
+          ctx.restore();
+          return;
+        }
+        switch (p) {
+          case 'hstripes': // 横条纹
+            for (let y = a; y <= b; y += 10) {
+              ctx.beginPath(); ctx.moveTo(a, y); ctx.lineTo(b, y); ctx.stroke();
+            }
+            break;
+          case 'vstripes': // 竖条纹
+            for (let x = a; x <= b; x += 10) {
+              ctx.beginPath(); ctx.moveTo(x, a); ctx.lineTo(x, b); ctx.stroke();
+            }
+            break;
+          case 'dstripes1': // 斜条纹 /
+            for (let c = a + a; c <= b + b; c += 10) {
+              ctx.beginPath();
+              ctx.moveTo(c - a, a); ctx.lineTo(c - b, b);
+              ctx.stroke();
+            }
+            break;
+          case 'dstripes2': // 斜条纹 \
+            for (let c = a - b; c <= b - a; c += 10) {
+              ctx.beginPath();
+              ctx.moveTo(c + a, a); ctx.lineTo(c + b, b);
+              ctx.stroke();
+            }
+            break;
+          case 'dots': // 点阵
+            for (let x = a + 8; x <= b; x += 14) {
+              for (let y = a + 8; y <= b; y += 14) {
+                ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+              }
+            }
+            break;
+          case 'grid': // 网格
+            for (let x = a; x <= b; x += 12) {
+              ctx.beginPath(); ctx.moveTo(x, a); ctx.lineTo(x, b); ctx.stroke();
+            }
+            for (let y = a; y <= b; y += 12) {
+              ctx.beginPath(); ctx.moveTo(a, y); ctx.lineTo(b, y); ctx.stroke();
+            }
+            break;
+          case 'checker': { // 棋盘格
+            const cs = 16;
+            for (let x = a; x < b; x += cs) {
+              for (let y = a; y < b; y += cs) {
+                if ((Math.floor((x - a) / cs) + Math.floor((y - a) / cs)) % 2 === 0) {
+                  ctx.fillRect(x, y, cs, cs);
+                }
+              }
+            }
+            break;
+          }
+          case 'rings': // 同心圆
+            ctx.lineWidth = 2.5;
+            for (let r = 8; r <= 56; r += 12) {
+              ctx.beginPath(); ctx.arc(mid, mid, r, 0, Math.PI * 2); ctx.stroke();
+            }
+            break;
+          case 'cross': // 十字纹
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(mid, a + 8); ctx.lineTo(mid, b - 8);
+            ctx.moveTo(a + 8, mid); ctx.lineTo(b - 8, mid);
+            ctx.stroke();
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(a + 12, a + 12); ctx.lineTo(b - 12, b - 12);
+            ctx.moveTo(b - 12, a + 12); ctx.lineTo(a + 12, b - 12);
+            ctx.stroke();
+            break;
+          case 'stars': { // 星纹
+            const drawStar = (cx, cy, R) => {
+              ctx.beginPath();
+              for (let i = 0; i < 10; i++) {
+                const ang = -Math.PI / 2 + i * Math.PI / 5;
+                const r = i % 2 === 0 ? R : R * 0.45;
+                const px = cx + Math.cos(ang) * r, py = cy + Math.sin(ang) * r;
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+              }
+              ctx.closePath(); ctx.fill();
+            };
+            drawStar(mid, mid, 26);
+            drawStar(a + 16, a + 16, 12);
+            drawStar(b - 16, a + 16, 12);
+            drawStar(a + 16, b - 16, 12);
+            drawStar(b - 16, b - 16, 12);
+            break;
+          }
+        }
+        ctx.restore();
       },
 
       roundRect(ctx, x, y, w, h, r) {
@@ -1160,6 +1353,11 @@
       freeMesh(b) {
         if (!b.mesh) return;
         b.mesh.visible = false;
+        // 释放非共享（克隆）材质，避免内存泄漏；共享缓存材质不在此处释放
+        if (b.mesh.material) {
+          const isCached = Object.values(this.matCache).includes(b.mesh.material);
+          if (!isCached) b.mesh.material.dispose();
+        }
         b.mesh.material = null;
         if (this.meshPool.length < 60) {
           this.meshPool.push(b.mesh);
@@ -1192,6 +1390,10 @@
         b.dying = true;
         b.dieTarget = { face: survivor.face, r: survivor.r, c: survivor.c };
         b.dieT = 0;
+        // 克隆材质：dying 动画会修改 opacity，避免污染共享缓存材质
+        if (b.mesh && b.mesh.material) {
+          b.mesh.material = b.mesh.material.clone();
+        }
         state.dying.push(b);
       },
 
@@ -1303,7 +1505,8 @@
           const tx = target[0] + n[0]*CONFIG.BLOCK_LIFT;
           const ty = target[1] + n[1]*CONFIG.BLOCK_LIFT;
           const tz = target[2] + n[2]*CONFIG.BLOCK_LIFT;
-          const k = Math.min(1, CONFIG.ANIM_SLIDE * sp * 2);
+          // 帧率无关缓动：k = 1 - exp(-rate * dt)，120Hz/144Hz 屏幕不再速度翻倍
+          const k = Math.min(1, 1 - Math.exp(-CONFIG.ANIM_SLIDE * sp * 2 * dt * 60));
           b.mesh.position.x += (tx - b.mesh.position.x) * k;
           b.mesh.position.y += (ty - b.mesh.position.y) * k;
           b.mesh.position.z += (tz - b.mesh.position.z) * k;
@@ -1323,10 +1526,10 @@
           if (b.mesh.material !== expectedMat) {
             b.mesh.material = expectedMat;
           }
-          // 发光脉冲（高数值方块）
+          // 发光脉冲（高数值方块）— 同值方块共享材质，使用统一相位避免脉冲覆盖
           if (b.value >= CONFIG.GLOW_THRESHOLD && b.mesh.material && b.mesh.material.emissiveIntensity !== undefined) {
             const base = state.skin === 'neon' ? 0.6 : 0.35;
-            const pulse = Math.sin(t * 2 + b.id) * 0.1 + 0.1;
+            const pulse = Math.sin(t * 2) * 0.1 + 0.1;
             b.mesh.material.emissiveIntensity = base + pulse;
           }
         }
@@ -1353,7 +1556,8 @@
           const tx = tgt[0] + n[0]*CONFIG.BLOCK_LIFT;
           const ty = tgt[1] + n[1]*CONFIG.BLOCK_LIFT;
           const tz = tgt[2] + n[2]*CONFIG.BLOCK_LIFT;
-          const k = Math.min(1, 0.25 * sp * 2);
+          // 帧率无关缓动
+          const k = Math.min(1, 1 - Math.exp(-0.25 * sp * 2 * dt * 60));
           b.mesh.position.x += (tx - b.mesh.position.x) * k;
           b.mesh.position.y += (ty - b.mesh.position.y) * k;
           b.mesh.position.z += (tz - b.mesh.position.z) * k;
@@ -1431,19 +1635,31 @@
           if (b.mesh) b.mesh.material = this.acquireMaterial(b.value);
         }
         for (const b of state.dying) {
-          if (b.mesh) b.mesh.material = this.acquireMaterial(b.value);
+          // dying 方块会修改 opacity，必须克隆材质，避免污染共享缓存材质
+          if (b.mesh) {
+            const isCached = b.mesh.material && Object.values(this.matCache).includes(b.mesh.material);
+            if (b.mesh.material && !isCached) b.mesh.material.dispose(); // 释放旧克隆材质
+            b.mesh.material = this.acquireMaterial(b.value).clone();
+          }
         }
       },
 
       // 难度切换：重建主体几何
       rebuildCubeBody() {
         // 只移除主体 mesh，不动方块
+        const disposedGeo = new Set();
+        const disposedMat = new Set();
         for (const obj of this.bodyMeshes) {
           this.scene.remove(obj);
-          if (obj.geometry) obj.geometry.dispose();
+          if (obj.geometry && !disposedGeo.has(obj.geometry)) {
+            obj.geometry.dispose();
+            disposedGeo.add(obj.geometry);
+          }
           if (obj.material) {
-            if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
-            else obj.material.dispose();
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            for (const m of mats) {
+              if (!disposedMat.has(m)) { m.dispose(); disposedMat.add(m); }
+            }
           }
         }
         this.bodyMeshes = [];
@@ -1475,12 +1691,32 @@
         document.getElementById('modalContinue').onclick = () => this.hideModal();
         document.getElementById('undoBtn').onclick = () => logic.undo();
         document.getElementById('resetViewBtn').onclick = () => renderer.resetView();
-        document.getElementById('screenshotBtn').onclick = () => { renderer.screenshot(); this.toast('截图已保存'); };
+        document.getElementById('btnFullscreen').onclick = () => {
+          if (window.GameUtils) GameUtils.toggleFullscreen(document.getElementById('canvasStage'));
+        };
+        document.getElementById('btnDaily').onclick = () => {
+          if (!state.over && state.moves > 0 && !state.won) {
+            this.toast('请先结束当前一局再开始每日挑战');
+            return;
+          }
+          this.startDailyChallenge();
+        };
+        document.getElementById('btnShot').onclick = function() {
+          var canvas = renderer.threeRenderer.domElement;
+          if (canvas) {
+            renderer.threeRenderer.render(renderer.scene, renderer.camera);
+            if (window.GameUtils) {
+              GameUtils.screenshotCanvas(canvas, '3D折叠数字魔方', '分数 ' + state.score);
+              GameUtils.unlock('use_screenshot', '定格瞬间', '使用截图功能分享一次');
+            }
+          }
+        };
         document.querySelectorAll('.dpad [data-dir]').forEach(btn => {
           btn.addEventListener('click', () => logic.slide(btn.dataset.dir));
         });
         // 键盘
         window.addEventListener('keydown', (e) => {
+          if (e.repeat) return; // 拦截长按连发，避免雪崩式滑动
           const map = { ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right',
                         w:'up', s:'down', a:'left', d:'right', W:'up', S:'down', A:'left', D:'right' };
           if (map[e.key]) { e.preventDefault(); logic.slide(map[e.key]); return; }
@@ -1501,10 +1737,14 @@
         themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
         // 页面离开前刷新保存
         window.addEventListener('beforeunload', () => storage.flushSave());
-        // 首次交互恢复音频上下文
+        // 首次交互恢复音频上下文（音效 + BGM 各有独立 AudioContext）
         const resumeAudio = () => {
           audio.init();
-          if (audio.ctx && audio.ctx.state === 'suspended') audio.ctx.resume();
+          if (audio.ctx && audio.ctx.state === 'suspended') audio.ctx.resume().catch(function () {});
+          // BGM 使用独立的 AudioContext，页面加载时若已 enabled 但被浏览器挂起，需在此恢复
+          if (window.CubeBGM && CubeBGM.isEnabled() && !CubeBGM.isPlaying()) {
+            CubeBGM.play();
+          }
           window.removeEventListener('pointerdown', resumeAudio);
           window.removeEventListener('keydown', resumeAudio);
         };
@@ -1525,6 +1765,7 @@
           if (sk === state.skin) return;
           document.querySelectorAll('#skinSeg button').forEach(b => b.classList.toggle('active', b === btn));
           state.skin = sk;
+          if (window.GameUtils) GameUtils.unlock('try_skin', '换个皮肤', '切换过一次游戏皮肤');
           document.getElementById('canvasStage').className = 'canvas-stage skin-' + sk + (state.slideMode ? ' slide-mode' : '');
           renderer.refreshSkin();
           storage.save();
@@ -1543,6 +1784,17 @@
           state.soundOn = on;
           document.querySelectorAll('#soundSeg button').forEach(b => b.classList.toggle('active', b === btn));
           if (on) audio.play('spawn');
+        });
+        // 色盲模式
+        document.getElementById('cbSeg').addEventListener('click', (e) => {
+          const btn = e.target.closest('button'); if (!btn) return;
+          const on = btn.dataset.cb === 'on';
+          if (on === state.colorblind) return;
+          state.colorblind = on;
+          try { localStorage.setItem('cube_colorblind_v1', on ? '1' : '0'); } catch(e) {}
+          document.querySelectorAll('#cbSeg button').forEach(b => b.classList.toggle('active', (b.dataset.cb === 'on') === on));
+          renderer.refreshSkin();
+          this.toast('色盲模式：' + (on ? '开' : '关'));
         });
         // 模式切换（旋转/滑动）
         document.getElementById('modeBadge').addEventListener('click', () => this.toggleSlideMode());
@@ -1588,6 +1840,7 @@
         canvas.addEventListener('touchstart', e => { if (e.touches[0]) onStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
         canvas.addEventListener('touchmove', e => { if (e.touches[0]) onMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
         canvas.addEventListener('touchend', e => { if (e.changedTouches[0]) onEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY); }, { passive: true });
+        canvas.addEventListener('touchcancel', () => { active = false; }, { passive: true });
       },
 
       toggleSlideMode() {
@@ -1659,7 +1912,8 @@
         this._tt = setTimeout(() => el.classList.remove('show'), 1800);
       },
 
-      restart() {
+      restart(opts) {
+        opts = opts || {};
         // 仅当用户主动放弃未结束的局才计数
         if (state.moves > 0 && !state.over) state.games++;
         renderer.clearAll();
@@ -1670,24 +1924,57 @@
         state.over = false;
         state.snapshot = null;
         state.dying = [];
+        // 每日挑战：在生成初始方块前注入种子，保证全员序列一致
+        if (opts.seed) setDailySeed(opts.seed); else clearDailySeed();
         for (let i = 0; i < CONFIG.INIT_BLOCKS; i++) spawnBlock();
         audio.play('spawn');
         this.update();
         storage.save();
         storage.saveStats();
         this.renderLeaderboard();
-        this.toast('新游戏开始');
+        // 每日挑战的提示由 startDailyChallenge 负责显示，避免双 toast
+        if (!opts.seed) this.toast('新游戏开始');
+        if (window.GameUtils) GameUtils.recordPlay('cube2048', 0);
+      },
+
+      // 每日挑战
+      startDailyChallenge() {
+        if (!window.GameUtils) return;
+        const seed = GameUtils.getDailySeed();
+        const st = GameUtils.getDailyStatus('cube2048');
+        if (st.played) {
+          GameUtils._toast('今日已挑战过，成绩 ' + st.score + ' 分，明天再来', 2800);
+          return;
+        }
+        this.restart({ seed });
+        GameUtils._toast('🏆 每日挑战开始！今日所有玩家方块序列相同 · 仅一次机会', 3000);
       },
 
       renderLeaderboard() {
-        const lb = storage.loadLeaderboard();
         const el = document.getElementById('lbList');
-        if (!lb.length) { el.innerHTML = '<div class="lb-empty">暂无记录</div>'; return; }
+        // 优先使用 GameUtils 统一排行榜（v1），与其它游戏一致；meta 回调显示 grid×grid + 日期
+        if (window.GameUtils && typeof GameUtils.renderLeaderboard === 'function') {
+          el.innerHTML = GameUtils.renderLeaderboard('cube2048', {
+            meta: (r) => {
+              const g = r.extra && r.extra.grid ? r.extra.grid + '×' + r.extra.grid + ' · ' : '';
+              const d = new Date(r.date);
+              return g + (d.getMonth() + 1) + '/' + d.getDate();
+            }
+          });
+          return;
+        }
+        // 兜底：GameUtils 未加载时用本地 v2
+        const lb = storage.loadLeaderboard();
+        const trendHtml = '';
+        if (!lb.length) {
+          el.innerHTML = '<div class="lb-empty">暂无记录</div>' + trendHtml;
+          return;
+        }
         el.innerHTML = lb.slice(0, 10).map((r, i) => {
           const d = new Date(r.date);
           const ds = `${d.getMonth()+1}/${d.getDate()}`;
           return `<div class="lb-item"><span class="rank">${i+1}</span><span class="score">${r.score}</span><span class="meta">${r.grid}×${r.grid} · ${ds}</span></div>`;
-        }).join('');
+        }).join('') + trendHtml;
       }
     };
 
@@ -1722,6 +2009,8 @@
             nextId: state.nextId, grid: G, skin: state.skin, soundOn: state.soundOn, speedMul: state.speedMul
           }));
           localStorage.setItem(KEY_BEST, String(state.best));
+          // 同步持久化 maxEver，避免关闭页签时丢失历史最高数字
+          localStorage.setItem(KEY_STATS, JSON.stringify({ games: state.games, best: state.best, maxEver: state.maxEver }));
         } catch(e) {}
       },
       saveStats() {
@@ -1752,11 +2041,13 @@
             CONFIG.HALF = data.grid / 2;
             buildAdjacency();
             document.querySelectorAll('#diffSeg button').forEach(b => b.classList.toggle('active', parseInt(b.dataset.grid,10) === data.grid));
+            // 网格尺寸变更：必须重建主体几何和方块几何体，否则尺寸不匹配
+            if (renderer && renderer.rebuildCubeBody) renderer.rebuildCubeBody();
           }
           if (data.skin) {
             state.skin = data.skin;
             document.querySelectorAll('#skinSeg button').forEach(b => b.classList.toggle('active', b.dataset.skin === data.skin));
-            document.getElementById('canvasStage').className = 'canvas-stage skin-' + data.skin;
+            document.getElementById('canvasStage').className = 'canvas-stage skin-' + data.skin + (state.slideMode ? ' slide-mode' : '');
           }
           if (typeof data.soundOn === 'boolean') {
             state.soundOn = data.soundOn;
@@ -1791,10 +2082,37 @@
       },
       saveLeaderboard() {
         try {
+          if (state.score <= 0) return;
           const lb = this.loadLeaderboard();
           lb.push({ score: state.score, grid: CONFIG.GRID, date: Date.now() });
           lb.sort((a,b) => b.score - a.score);
           localStorage.setItem(KEY_LB, JSON.stringify(lb.slice(0, 20)));
+          // 同步接入 GameUtils 统一排行榜体系（v1），与其他 9 款游戏一致
+          if (window.GameUtils && typeof GameUtils.saveLeaderboard === 'function') {
+            GameUtils.saveLeaderboard('cube2048', state.score, { grid: CONFIG.GRID });
+          }
+        } catch(e) {}
+      },
+
+      // 一次性迁移：将旧 v2 排行榜数据导入 GameUtils v1 体系
+      migrateLeaderboard() {
+        try {
+          if (localStorage.getItem('cube2048_lb_migrated_v1')) return;
+          const old = this.loadLeaderboard();
+          if (!old.length) { localStorage.setItem('cube2048_lb_migrated_v1', '1'); return; }
+          if (window.GameUtils && typeof GameUtils.loadLeaderboard === 'function') {
+            const existing = GameUtils.loadLeaderboard('cube2048');
+            const merged = existing.slice();
+            old.forEach(r => {
+              // 避免重复：按 date 去重
+              if (!merged.some(m => m.date === r.date)) {
+                merged.push({ score: r.score, date: r.date, extra: { grid: r.grid } });
+              }
+            });
+            merged.sort((a,b) => b.score - a.score);
+            localStorage.setItem('cube2048_leaderboard_v1', JSON.stringify(merged.slice(0, 20)));
+          }
+          localStorage.setItem('cube2048_lb_migrated_v1', '1');
         } catch(e) {}
       }
     };
@@ -1813,15 +2131,541 @@
     /* ============================================================
      *  启动
      * ============================================================ */
+    // 色盲模式初始化（需在方块生成前设定，以保证纹理正确）
+    try {
+      state.colorblind = localStorage.getItem('cube_colorblind_v1') === '1';
+    } catch(e) {}
+    document.querySelectorAll('#cbSeg button').forEach(b => {
+      b.classList.toggle('active', (b.dataset.cb === 'on') === state.colorblind);
+    });
     renderer.init();
     ui.init();
+    storage.migrateLeaderboard(); // 一次性迁移旧 v2 排行榜到 GameUtils v1
     if (!storage.load()) {
+      state.board = newBoard();
       for (let i = 0; i < CONFIG.INIT_BLOCKS; i++) spawnBlock();
       storage.save();
     }
     ui.update();
     ui.renderLeaderboard();
     requestAnimationFrame(loop);
+
+    // 新手引导
+    if (window.GameUtils) {
+      GameUtils.showTutorial('cube2048', '3D折叠数字魔方 · 玩法指南', [
+        { step: '旋转视角', desc: '鼠标拖拽旋转立方体，滚轮缩放，看清六面布局' },
+        { step: '滑动合并', desc: '方向键或 WASD 滑动，相同数字方块合并成双倍' },
+        { step: '跨面滑动', desc: '方块在面边缘会滑到相邻面，这是 3D 版的核心机制' },
+        { step: '目标 2048', desc: '合成 2048 通关，可继续挑战更高数字' },
+        { step: '撤销与重置', desc: '可撤销最近 9 步操作，视角乱了可一键重置' }
+      ]);
+    }
+
+    // 成就：首次游玩
+    if (window.GameUtils && !GameUtils.isUnlocked('first_play')) {
+      GameUtils.unlock('first_play', '初次到访', '第一次游玩任意游戏');
+    }
+
+    // 全局快捷键：? 玩法提示 / L 排行榜
+    if (window.GameUtils && GameUtils.registerGlobalShortcuts) {
+      GameUtils.registerGlobalShortcuts({
+        onHelp: function () {
+          GameUtils.showHowtoPopup('方向键/WASD 滑动 · 鼠标拖拽旋转视角 · 相同数字方块合并 · 跨面滑动是核心 · 目标 2048');
+        },
+        onLeaderboard: function () {
+          var lb = document.getElementById('lbList');
+          if (lb) { lb.scrollIntoView({behavior:'smooth'}); lb.style.transition='box-shadow .3s'; lb.style.boxShadow='0 0 0 2px var(--color-accent)'; setTimeout(function(){lb.style.boxShadow='';},800); }
+        }
+      });
+    }
+
+    // 移动端首次进入提示（3D 魔方建议在电脑上体验）
+    if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+      if (!localStorage.getItem('cube_mobile_warned')) {
+        localStorage.setItem('cube_mobile_warned', '1');
+        setTimeout(function() {
+          if (window.GameUtils) {
+            GameUtils._toast('💡 建议在电脑上体验 3D 魔方，操作更顺手', 4000);
+          }
+        }, 1500);
+      }
+    }
+
+    // PWA：注册 Service Worker + 注入反馈入口
+    if (window.GameUtils) {
+      document.documentElement.setAttribute('data-sw-root', '../');
+      GameUtils.registerSW();
+      // 反馈入口注入到侧栏末尾（在游戏结束弹窗后追加一个反馈区）
+      var fbHost = document.createElement('div');
+      fbHost.id = 'feedbackSlot';
+      fbHost.style.cssText = 'text-align:center;padding:12px 0;border-top:1px solid var(--color-border-light);margin-top:12px;font-size:11px';
+      var sidePanel = document.querySelector('.side-panel');
+      if (sidePanel) sidePanel.appendChild(fbHost);
+      GameUtils.injectFeedback('#feedbackSlot');
+    }
+
+    /* ============================================================
+     *  BGM 系统 — 多曲目版（静谧星空 / 卡农片段 / 月光曲）
+     *  设计原则：稀疏、柔和、不抢戏。Pad 铺底 + 慢速钢琴音
+     * ============================================================ */
+    var CubeBGM = (function () {
+      var STORAGE_KEY = 'cube2048_bgm_v2'; // 升级版本号，新增 track 字段
+
+      // —— 统一音符频率表 ——
+      var NOTE_FREQS = {
+        'C2': 65.41, 'D2': 73.42, 'E2': 82.41, 'F2': 87.31, 'G2': 98.00, 'A2': 110.00, 'B2': 123.47,
+        'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94,
+        'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
+        'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77,
+        'Db4': 277.18, 'Eb4': 311.13, 'Ab4': 415.30, 'Bb4': 466.16,
+        'Db5': 554.37, 'Eb5': 622.25, 'Ab5': 830.61, 'Bb5': 932.33,
+        'C6': 1046.50, 'D6': 1174.66, 'E6': 1318.51, 'F6': 1396.91, 'G6': 1567.98
+      };
+      function freqOf(name) { return NOTE_FREQS[name] || 220; }
+
+      // ============================================================
+      //  曲目定义
+      //  每首含：name / BPM / bars（小节数组，每小节 = 和弦 + 旋律音符序列）
+      // ============================================================
+      var TRACKS = {
+
+        // —— 曲目 1：静谧星空（原版重制，大幅简化）——
+        // E 小调五声音阶，72 BPM，仅 pad 铺底 + 稀疏钢琴琶音
+        'serene': {
+          name: '静谧星空',
+          desc: 'E小调 · 五声音阶 · 慢板',
+          bpm: 72,
+          // 每小节 4 拍，beatsPerBar=4
+          bars: [
+            { chord: { root: 'E2', tones: ['E3','G3','B3','E4'] }, melody: ['B3','E4','G4'] },
+            { chord: { root: 'A2', tones: ['A3','C4','E4','A4'] }, melody: ['C4','E4','A4'] },
+            { chord: { root: 'G2', tones: ['G3','B3','D4','G4'] }, melody: ['B3','D4','G4'] },
+            { chord: { root: 'D3', tones: ['D3','A3','D4','F4'] }, melody: ['A3','D4','F4'] },
+            { chord: { root: 'E2', tones: ['E3','G3','B3','E4'] }, melody: ['E4','G4','B4'] },
+            { chord: { root: 'C3', tones: ['C3','G3','C4','E4'] }, melody: ['G3','C4','E4'] },
+            { chord: { root: 'G2', tones: ['G3','B3','D4','G4'] }, melody: ['D4','G4','B4'] },
+            { chord: { root: 'D3', tones: ['D3','A3','D4','F4'] }, melody: ['A3','D4','F4'] }
+          ]
+        },
+
+        // —— 曲目 2：卡农片段（帕赫贝尔卡农 D 大调开头）——
+        // 68 BPM，D-A-Bm-F#m-G-D-G-A 经典进行
+        'canon': {
+          name: '卡农片段',
+          desc: 'D大调 · 帕赫贝尔 · 行板',
+          bpm: 68,
+          bars: [
+            { chord: { root: 'D3', tones: ['D3','A3','D4','F4'] }, melody: ['F4','E4','D4','C4'] },
+            { chord: { root: 'A2', tones: ['A2','E3','A3','C4'] }, melody: ['C4','B3','A3','G3'] },
+            { chord: { root: 'B2', tones: ['B2','F3','B3','D4'] }, melody: ['B3','A3','G3','F3'] },
+            { chord: { root: 'F2', tones: ['F2','C3','F3','A3'] }, melody: ['A3','G3','F3','E3'] },
+            { chord: { root: 'G2', tones: ['G2','D3','G3','B3'] }, melody: ['G3','F3','E3','D3'] },
+            { chord: { root: 'D3', tones: ['D3','A3','D4','F4'] }, melody: ['F4','E4','D4','C4'] },
+            { chord: { root: 'G2', tones: ['G2','D3','G3','B3'] }, melody: ['G3','A3','B3','C4'] },
+            { chord: { root: 'A2', tones: ['A2','E3','A3','C4'] }, melody: ['C4','D4','E4','F4'] }
+          ]
+        },
+
+        // —— 曲目 3：月光曲（德彪西《月光》第一主题慢速改编）——
+        // 降 D 大调，60 BPM，极慢、空灵
+        'moonlight': {
+          name: '月光曲',
+          desc: '降D大调 · 德彪西 · 慢板',
+          bpm: 60,
+          bars: [
+            { chord: { root: 'Db4', tones: ['Db4','F4','Ab4'] }, melody: ['Db5','F5','Ab5'] },
+            { chord: { root: 'Ab4', tones: ['Ab4','C5','Eb5'] }, melody: ['Ab4','C5','Eb5'] },
+            { chord: { root: 'F4',  tones: ['F4','Ab4','C5']  }, melody: ['F5','Ab5','C6'] },
+            { chord: { root: 'Bb4', tones: ['Bb4','Db5','F5'] }, melody: ['Bb4','Db5','F5'] },
+            { chord: { root: 'Eb4', tones: ['Eb4','G4','Bb4'] }, melody: ['Eb5','G5','Bb5'] },
+            { chord: { root: 'Ab4', tones: ['Ab4','C5','Eb5'] }, melody: ['Ab4','C5','Eb5'] },
+            { chord: { root: 'Db4', tones: ['Db4','F4','Ab4'] }, melody: ['Db5','F5','Ab5'] },
+            { chord: { root: 'Ab4', tones: ['Ab4','C5','Eb5'] }, melody: ['Ab5','C6','Eb5'] }
+          ]
+        }
+      };
+
+      var TRACK_ORDER = ['serene', 'canon', 'moonlight'];
+      var currentTrack = 'serene';
+
+      // ============================================================
+      //  音频引擎
+      // ============================================================
+      var audioCtx = null;
+      var masterGain = null;
+      var isPlaying = false;
+      var isUserEnabled = false;
+      var userVolume = 0.35;
+      var schedulerTimer = null;
+      var nextNoteTime = 0;
+      var currentBeat = 0;
+
+      function initAudio() {
+        if (audioCtx) return;
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          masterGain = audioCtx.createGain();
+          masterGain.gain.value = 0;
+          masterGain.connect(audioCtx.destination);
+        } catch (e) {}
+      }
+
+      function loadSettings() {
+        try {
+          var data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+          if (typeof data.enabled === 'boolean') isUserEnabled = data.enabled;
+          if (typeof data.volume === 'number') userVolume = Math.max(0, Math.min(1, data.volume));
+          if (typeof data.track === 'string' && TRACKS[data.track]) currentTrack = data.track;
+        } catch (e) {}
+      }
+
+      function saveSettings() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            enabled: isUserEnabled,
+            volume: userVolume,
+            track: currentTrack
+          }));
+        } catch (e) {}
+      }
+
+      // —— 柔和 pad 铺底（正弦波 + 轻微失谐）——
+      function playPad(tones, when, dur) {
+        if (!audioCtx || !masterGain) return;
+        for (var i = 0; i < tones.length; i++) {
+          var osc = audioCtx.createOscillator();
+          var osc2 = audioCtx.createOscillator();
+          var g = audioCtx.createGain();
+          var filter = audioCtx.createBiquadFilter();
+          osc.type = 'sine';
+          osc2.type = 'sine';
+          osc.frequency.value = freqOf(tones[i]);
+          osc2.frequency.value = freqOf(tones[i]) * 1.003; // 轻微失谐
+          filter.type = 'lowpass';
+          filter.frequency.value = 1200;
+          // 长缓慢的 Attack/Release，避免突兀
+          g.gain.setValueAtTime(0.0001, when);
+          g.gain.linearRampToValueAtTime(0.025, when + dur * 0.4);
+          g.gain.linearRampToValueAtTime(0.022, when + dur * 0.7);
+          g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+          osc.connect(filter); osc2.connect(filter); filter.connect(g); g.connect(masterGain);
+          osc.start(when); osc.stop(when + dur);
+          osc2.start(when); osc2.stop(when + dur);
+        }
+      }
+
+      // —— 柔和钢琴音（三角波 + 衰减包络，模拟钢琴质感）——
+      function playPianoNote(note, when, dur, vol) {
+        if (!audioCtx || !masterGain) return;
+        vol = vol || 0.06;
+        var osc = audioCtx.createOscillator();
+        var osc2 = audioCtx.createOscillator();
+        var g = audioCtx.createGain();
+        var filter = audioCtx.createBiquadFilter();
+        osc.type = 'triangle';
+        osc2.type = 'sine';
+        osc.frequency.value = freqOf(note);
+        osc2.frequency.value = freqOf(note) * 2; // 泛音
+        filter.type = 'lowpass';
+        filter.frequency.value = 2000;
+        // 钢琴式快速衰减
+        g.gain.setValueAtTime(0.0001, when);
+        g.gain.exponentialRampToValueAtTime(vol, when + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+        var g2 = audioCtx.createGain();
+        g2.gain.setValueAtTime(0.0001, when);
+        g2.gain.exponentialRampToValueAtTime(vol * 0.4, when + 0.01);
+        g2.gain.exponentialRampToValueAtTime(0.0001, when + dur * 0.6);
+        osc.connect(filter); filter.connect(g); g.connect(masterGain);
+        osc2.connect(g2); g2.connect(masterGain);
+        osc.start(when); osc.stop(when + dur);
+        osc2.start(when); osc2.stop(when + dur * 0.6);
+      }
+
+      // —— 低音根音（极柔和，仅小节开头）——
+      function playBassNote(note, when, dur) {
+        if (!audioCtx || !masterGain) return;
+        var osc = audioCtx.createOscillator();
+        var g = audioCtx.createGain();
+        var filter = audioCtx.createBiquadFilter();
+        osc.type = 'sine';
+        osc.frequency.value = freqOf(note);
+        filter.type = 'lowpass';
+        filter.frequency.value = 400;
+        g.gain.setValueAtTime(0.0001, when);
+        g.gain.linearRampToValueAtTime(0.04, when + 0.1);
+        g.gain.linearRampToValueAtTime(0.03, when + dur * 0.5);
+        g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+        osc.connect(filter); filter.connect(g); g.connect(masterGain);
+        osc.start(when); osc.stop(when + dur);
+      }
+
+      // ============================================================
+      //  调度器 — 稀疏编排，每小节只触发：1 次 pad + 1 次根音 + 3 个旋律音
+      // ============================================================
+      function scheduler() {
+        if (!isPlaying || !audioCtx) return;
+        var track = TRACKS[currentTrack];
+        if (!track) return;
+        var BEAT = 60 / track.bpm;
+        var lookahead = 0.15;
+        var beatsPerBar = 4;
+
+        while (nextNoteTime < audioCtx.currentTime + lookahead) {
+          var beatInBar = currentBeat % beatsPerBar;
+          var barIndex = Math.floor(currentBeat / beatsPerBar) % track.bars.length;
+          var bar = track.bars[barIndex];
+
+          // 每小节开头一次性安排本小节所有元素
+          if (beatInBar === 0) {
+            // 1. pad 铺底（持续整小节）
+            playPad(bar.chord.tones, nextNoteTime, BEAT * beatsPerBar);
+            // 2. 低音根音（持续 3 拍）
+            playBassNote(bar.chord.root, nextNoteTime, BEAT * 3);
+            // 3. 旋律音：3 个音，均匀分布在拍 0 / 1.5 / 3（稀疏）
+            if (bar.melody && bar.melody.length >= 3) {
+              var offsets = [0, 1.5, 3];
+              for (var i = 0; i < 3; i++) {
+                playPianoNote(bar.melody[i], nextNoteTime + offsets[i] * BEAT, BEAT * 1.5, 0.05);
+              }
+            }
+          }
+
+          nextNoteTime += BEAT;
+          currentBeat++;
+        }
+        schedulerTimer = setTimeout(scheduler, 50);
+      }
+
+      function play() {
+        if (isPlaying) return;
+        initAudio();
+        if (!audioCtx || !masterGain) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+        isPlaying = true;
+        currentBeat = 0;
+        nextNoteTime = audioCtx.currentTime + 0.05;
+        masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+        masterGain.gain.setValueAtTime(masterGain.gain.value, audioCtx.currentTime);
+        masterGain.gain.linearRampToValueAtTime(userVolume, audioCtx.currentTime + 0.8);
+        scheduler();
+      }
+
+      function stop() {
+        if (!isPlaying) return;
+        isPlaying = false;
+        if (schedulerTimer) {
+          clearTimeout(schedulerTimer);
+          schedulerTimer = null;
+        }
+        if (trackSwitchTimer) { clearTimeout(trackSwitchTimer); trackSwitchTimer = null; }
+        if (audioCtx && masterGain) {
+          var now = audioCtx.currentTime;
+          masterGain.gain.cancelScheduledValues(now);
+          masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+          masterGain.gain.setTargetAtTime(0, now, 0.3);
+        }
+      }
+
+      function toggle() {
+        if (isPlaying) stop(); else play();
+      }
+
+      function setVolume(v) {
+        userVolume = Math.max(0, Math.min(1, v));
+        if (masterGain && isPlaying) {
+          masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+          masterGain.gain.setTargetAtTime(userVolume, audioCtx.currentTime, 0.1);
+        }
+        saveSettings();
+      }
+
+      function setEnabled(enabled) {
+        isUserEnabled = enabled;
+        if (enabled) {
+          if (window.GameUtils) GameUtils.unlock('enable_bgm', '奏响旋律', '开启任意游戏的 BGM');
+          play();
+        } else {
+          stop();
+        }
+        saveSettings();
+      }
+
+      var trackSwitchTimer = null;
+      function setTrack(trackId) {
+        if (!TRACKS[trackId]) return;
+        if (trackSwitchTimer) { clearTimeout(trackSwitchTimer); trackSwitchTimer = null; }
+        var wasPlaying = isPlaying;
+        if (wasPlaying) stop();
+        currentTrack = trackId;
+        saveSettings();
+        if (wasPlaying) {
+          // 短暂延迟后重新播放新曲目；用户在延迟期间关 BGM 则取消
+          trackSwitchTimer = setTimeout(function() {
+            trackSwitchTimer = null;
+            if (isUserEnabled) play();
+          }, 400);
+        }
+      }
+
+      function isPlayingFn() { return isPlaying; }
+      function isEnabledFn() { return isUserEnabled; }
+      function getTrackFn() { return currentTrack; }
+      function getTrackListFn() {
+        return TRACK_ORDER.map(function(id) {
+          return { id: id, name: TRACKS[id].name, desc: TRACKS[id].desc };
+        });
+      }
+
+      // —— 音效（保留，音量降低）——
+      function playWin() {
+        if (!isUserEnabled) return;
+        initAudio();
+        if (!audioCtx || !masterGain) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+        var now = audioCtx.currentTime;
+        var notes = ['E4', 'G4', 'B4', 'E5', 'G5'];
+        for (var i = 0; i < notes.length; i++) {
+          playPianoNote(notes[i], now + i * 0.12, 0.4, 0.08);
+        }
+      }
+
+      function playOver() {
+        if (!isUserEnabled) return;
+        initAudio();
+        if (!audioCtx || !masterGain) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+        var now = audioCtx.currentTime;
+        var notes = ['E4', 'D4', 'B3', 'G3'];
+        for (var i = 0; i < notes.length; i++) {
+          playPianoNote(notes[i], now + i * 0.15, 0.5, 0.06);
+        }
+      }
+
+      function playMerge(value) {
+        if (!isUserEnabled) return;
+        initAudio();
+        if (!audioCtx || !masterGain) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+        var now = audioCtx.currentTime;
+        var pentatonic = ['E4','G4','A4','B4','D5','E5','G5'];
+        var idx = Math.min(pentatonic.length - 1, Math.floor(Math.log2(value || 2) - 1));
+        if (idx < 0) idx = 0;
+        playPianoNote(pentatonic[idx], now, 0.2, 0.05);
+      }
+
+      // ============================================================
+      //  UI — 新增曲目选择器
+      // ============================================================
+      function initUI() {
+        var soundRow = document.querySelector('#soundSeg').closest('.opt-row');
+        if (!soundRow) return;
+
+        // 背景音乐开关行
+        var bgmRow = document.createElement('div');
+        bgmRow.className = 'opt-row';
+        bgmRow.innerHTML =
+          '<span class="opt-label">背景音乐</span>' +
+          '<div class="seg" id="bgmSeg">' +
+            '<button data-bgm="on">开</button>' +
+            '<button data-bgm="off">关</button>' +
+          '</div>';
+
+        // 曲目选择行（新增）
+        var trackRow = document.createElement('div');
+        trackRow.className = 'opt-row';
+        var trackBtns = TRACK_ORDER.map(function(id) {
+          return '<button data-track="' + id + '">' + TRACKS[id].name + '</button>';
+        }).join('');
+        trackRow.innerHTML =
+          '<span class="opt-label">曲目</span>' +
+          '<div class="seg" id="trackSeg" style="flex-wrap:wrap">' + trackBtns + '</div>';
+
+        var volRow = document.createElement('div');
+        volRow.className = 'opt-row';
+        volRow.innerHTML =
+          '<span class="opt-label">BGM 音量</span>' +
+          '<input type="range" id="bgmVolSlider" min="0" max="1" step="0.05" value="' + userVolume + '">' +
+          '<span class="v" id="bgmVolVal" style="font-size:13px;min-width:32px;text-align:right;">' + Math.round(userVolume * 100) + '%</span>';
+
+        soundRow.parentNode.insertBefore(bgmRow, soundRow.nextSibling);
+        soundRow.parentNode.insertBefore(trackRow, bgmRow.nextSibling);
+        soundRow.parentNode.insertBefore(volRow, trackRow.nextSibling);
+
+        // BGM 开关
+        var bgmSeg = document.getElementById('bgmSeg');
+        bgmSeg.querySelectorAll('button').forEach(function(btn) {
+          btn.classList.toggle('active', (btn.dataset.bgm === 'on') === isUserEnabled);
+          btn.addEventListener('click', function() {
+            var on = btn.dataset.bgm === 'on';
+            setEnabled(on);
+            bgmSeg.querySelectorAll('button').forEach(function(b) {
+              b.classList.toggle('active', (b.dataset.bgm === 'on') === on);
+            });
+          });
+        });
+
+        // 曲目选择
+        var trackSeg = document.getElementById('trackSeg');
+        trackSeg.querySelectorAll('button').forEach(function(btn) {
+          btn.classList.toggle('active', btn.dataset.track === currentTrack);
+          btn.addEventListener('click', function() {
+            var tid = btn.dataset.track;
+            setTrack(tid);
+            trackSeg.querySelectorAll('button').forEach(function(b) {
+              b.classList.toggle('active', b.dataset.track === tid);
+            });
+          });
+        });
+
+        // 音量
+        var volSlider = document.getElementById('bgmVolSlider');
+        var volVal = document.getElementById('bgmVolVal');
+        volSlider.addEventListener('input', function(e) {
+          var v = parseFloat(e.target.value);
+          setVolume(v);
+          volVal.textContent = Math.round(v * 100) + '%';
+        });
+      }
+
+      function bindGameEvents() {
+        var origPlay = audio.play;
+        audio.play = function(type) {
+          // BGM 启用时，win/over/merge 由 BGM 层播放钢琴音，避免与基础合成音重叠
+          var bgmHandled = false;
+          if (isUserEnabled) {
+            if (type === 'win') { playWin(); bgmHandled = true; }
+            else if (type === 'over') { playOver(); bgmHandled = true; }
+            else if (type === 'merge' && arguments[1]) { playMerge(arguments[1]); bgmHandled = true; }
+          }
+          // BGM 未启用或非 BGM 负责的类型（slide/spawn），走基础合成音
+          if (!bgmHandled) origPlay.call(this, type);
+        };
+      }
+
+      loadSettings();
+      initUI();
+      bindGameEvents();
+      if (isUserEnabled) play();
+
+      return {
+        play: play,
+        stop: stop,
+        toggle: toggle,
+        setVolume: setVolume,
+        setEnabled: setEnabled,
+        setTrack: setTrack,
+        getTrack: getTrackFn,
+        getTrackList: getTrackListFn,
+        playWin: playWin,
+        playOver: playOver,
+        playMerge: playMerge,
+        isPlaying: isPlayingFn,
+        isEnabled: isEnabledFn
+      };
+    })();
+
+    window.CubeBGM = CubeBGM;
   </script>
 </body>
 </html>

@@ -233,106 +233,147 @@ window.ProfileData = {
   },
 
   // 游戏列表（games.html 用）
+  // category: 用于分类筛选（可多选）；device: 'touch' 触屏友好 / 'keyboard' 键盘推荐 / 'both' 均可
   games: [
     {
       name: '贪吃蛇',
       slug: 'snake',
       desc: '经典贪吃蛇，方向键操控。每 10 秒出现金色奖励球，5 秒内吃到可加 5 分。',
+      howto: '方向键/WASD 控制方向 · 吃食物长大 · 撞墙或自身结束 · 含限时/穿墙/双人模式',
       tags: ['经典', '键盘', 'Canvas'],
       techStack: ['HTML', 'Canvas', 'JS'],
       file: 'games/snake.html',
       accent: 'primary',
-      available: true
+      available: true,
+      category: ['经典', '动作'],
+      device: 'both',
+      players: [1, 2]
     },
     {
       name: '扫雷',
       slug: 'mine',
       desc: '经典扫雷，含初级、中级、高级与自定义难度，首点安全保证可展开。',
+      howto: '左键翻开格子 · 右键标记雷 · 数字提示周围雷数 · 翻开所有非雷格通关',
       tags: ['经典', '策略', '鼠标'],
       techStack: ['HTML', 'CSS Grid', 'JS'],
       file: 'games/mine.html',
       accent: 'accent',
-      available: true
+      available: true,
+      category: ['经典', '策略'],
+      device: 'touch',
+      players: [1]
     },
     {
       name: '解谜剧场',
       slug: 'puzzle',
       desc: '21 道汉字交互谜题，拖拽组合文字破解关卡，含看答案功能。',
+      howto: '拖拽文字组合破解谜题 · 看答案可演示解法 · 跳关跳过当前关卡 · 21 关递进',
       tags: ['解谜', '汉字', '拖拽'],
       techStack: ['HTML', 'Canvas', 'JS'],
       file: 'games/puzzle.html',
       accent: 'primary',
-      available: true
+      available: true,
+      category: ['解谜'],
+      device: 'both',
+      players: [1]
     },
     {
       name: '瞬逝记忆拼图',
       slug: 'memory',
       desc: '记忆图片 3 秒后碎片打乱，拖回正确格子还原。含教程、看答案、自定义图片挑战。',
+      howto: '3 秒记忆图片 · 碎片打乱后拖回正确位置 · 用时越短排名越高 · 看答案可自动还原',
       tags: ['记忆', '拼图', '拖拽'],
       techStack: ['HTML', 'CSS Grid', 'JS'],
       file: 'games/memory.html',
       accent: 'accent',
-      available: true
+      available: true,
+      category: ['解谜', '记忆'],
+      device: 'both',
+      players: [1]
     },
     {
       name: '光影棱镜',
       slug: 'prism',
       desc: '30 关光学解谜，拖动反射镜、分光器、棱镜将光束导向彩色靶点。含色散与折射。',
+      howto: '拖动镜面/分光器/棱镜 · 引导光束击中彩色靶点 · 跳关跳过本关 · 30 关递进',
       tags: ['光学', '解谜', '物理'],
       techStack: ['HTML', 'Canvas', 'JS'],
       file: 'games/prism.html',
       accent: 'primary',
-      available: true
+      available: true,
+      category: ['解谜'],
+      device: 'touch',
+      players: [1]
     },
     {
       name: '声波盲境探路',
       slug: 'sonic',
       desc: '赛博朋克霓虹风格，身处漆黑迷宫中，发射声波探路找金色终点。10 关真实反射。',
+      howto: '发射声波探路 · 声波遇墙反射短暂照亮路径 · 找到金色终点通关 · 10 关递进',
       tags: ['声波', '迷宫', '探路'],
       techStack: ['HTML', 'Canvas', 'JS'],
       file: 'games/sonic.html',
       accent: 'accent',
-      available: true
+      available: true,
+      category: ['动作', '解谜'],
+      device: 'both',
+      players: [1]
     },
     {
       name: '引力弹弓航天挑战',
       slug: 'gravity',
       desc: '深空探索物理游戏，利用行星引力场弹弓变轨，将探测器精准送达目标。20 关含黑洞与斥力星。',
+      howto: '拖拽设定初速度 · 利用行星引力弹弓变轨 · 探测器到达目标通关 · 自动通关可跳关',
       tags: ['物理', '引力', '弹弓'],
       techStack: ['HTML', 'Canvas', 'JS'],
       file: 'games/gravity.html',
       accent: 'primary',
-      available: true
+      available: true,
+      category: ['动作', '解谜'],
+      device: 'touch',
+      players: [1]
     },
     {
       name: '微型生态瓶',
       slug: 'eco',
       desc: '治愈系放置模拟。在密封玻璃瓶中投放藻类、浮游生物与小鱼，调节光照温度，观察食物链动态演化，维持生态平衡。',
+      howto: '投放藻类/浮游/小鱼 · 调节光照温度 · 维持食物链平衡 · 平衡越久排名越高',
       tags: ['模拟', '放置', '治愈'],
       techStack: ['HTML', 'Canvas', 'JS'],
       file: 'games/eco.html',
       accent: 'accent',
-      available: true
+      available: true,
+      category: ['模拟'],
+      device: 'touch',
+      players: [1]
     },
     {
       name: '3D折叠数字魔方',
       slug: 'cube2048',
       desc: '三维 2048。在可自由旋转的立方体六面上合成数字，方块跨面滑动合并，全局规划空间布局，挑战 2048 及更高数字。',
+      howto: '方向键/WASD 滑动 · 鼠标拖拽旋转视角 · 相同数字方块合并 · 跨面滑动是核心 · 目标 2048',
       tags: ['解谜', '3D', 'Three.js'],
       techStack: ['HTML', 'Three.js', 'JS'],
       file: 'games/cube2048.html',
       accent: 'primary',
-      available: true
+      available: true,
+      category: ['解谜', '3D'],
+      device: 'keyboard',
+      players: [1]
     },
     {
       name: '节奏线条生成器',
       slug: 'rhythm',
       desc: '音乐驱动的视觉创作工具。点击爆发粒子、滑动绘制流动线条、长按生成环形波纹，配合节拍加成，音乐结束导出专属抽象画。',
+      howto: '点击爆发粒子 · 拖拽绘制线条 · 长按生成环形波纹 · 跟节拍得分翻倍 · 导出抽象画',
       tags: ['音乐', '创作', 'Canvas'],
       techStack: ['HTML', 'Web Audio', 'JS'],
       file: 'games/rhythm.html',
       accent: 'accent',
-      available: true
+      available: true,
+      category: ['创作', '音乐'],
+      device: 'touch',
+      players: [1]
     }
   ],
 

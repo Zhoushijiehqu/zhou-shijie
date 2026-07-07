@@ -7,6 +7,8 @@
 <meta name="generator" content="周世杰个人作品集 v7.0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>解谜剧场 · 周世杰</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#d4ab6a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,400..700&family=Manrope:wght@300..800&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
@@ -17,9 +19,13 @@
 <script>
   // 主题预载（防闪烁）
   (function() {
-    var t = localStorage.getItem('theme');
-    if (!t) t = 'dark';
-    document.documentElement.setAttribute('data-theme', t);
+    try {
+      var t = localStorage.getItem('theme');
+      if (!t) t = 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
   })();
 </script>
 <style>
@@ -463,6 +469,15 @@ body { overflow-wrap: break-word; }
   .level-grid { grid-template-columns: repeat(3, 1fr); }
   .menu-title { font-size: 1.6rem; }
 }
+
+/* ===== 本地排行榜样式（复用 GameUtils.renderLeaderboard） ===== */
+.lb-list { font-size: 12px; max-height: 180px; overflow-y: auto; }
+.lb-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--color-border-light); }
+.lb-item:last-child { border-bottom: none; }
+.lb-item .rank { font-family: var(--font-family-display); font-weight: 700; color: var(--color-accent); min-width: 24px; }
+.lb-item .score { font-family: var(--font-family-display); font-weight: 700; color: var(--color-text-primary); }
+.lb-item .meta { font-size: 10px; color: var(--color-text-tertiary); }
+.lb-empty { text-align: center; color: var(--color-text-tertiary); font-size: 12px; padding: 16px 0; }
 </style>
 </head>
 <body>
@@ -520,6 +535,10 @@ body { overflow-wrap: break-word; }
     <span class="level-title-display" id="level-title-display"></span>
     <button class="bar-btn" id="btn-reset">⟳ 重置</button>
     <button class="bar-btn auto-btn" id="btn-auto-solve">💡 看答案</button>
+    <button class="bar-btn" id="btnHint" title="使用提示" aria-label="提示">💡<span id="hintCount"></span></button>
+    <button class="bar-btn" id="btnShot" title="截图" aria-label="截图">📷</button>
+    <button class="bar-btn" id="btn-fullscreen" title="全屏" aria-label="全屏">⛶</button>
+    <button class="bar-btn" id="btn-skip" title="跳过本关">⏭ 跳关</button>
   </div>
   <div class="hint-display" id="hint-display"></div>
   <div id="viewport-wrapper">
@@ -539,6 +558,10 @@ body { overflow-wrap: break-word; }
       <button id="modal-next" class="primary">下一关 →</button>
       <button id="modal-menu">返回主菜单</button>
     </div>
+    <div class="panel-card" style="margin-top:20px;text-align:left;padding:12px 16px;border:1px solid var(--color-border-light);border-radius:8px;background:var(--color-bg-card)">
+      <h3 style="font-family:var(--font-family-display);font-size:14px;color:var(--color-accent);margin:0 0 8px;letter-spacing:0.06em">排行榜</h3>
+      <div class="lb-list" id="lbList"></div>
+    </div>
   </div>
 </div>
 
@@ -546,6 +569,7 @@ body { overflow-wrap: break-word; }
 <div class="toast" id="toast"></div>
 </div><!-- /#game-root -->
 
+<script src="../assets/js/game-utils.js"></script>
 <script>
 // ==================== LEVEL DATA (21 levels: 0-20) ====================
 const levels = [
@@ -875,6 +899,7 @@ var App = {
   animFrameId: null,
   countdownTimer: null,
   autoSolving: false,
+  usedAutoSolve: false,
   butterflyFlyTimer: null,
   butterflyLandTimer: null,
 
@@ -928,6 +953,11 @@ var App = {
 
     // Load saved data
     self._loadSave();
+
+    // 首次游玩成就
+    if (window.GameUtils && !GameUtils.isUnlocked('first_play')) {
+      GameUtils.unlock('first_play', '初次到访', '第一次游玩任意游戏');
+    }
 
     // Bind global actions
     self._bindActions();
@@ -1017,6 +1047,7 @@ var App = {
           break;
         case 'tutorial':
           self.isTutorial = true;
+          if (window.GameUtils) GameUtils.recordPlay('puzzle', 0);
           self._loadLevel(0);
           self._showScene('gameplay');
           break;
@@ -1047,9 +1078,19 @@ var App = {
     // Level grid delegation
     self.levelGrid.addEventListener('click', function(e) {
       var card = e.target.closest('.level-card');
-      if (!card || card.classList.contains('locked')) return;
+      if (!card) return;
       var idx = parseInt(card.dataset.index);
       if (isNaN(idx)) return;
+      // 关卡解锁检查（与 GameUtils 进度并行）
+      if (card.classList.contains('locked')) {
+        self._showToast('🔒 先通关前一关解锁');
+        return;
+      }
+      if (window.GameUtils && !GameUtils.isLevelUnlocked('puzzle', idx)) {
+        self._showToast('🔒 先通关前一关解锁');
+        return;
+      }
+      if (window.GameUtils) GameUtils.recordPlay('puzzle', 0);
       self.isTutorial = false;
       self._loadLevel(idx);
       self._showScene('gameplay');
@@ -1096,9 +1137,13 @@ var App = {
     html += '<span style="font-size:0.85rem;color:var(--text-muted);letter-spacing:0.06em;">';
     html += '已通关 ' + completed + ' / ' + total + ' · ' + progress + '%';
     html += '</span></div>';
+    // 缓存 GameUtils 星数，避免循环内反复读 localStorage
+    var guStars = (window.GameUtils ? GameUtils.getLevelProgress('puzzle').stars : {});
     for (var i = 1; i <= 20; i++) {
       var level = levels[i]; // levels[1] = id:1
-      var locked = (self.mode === 'linear' && i > self.maxUnlocked);
+      // 锁定判定：本地进度 OR GameUtils 进度，任一解锁则解锁（尊重跨会话全局进度）
+      var guUnlocked = (window.GameUtils && GameUtils.isLevelUnlocked('puzzle', i));
+      var locked = (self.mode === 'linear' && i > self.maxUnlocked && !guUnlocked);
       var isCompleted = self.completedLevels.indexOf(i) !== -1;
       var cls = 'level-card';
       if (locked) cls += ' locked';
@@ -1106,7 +1151,12 @@ var App = {
       html += '<div class="' + cls + '" data-index="' + i + '">';
       html += '<span class="level-num">' + i + '</span>';
       html += '<span class="level-card-name">' + level.title + '</span>';
-      if (locked) html += '<span class="lock-icon">🔒</span>';
+      if (locked) {
+        html += '<span class="lock-icon">🔒</span>';
+      } else if (isCompleted && window.GameUtils) {
+        var s = guStars[i] || 0;
+        if (s > 0) html += '<span style="font-size:0.7rem;color:var(--gold);letter-spacing:1px">' + '★'.repeat(s) + '☆'.repeat(3 - s) + '</span>';
+      }
       html += '</div>';
     }
     self.levelGrid.innerHTML = html;
@@ -1117,6 +1167,7 @@ var App = {
     this._cleanup();
     this.currentLevelIndex = index;
     this.autoSolving = false;
+    this.usedAutoSolve = false;
 
     var level = levels[index];
     if (!level) return;
@@ -1269,6 +1320,11 @@ var App = {
     dom.setPointerCapture(e.pointerId);
     document.addEventListener('pointermove', this._boundPointerMove);
     document.addEventListener('pointerup', this._boundPointerUp);
+
+    // 播放选字音效
+    if (window.PuzzleBGM && typeof window.PuzzleBGM.playPick === 'function') {
+      window.PuzzleBGM.playPick();
+    }
   },
 
   _onPointerMove: function(e) {
@@ -1400,6 +1456,11 @@ var App = {
     var gs = this.gameState;
     var self = this;
 
+    // 播放成功音效
+    if (window.PuzzleBGM && typeof window.PuzzleBGM.playSuccess === 'function') {
+      window.PuzzleBGM.playSuccess();
+    }
+
     switch (rule.type) {
       case 'ELIMINATE':
         this._spawnParticles(triggerEl.x, triggerEl.y);
@@ -1412,6 +1473,13 @@ var App = {
         this._spawnParticles(targetEl.x, targetEl.y);
         this._hideElement(triggerEl);
         this._hideElement(targetEl);
+        if (rule.extraTarget) {
+          var extraEl = gs.elements.get(rule.extraTarget);
+          if (extraEl && extraEl.visible) {
+            this._spawnParticles(extraEl.x, extraEl.y);
+            this._hideElement(extraEl);
+          }
+        }
         this._createResultElement(rule, targetEl.x, targetEl.y);
         break;
 
@@ -1712,6 +1780,11 @@ var App = {
     var level = this.gameState.level;
     var self = this;
 
+    // 播放胜利音效
+    if (window.PuzzleBGM && typeof window.PuzzleBGM.playWin === 'function') {
+      window.PuzzleBGM.playWin();
+    }
+
     // Tutorial: return to menu
     if (this.isTutorial) {
       this.isTutorial = false;
@@ -1721,6 +1794,7 @@ var App = {
       this.modalRetry.style.display = 'none';
       this.modalMenu.style.display = '';
       this.modalOverlay.classList.add('active');
+      if (window.GameUtils) GameUtils.celebrate();
       return;
     }
 
@@ -1735,9 +1809,34 @@ var App = {
     }
     this._save();
 
+    // 星级评价：未用看答案=3星，用了看答案=2星，跳关=1星（跳关由跳关按钮单独处理）
+    var stars = this.usedAutoSolve ? 2 : 3;
+
+    // 成就系统（带 isUnlocked 守卫，避免重复检测）
+    if (window.GameUtils) {
+      var clearedCount = this.completedLevels.length;
+      if (!GameUtils.isUnlocked('puzzle_lv5') && clearedCount >= 5) {
+        GameUtils.unlock('puzzle_lv5', '汉字学徒', '解谜剧场通关 5 关');
+      }
+      if (!GameUtils.isUnlocked('puzzle_all') && clearedCount >= 20) {
+        GameUtils.unlock('puzzle_all', '字字珠玑', '解谜剧场全关卡通关');
+      }
+      // 关卡进度：保存星级 + 解锁下一关
+      GameUtils.saveLevelStars('puzzle', level.id, stars, level.id + 1);
+    }
+
+    // 排行榜接入：记录已通关数
+    if (window.GameUtils) {
+      var cleared = App.completedLevels.length;
+      GameUtils.saveLeaderboard('puzzle', cleared);
+      GameUtils.recordScore('puzzle', cleared);
+      var lbEl = document.getElementById('lbList');
+      if (lbEl) lbEl.innerHTML = GameUtils.renderLeaderboard('puzzle', { meta: function(r){ return '通关 ' + r.score + ' 关'; } });
+    }
+
     // Modal
     this.modalTitle.textContent = '🎉 通关！';
-    this.modalMsg.textContent = '你成功通过了「' + level.title + '」！';
+    this.modalMsg.textContent = '你成功通过了「' + level.title + '」！ ' + '★'.repeat(stars) + '☆'.repeat(3 - stars);
     this.modalRetry.style.display = '';
     this.modalMenu.style.display = '';
 
@@ -1749,12 +1848,14 @@ var App = {
       this.modalNext.style.display = '';
     }
     this.modalOverlay.classList.add('active');
+    if (window.GameUtils) GameUtils.celebrate();
   },
 
   _onNextLevel: function() {
     var nextIdx = this.currentLevelIndex + 1;
     if (nextIdx < levels.length) {
       this.isTutorial = false;
+      if (window.GameUtils) GameUtils.recordPlay('puzzle', 0);
       this._loadLevel(nextIdx);
     } else {
       this._cleanup();
@@ -1769,6 +1870,7 @@ var App = {
   // ---- AUTO SOLVE ----
   _autoSolve: function() {
     if (this.gameState.completed || this.autoSolving) return;
+    this.usedAutoSolve = true;
     var level = this.gameState.level;
     if (!level.rules.length) {
       this._autoSolveSpecial();
@@ -2019,6 +2121,787 @@ document.addEventListener('keydown', function(e) {
     }
   }
 });
+
+// ---- PWA Service Worker 注册 ----
+if (window.GameUtils) {
+  document.documentElement.setAttribute('data-sw-root', '../');
+  GameUtils.registerSW();
+}
 </script>
+
+<script>
+/* ============================================================
+ * 背景音乐系统 - 纯代码生成（Web Audio API）
+ * 风格：中国古风 · 五声音阶 · 古琴/古筝/笛音色 · 72BPM · 16小节循环
+ * ============================================================ */
+(function bgmSystem() {
+  // ---------- 配置 ----------
+  var STORAGE_KEY = 'puzzle_bgm_v1';
+  var BPM = 72;
+  var BEAT = 60 / BPM;
+
+  // 五声音阶频率表（D宫调式：D E #F A B，含偏音G、C）
+  var NOTE_FREQS = {
+    'C3': 130.81, 'Cs3': 138.59,
+    'D2': 73.42,  'E2': 82.41,  'Fs2': 92.50, 'G2': 98.00,  'A2': 110.00, 'B2': 123.47,
+    'D3': 146.83, 'E3': 164.81, 'Fs3': 185.00, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94,
+    'C4': 261.63, 'Cs4': 277.18,
+    'D4': 293.66, 'E4': 329.63, 'Fs4': 369.99, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
+    'C5': 523.25, 'Cs5': 554.37,
+    'D5': 587.33, 'E5': 659.25, 'Fs5': 739.99, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77,
+    'D6': 1174.66
+  };
+
+  function freqOf(name) {
+    return NOTE_FREQS[name] || 293.66;
+  }
+
+  // 和弦进行（五声化）：D - A - Bm - G  → 用五声音阶演绎
+  // 16小节：A(4) + B(4) + A'(4) + B'(4)
+  var CHORDS = [
+    // === A段：宁静开场 (第1-4小节) ===
+    { name: 'D',  root: 'D3', tones: ['D4', 'Fs4', 'A4'], bar: 1 },
+    { name: 'D',  root: 'D3', tones: ['D4', 'Fs4', 'A4'], bar: 2 },
+    { name: 'Bm', root: 'B2', tones: ['B3', 'D4', 'Fs4'], bar: 3 },
+    { name: 'A',  root: 'A2', tones: ['A3', 'Cs4', 'E4'], bar: 4 },
+    // === B段：情感推进 (第5-8小节) ===
+    { name: 'G',  root: 'G2', tones: ['G3', 'B3', 'D4'], bar: 5 },
+    { name: 'D',  root: 'D3', tones: ['D4', 'Fs4', 'A4'], bar: 6 },
+    { name: 'Em', root: 'E2', tones: ['E3', 'G3', 'B3'], bar: 7 },
+    { name: 'A',  root: 'A2', tones: ['A3', 'E4', 'A4'], bar: 8 },
+    // === A'段：主题再现 (第9-12小节) ===
+    { name: 'D',  root: 'D3', tones: ['D4', 'Fs4', 'A4'], bar: 9 },
+    { name: 'Bm', root: 'B2', tones: ['B3', 'D4', 'Fs4'], bar: 10 },
+    { name: 'G',  root: 'G2', tones: ['G3', 'B3', 'D4'], bar: 11 },
+    { name: 'A',  root: 'A2', tones: ['A3', 'E4', 'A4'], bar: 12 },
+    // === B'段：高潮收尾 (第13-16小节) ===
+    { name: 'D',  root: 'D3', tones: ['D4', 'Fs4', 'A4'], bar: 13 },
+    { name: 'Bm', root: 'B2', tones: ['B3', 'D4', 'Fs4'], bar: 14 },
+    { name: 'Em', root: 'E2', tones: ['E3', 'G3', 'B3'], bar: 15 },
+    { name: 'A',  root: 'A2', tones: ['A3', 'E4', 'A4'], bar: 16 }
+  ];
+
+  // 古筝分解模式（每小节8个八分音符，0表示休止）
+  var ARP_PATTERNS = [
+    [0, 0, 0, 1, 2, 1, 0, 2],
+    [0, 1, 0, 2, 1, 0, 2, 1],
+    [0, 0, 1, 0, 2, 1, 0, 2],
+    [1, 0, 2, 1, 0, 1, 2, 0]
+  ];
+
+  // 笛子主旋律（每小节4拍，用音名+拍数表示，0为休止）
+  var MELODY = [
+    // A段 (1-4)
+    // bar 1: D
+    [['D5', 1], ['Fs5', 0.5], ['E5', 0.5], ['D5', 1], ['B4', 1]],
+    // bar 2: D
+    [['A4', 0.5], ['B4', 0.5], ['D5', 1], ['Fs5', 1], ['E5', 1]],
+    // bar 3: Bm
+    [['D5', 1], ['B4', 1], ['A4', 0.5], ['B4', 0.5], ['D5', 1]],
+    // bar 4: A
+    [['Fs5', 1], ['E5', 1], ['D5', 1], ['B4', 1]],
+    // B段 (5-8)
+    // bar 5: G
+    [['B4', 1], ['D5', 1], ['Fs5', 0.5], ['E5', 0.5], ['D5', 1]],
+    // bar 6: D
+    [['D5', 1], ['Fs5', 1], ['A5', 1], ['Fs5', 1]],
+    // bar 7: Em
+    [['E5', 1], ['G5', 0.5], ['Fs5', 0.5], ['E5', 1], ['D5', 1]],
+    // bar 8: A
+    [['D5', 0.5], ['E5', 0.5], ['Fs5', 1], ['A5', 1], ['Fs5', 1]],
+    // A'段 (9-12)
+    // bar 9: D
+    [['D5', 1.5], ['Fs5', 0.5], ['E5', 0.5], ['D5', 0.5], ['B4', 1]],
+    // bar 10: Bm
+    [['B4', 0.5], ['D5', 0.5], ['Fs5', 1], ['E5', 0.5], ['D5', 0.5], ['B4', 1]],
+    // bar 11: G
+    [['G4', 0.5], ['A4', 0.5], ['B4', 1], ['D5', 1], ['B4', 1]],
+    // bar 12: A
+    [['Fs5', 1], ['E5', 1], ['D5', 1], ['B4', 1]],
+    // B'段 (13-16)
+    // bar 13: D
+    [['A5', 1], ['Fs5', 1], ['E5', 0.5], ['Fs5', 0.5], ['D5', 1]],
+    // bar 14: Bm
+    [['D5', 1], ['B4', 1], ['A4', 1], ['B4', 1]],
+    // bar 15: Em
+    [['E5', 0.5], ['G5', 0.5], ['Fs5', 1], ['E5', 0.5], ['D5', 0.5], ['B4', 1]],
+    // bar 16: A → 回到D
+    [['D5', 2], ['Fs5', 1], ['D5', 1]]
+  ];
+
+  // 低音线（每小节一个或两个音，古琴风格）
+  var BASSLINE = [
+    ['D2', 4], ['D2', 4],
+    ['B2', 4], ['A2', 4],
+    ['G2', 4], ['D2', 4],
+    ['E2', 4], ['A2', 4],
+    ['D2', 4], ['B2', 4],
+    ['G2', 4], ['A2', 4],
+    ['D2', 4], ['B2', 4],
+    ['E2', 4], ['A2', 4]
+  ];
+
+  // ---------- 状态 ----------
+  var audioCtx = null;
+  var masterGain = null;
+  var isUserEnabled = false;
+  var isPlaying = false;
+  var userVolume = 0.35;
+
+  var barIndex = 0;
+  var beatInBar = 0;
+  var lastEighthIndex = -1;
+  var lastBeatNum = -1;
+  var arpPatternIndex = 0;
+  var melodyStep = 0;
+  var melodyTimeInBar = 0;
+  var bassStep = 0;
+  var bassTimeInBar = 0;
+  var nextNoteTime = 0;
+  var schedulerTimer = null;
+  var TICK = 0.05;
+
+  // 音色：古筝（弹拨类）
+  function playZitherNote(freq, startTime, duration, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+    var filter = audioCtx.createBiquadFilter();
+
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+
+    filter.type = 'lowpass';
+    filter.frequency.value = freq * 3;
+    filter.Q.value = 0.5;
+
+    var t = startTime;
+    var attack = 0.005;
+    var peak = duration * 0.05;
+    var decay = duration * 0.3;
+    var sustain = duration * 0.6;
+    var release = duration * 0.05;
+
+    noteGain.gain.setValueAtTime(0, t);
+    noteGain.gain.linearRampToValueAtTime(0.5 * gain, t + attack);
+    noteGain.gain.linearRampToValueAtTime(0.35 * gain, t + attack + peak);
+    noteGain.gain.exponentialRampToValueAtTime(0.12 * gain, t + attack + peak + decay);
+    noteGain.gain.setValueAtTime(0.12 * gain, t + duration - release);
+    noteGain.gain.linearRampToValueAtTime(0.001, t + duration);
+
+    osc.connect(filter);
+    filter.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc.start(t);
+    osc.stop(t + duration + 0.05);
+  }
+
+  // 音色：笛子（气鸣类，带呼吸感）
+  function playFluteNote(freq, startTime, duration, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+    var filter = audioCtx.createBiquadFilter();
+
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+
+    filter.type = 'lowpass';
+    filter.frequency.value = freq * 2.5;
+    filter.Q.value = 1;
+
+    // 颤音（笛子的自然波动）
+    var lfo = audioCtx.createOscillator();
+    var lfoGain = audioCtx.createGain();
+    lfo.type = 'sine';
+    lfo.frequency.value = 5.5;
+    lfoGain.gain.value = freq * 0.008;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+
+    var t = startTime;
+    var attack = 0.08;
+    var release = 0.08;
+
+    noteGain.gain.setValueAtTime(0, t);
+    noteGain.gain.linearRampToValueAtTime(0.25 * gain, t + attack);
+    noteGain.gain.setValueAtTime(0.25 * gain, t + duration - release);
+    noteGain.gain.linearRampToValueAtTime(0.001, t + duration);
+
+    osc.connect(filter);
+    filter.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc.start(t);
+    lfo.start(t);
+    osc.stop(t + duration + 0.05);
+    lfo.stop(t + duration + 0.05);
+  }
+
+  // 音色：古琴（低沉弹拨，长余韵）
+  function playGuqinNote(freq, startTime, duration, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc = audioCtx.createOscillator();
+    var osc2 = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+    var filter = audioCtx.createBiquadFilter();
+
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    osc2.type = 'sine';
+    osc2.frequency.value = freq * 2;
+
+    filter.type = 'lowpass';
+    filter.frequency.value = freq * 2;
+    filter.Q.value = 0.3;
+
+    var t = startTime;
+    var attack = 0.02;
+    var peak = 0.05;
+    var decay = duration * 0.4;
+    var sustain = duration * 0.5;
+    var release = duration * 0.1;
+
+    noteGain.gain.setValueAtTime(0, t);
+    noteGain.gain.linearRampToValueAtTime(0.4 * gain, t + attack);
+    noteGain.gain.linearRampToValueAtTime(0.3 * gain, t + attack + peak);
+    noteGain.gain.exponentialRampToValueAtTime(0.08 * gain, t + attack + peak + decay);
+    noteGain.gain.setValueAtTime(0.08 * gain, t + duration - release);
+    noteGain.gain.linearRampToValueAtTime(0.001, t + duration);
+
+    osc.connect(filter);
+    osc2.connect(filter);
+    filter.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc.start(t);
+    osc2.start(t);
+    osc.stop(t + duration + 0.1);
+    osc2.stop(t + duration + 0.1);
+  }
+
+  // 木鱼打击
+  function playWoodblock(startTime, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+    var filter = audioCtx.createBiquadFilter();
+
+    osc.type = 'triangle';
+    osc.frequency.value = 800;
+    osc.frequency.exponentialRampToValueAtTime(400, startTime + 0.05);
+
+    filter.type = 'bandpass';
+    filter.frequency.value = 600;
+    filter.Q.value = 3;
+
+    noteGain.gain.setValueAtTime(0, startTime);
+    noteGain.gain.linearRampToValueAtTime(0.3 * gain, startTime + 0.002);
+    noteGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.08);
+
+    osc.connect(filter);
+    filter.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc.start(startTime);
+    osc.stop(startTime + 0.1);
+  }
+
+  // ---------- 调度 ----------
+  function scheduler() {
+    if (!isPlaying || !audioCtx) return;
+    var now = audioCtx.currentTime;
+    while (nextNoteTime < now + 0.3) {
+      scheduleTick(nextNoteTime);
+      nextNoteTime += TICK;
+    }
+    schedulerTimer = setTimeout(scheduler, 30);
+  }
+
+  function scheduleTick(t) {
+    var chord = CHORDS[barIndex];
+    var arpPattern = ARP_PATTERNS[arpPatternIndex % ARP_PATTERNS.length];
+
+    // === 古筝分解（每拍2个八分音符，用 beatInBar 计算位置） ===
+    var eighthIndex = Math.floor(beatInBar * 2);
+    if (eighthIndex !== lastEighthIndex) {
+      var eighthPos = eighthIndex % 8;
+      var arpNoteIdx = arpPattern[eighthPos];
+      if (arpNoteIdx > 0) {
+        var noteName = chord.tones[arpNoteIdx - 1];
+        if (noteName) {
+          var afreq = freqOf(noteName);
+          var offset = Math.random() * 0.005;
+          playZitherNote(afreq, t + offset, BEAT * 0.8, 0.35);
+        }
+      }
+      lastEighthIndex = eighthIndex;
+    }
+
+    // === 笛子旋律（按时长推进） ===
+    if (melodyTimeInBar <= 0.001) {
+      var barMelody = MELODY[barIndex];
+      if (barMelody && melodyStep < barMelody.length) {
+        var mNote = barMelody[melodyStep];
+        if (mNote[0] !== 0 && mNote[0]) {
+          var mfreq = freqOf(mNote[0]);
+          playFluteNote(mfreq, t, BEAT * mNote[1] * 0.95, 0.5);
+        }
+        melodyTimeInBar = mNote[1];
+        melodyStep++;
+        if (melodyStep >= barMelody.length) {
+          melodyStep = 0;
+        }
+      }
+    }
+    melodyTimeInBar -= TICK / BEAT;
+    if (melodyTimeInBar < 0) melodyTimeInBar = 0;
+
+    // === 古琴低音（按时长推进） ===
+    if (bassTimeInBar <= 0.001) {
+      var bassNote = BASSLINE[bassStep];
+      if (bassNote) {
+        var bfreq = freqOf(bassNote[0]);
+        playGuqinNote(bfreq, t, BEAT * bassNote[1] * 0.9, 0.45);
+      }
+      bassTimeInBar = bassNote[1];
+      bassStep++;
+      if (bassStep >= BASSLINE.length) {
+        bassStep = 0;
+      }
+    }
+    bassTimeInBar -= TICK / BEAT;
+    if (bassTimeInBar < 0) bassTimeInBar = 0;
+
+    // === 木鱼（每小节第1拍和第3拍，用 beatNum 变化检测） ===
+    var beatNum = Math.floor(beatInBar);
+    if (beatNum !== lastBeatNum) {
+      if (beatNum === 0 || beatNum === 2) {
+        var woodGain = beatNum === 0 ? 0.25 : 0.15;
+        playWoodblock(t, woodGain);
+      }
+      lastBeatNum = beatNum;
+    }
+
+    // 推进节拍
+    beatInBar += TICK / BEAT;
+    if (beatInBar >= 4) {
+      beatInBar -= 4;
+      barIndex++;
+      arpPatternIndex++;
+      if (barIndex >= CHORDS.length) {
+        barIndex = 0;
+      }
+      // 新小节时重置旋律步数
+      melodyStep = 0;
+      melodyTimeInBar = 0;
+    }
+  }
+
+  // ---------- 控制 ----------
+  function initAudio() {
+    if (audioCtx) return true;
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return false;
+      audioCtx = new Ctx();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = isUserEnabled ? userVolume : 0;
+      masterGain.connect(audioCtx.destination);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function play() {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (isPlaying) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+
+    barIndex = 0;
+    beatInBar = 0;
+    lastEighthIndex = -1;
+    lastBeatNum = -1;
+    arpPatternIndex = 0;
+    melodyStep = 0;
+    melodyTimeInBar = 0;
+    bassStep = 0;
+    bassTimeInBar = 0;
+    nextNoteTime = audioCtx.currentTime + 0.1;
+    isPlaying = true;
+    scheduler();
+  }
+
+  function stop() {
+    isPlaying = false;
+    if (schedulerTimer) {
+      clearTimeout(schedulerTimer);
+      schedulerTimer = null;
+    }
+    if (masterGain && audioCtx) {
+      masterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.3);
+    }
+  }
+
+  function toggle() {
+    if (isPlaying) {
+      stop();
+    } else {
+      play();
+    }
+    return isPlaying;
+  }
+
+  function setVolume(v) {
+    userVolume = Math.max(0, Math.min(1, v));
+    if (masterGain) {
+      masterGain.gain.setTargetAtTime(isUserEnabled ? userVolume : 0, audioCtx.currentTime, 0.05);
+    }
+    saveSettings();
+  }
+
+  function setEnabled(enabled) {
+    isUserEnabled = enabled;
+    if (enabled && window.GameUtils) {
+      GameUtils.unlock('enable_bgm', '奏响旋律', '开启任意游戏的 BGM');
+    }
+    if (masterGain && audioCtx) {
+      masterGain.gain.setTargetAtTime(enabled ? userVolume : 0, audioCtx.currentTime, 0.05);
+    }
+    if (enabled) {
+      play();
+    } else {
+      stop();
+    }
+    saveSettings();
+  }
+
+  // ---------- 存档 ----------
+  function loadSettings() {
+    try {
+      var saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        var obj = JSON.parse(saved);
+        if (typeof obj.enabled === 'boolean') isUserEnabled = obj.enabled;
+        if (typeof obj.volume === 'number') userVolume = Math.max(0, Math.min(1, obj.volume));
+      }
+    } catch (e) {}
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        enabled: isUserEnabled,
+        volume: userVolume
+      }));
+    } catch (e) {}
+  }
+
+  // ---------- 音效 ----------
+  // 选字/点击音效（古琴泛音）
+  function playPick() {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+    var t = audioCtx.currentTime;
+    var freq = freqOf('A5');
+    playZitherNote(freq, t, 0.3, 0.4);
+  }
+
+  // 成功/合成音效（古筝和弦）
+  function playSuccess() {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+    var t = audioCtx.currentTime;
+    playZitherNote(freqOf('D4'), t, 0.6, 0.5);
+    playZitherNote(freqOf('Fs4'), t + 0.05, 0.6, 0.5);
+    playZitherNote(freqOf('A4'), t + 0.1, 0.6, 0.5);
+    playFluteNote(freqOf('D5'), t + 0.05, 0.5, 0.3);
+  }
+
+  // 错误音效（低音滑降）
+  function playError() {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+    var t = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(300, t);
+    osc.frequency.exponentialRampToValueAtTime(150, t + 0.2);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.3, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    osc.connect(g);
+    g.connect(masterGain);
+    osc.start(t);
+    osc.stop(t + 0.3);
+  }
+
+  // 过关胜利音效（笛子旋律片段）
+  function playWin() {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+    var t = audioCtx.currentTime;
+    var notes = [
+      ['D5', 0.25], ['Fs5', 0.25], ['A5', 0.25],
+      ['B5', 0.3], ['A5', 0.15], ['Fs5', 0.15], ['D5', 0.4]
+    ];
+    var time = t;
+    for (var i = 0; i < notes.length; i++) {
+      playFluteNote(freqOf(notes[i][0]), time, notes[i][1] * 0.95, 0.55);
+      playZitherNote(freqOf(notes[i][0]), time, notes[i][1] * 0.8, 0.3);
+      time += notes[i][1];
+    }
+    // 低音结束
+    playGuqinNote(freqOf('D3'), t + 0.2, 1.0, 0.5);
+  }
+
+  // ---------- UI 绑定 ----------
+  function initUI() {
+    var settingsEl = document.getElementById('settings');
+    if (!settingsEl) return;
+
+    var group = document.createElement('div');
+    group.className = 'settings-group';
+    group.style.marginTop = '4px';
+
+    var label = document.createElement('div');
+    label.className = 'settings-label';
+    label.textContent = '背景音乐';
+
+    var toggleRow = document.createElement('div');
+    toggleRow.className = 'toggle-row';
+    toggleRow.id = 'bgm-toggle';
+    toggleRow.style.marginBottom = '6px';
+
+    var btnOn = document.createElement('button');
+    btnOn.className = 'toggle-opt';
+    btnOn.dataset.bgm = 'on';
+    btnOn.textContent = '开启';
+
+    var btnOff = document.createElement('button');
+    btnOff.className = 'toggle-opt';
+    btnOff.dataset.bgm = 'off';
+    btnOff.textContent = '关闭';
+
+    toggleRow.appendChild(btnOn);
+    toggleRow.appendChild(btnOff);
+
+    if (isUserEnabled) {
+      btnOn.classList.add('active');
+    } else {
+      btnOff.classList.add('active');
+    }
+
+    var volGroup = document.createElement('div');
+    volGroup.className = 'settings-group';
+    volGroup.style.gap = '6px';
+
+    var volLabel = document.createElement('div');
+    volLabel.className = 'settings-label';
+    volLabel.textContent = '音量';
+
+    var volSlider = document.createElement('input');
+    volSlider.type = 'range';
+    volSlider.min = '0';
+    volSlider.max = '100';
+    volSlider.value = Math.round(userVolume * 100);
+    volSlider.style.width = '180px';
+
+    volGroup.appendChild(volLabel);
+    volGroup.appendChild(volSlider);
+
+    group.appendChild(label);
+    group.appendChild(toggleRow);
+    group.appendChild(volGroup);
+
+    var clearBtn = document.getElementById('btn-clear-save');
+    if (clearBtn && clearBtn.parentNode) {
+      clearBtn.parentNode.insertBefore(group, clearBtn);
+    }
+
+    toggleRow.addEventListener('click', function (e) {
+      var btn = e.target.closest('.toggle-opt');
+      if (!btn) return;
+      var bgm = btn.dataset.bgm;
+      var enabled = bgm === 'on';
+      setEnabled(enabled);
+      btnOn.classList.toggle('active', enabled);
+      btnOff.classList.toggle('active', !enabled);
+    });
+
+    volSlider.addEventListener('input', function (e) {
+      setVolume(parseInt(e.target.value) / 100);
+    });
+  }
+
+  // ---------- 暴露给外部 ----------
+  window.PuzzleBGM = {
+    play: play,
+    stop: stop,
+    toggle: toggle,
+    setVolume: setVolume,
+    setEnabled: setEnabled,
+    playPick: playPick,
+    playSuccess: playSuccess,
+    playError: playError,
+    playWin: playWin,
+    isPlaying: function () { return isPlaying; },
+    isEnabled: function () { return isUserEnabled; }
+  };
+
+  // ---------- 初始化 ----------
+  loadSettings();
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      initUI();
+      if (isUserEnabled) play();
+    });
+  } else {
+    initUI();
+    if (isUserEnabled) play();
+  }
+})();
+</script>
+
+<script>
+// ===== 新手引导 / 提示 / 截图 =====
+(function() {
+  if (!window.GameUtils) return;
+
+  // 新手引导
+  GameUtils.showTutorial('puzzle', '解谜剧场 · 玩法指南', [
+    { step: '观察题目', desc: '每关给出一个汉字谜题，需要组合文字部件破解' },
+    { step: '拖拽文字', desc: '拖动屏幕上的汉字/偏旁到合适位置，组合成新字' },
+    { step: '点击交互', desc: '点击文字可能触发变形、分裂或合并，多试几次' },
+    { step: '看答案', desc: '卡关时可点击"看答案"按钮，但会失去本关三星评价' },
+    { step: '提示功能', desc: '每日有 3 次免费提示，点击💡按钮获得下一步建议' }
+  ]);
+
+  // 提示按钮
+  function updateHintUI() {
+    var c = GameUtils.getHintCount();
+    var el = document.getElementById('hintCount');
+    if (el) el.textContent = ' (' + c + ')';
+  }
+  updateHintUI();
+
+  var btnHint = document.getElementById('btnHint');
+  if (btnHint) {
+    btnHint.onclick = function() {
+      if (GameUtils.useHint()) {
+        GameUtils.unlock('use_hint', '不耻下问', '使用一次提示功能');
+        GameUtils._toast('提示：试着把能组合成常用字的部件放在一起');
+        updateHintUI();
+      } else {
+        GameUtils._toast('今日提示次数已用完，明天再来');
+      }
+    };
+  }
+
+  // 截图按钮
+  var btnShot = document.getElementById('btnShot');
+  if (btnShot) {
+    btnShot.onclick = function() {
+      if (!window.GameUtils) return;
+      // puzzle 是 DOM 游戏（无 canvas），用 SVG foreignObject 对游戏主面板截图
+      var stage = document.querySelector('#game-viewport') || document.querySelector('.stage, .game-stage, #stage, .board') || document.querySelector('main');
+      if (!stage) { GameUtils._toast('截图失败：未找到游戏区域'); return; }
+      try {
+        var rect = stage.getBoundingClientRect();
+        var data = '<svg xmlns="http://www.w3.org/2000/svg" width="' + rect.width + '" height="' + rect.height + '">' +
+          '<foreignObject width="100%" height="100%">' +
+          '<div xmlns="http://www.w3.org/1999/xhtml" style="width:' + rect.width + 'px;height:' + rect.height + 'px">' +
+          new XMLSerializer().serializeToString(stage) +
+          '</div></foreignObject></svg>';
+        var blob = new Blob([data], { type: 'image/svg+xml' });
+        var url = URL.createObjectURL(blob);
+        var img = new Image();
+        img.onload = function() {
+          var canvas = document.createElement('canvas');
+          canvas.width = rect.width; canvas.height = rect.height;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(url);
+          GameUtils.screenshotCanvas(canvas, '解谜剧场', '第 ' + (App.currentLevelIndex >= 0 ? App.currentLevelIndex : 0) + ' 关');
+          GameUtils.unlock('use_screenshot', '定格瞬间', '使用截图功能分享一次');
+        };
+        img.onerror = function() {
+          URL.revokeObjectURL(url);
+          GameUtils._toast('DOM 截图失败，可尝试用系统截图');
+        };
+        img.src = url;
+      } catch (e) {
+        GameUtils._toast('截图失败：' + e.message);
+      }
+    };
+  }
+
+  // 全屏按钮
+  var btnFs = document.getElementById('btn-fullscreen');
+  if (btnFs) {
+    btnFs.onclick = function() {
+      if (window.GameUtils) GameUtils.toggleFullscreen(document.documentElement);
+    };
+  }
+
+  // 跳关按钮（给当前关 1 星并解锁下一关）
+  var btnSkip = document.getElementById('btn-skip');
+  if (btnSkip) {
+    btnSkip.onclick = function() {
+      var nextIdx = App.currentLevelIndex + 1;
+      var curLevel = App.currentLevelIndex;
+      if (nextIdx < levels.length) {
+        // 跳关：当前关记 1 星，解锁下一关
+        if (window.GameUtils && curLevel >= 1) {
+          GameUtils.saveLevelStars('puzzle', curLevel, 1, curLevel + 1);
+        }
+        // 同步更新本地进度，避免选关界面仍显示锁定
+        if (curLevel >= 1 && App.completedLevels.indexOf(curLevel) === -1) {
+          App.completedLevels.push(curLevel);
+        }
+        if (nextIdx > App.maxUnlocked) App.maxUnlocked = nextIdx;
+        App._loadLevel(nextIdx);
+        if (window.GameUtils) GameUtils._toast('已跳过本关 · 1 星评价');
+      } else {
+        if (window.GameUtils) GameUtils._toast('已是最后一关');
+      }
+    };
+  }
+
+  // 反馈入口注入
+  if (window.GameUtils) {
+    GameUtils.injectFeedback('#feedbackSlot');
+  }
+
+  // 页面初始化时渲染排行榜
+  if (window.GameUtils) {
+    var lbEl = document.getElementById('lbList');
+    if (lbEl) lbEl.innerHTML = GameUtils.renderLeaderboard('puzzle', { meta: function(r){ return '通关 ' + r.score + ' 关'; } });
+  }
+
+  // 全局快捷键（? 唤起玩法提示，L 滚动到排行榜）
+  if (window.GameUtils && GameUtils.registerGlobalShortcuts) {
+    GameUtils.registerGlobalShortcuts({
+      onHelp: function() { GameUtils.showHowtoPopup('拖拽文字组合破解谜题 · 看答案可演示解法 · 跳关跳过当前关卡 · 21 关递进'); },
+      onLeaderboard: function() {
+        var lb = document.getElementById('lbList');
+        if (lb) { lb.scrollIntoView({ behavior: 'smooth', block: 'center' }); lb.style.transition = 'box-shadow .3s'; lb.style.boxShadow = '0 0 0 2px var(--color-accent)'; setTimeout(function(){ lb.style.boxShadow = ''; }, 800); }
+      }
+    });
+  }
+})();
+</script>
+
+<!-- 反馈入口 -->
+<div id="feedbackSlot" style="text-align:center;padding:12px 0;border-top:1px solid var(--color-border-light);margin-top:24px"></div>
 </body>
 </html>

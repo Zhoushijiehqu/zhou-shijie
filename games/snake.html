@@ -22,12 +22,18 @@
 
   <!-- 网站图标 -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐍</text></svg>">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <meta name="theme-color" content="#d4ab6a">
 
   <!-- 主题预载：避免刷新闪烁，读取 localStorage 的 theme（默认 dark） -->
   <script>
     (function () {
-      var saved = localStorage.getItem('theme');
-      document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      try {
+        var saved = localStorage.getItem('theme');
+        document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
     })();
   </script>
 
@@ -428,6 +434,79 @@
       cursor: pointer;
       border: none;
     }
+
+    /* ========== 挑战模式选择 ========== */
+    .challenge-selector {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .challenge-btn {
+      padding: 8px 18px;
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--color-border-medium);
+      background: var(--color-bg-secondary);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      font-family: var(--font-family-base);
+      transition: all var(--transition-fast);
+      user-select: none;
+    }
+
+    .challenge-btn:hover {
+      border-color: var(--color-accent-light);
+      color: var(--color-accent);
+      transform: translateY(-1px);
+    }
+
+    .challenge-btn:active {
+      transform: scale(0.97);
+    }
+
+    .challenge-btn.is-active {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: #fff;
+    }
+
+    .challenge-btn .ico {
+      margin-right: 4px;
+    }
+
+    /* 限时模式 HUD 倒计时 */
+    .timer-display {
+      color: var(--color-danger, #e74c3c);
+      font-weight: 700;
+    }
+
+    .timer-display.warning {
+      animation: snakeTimerPulse 0.8s ease-in-out infinite;
+    }
+
+    @keyframes snakeTimerPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* 双人模式玩家 2 的蛇（用不同颜色 */
+    .p2-snake {
+      filter: hue-rotate(180deg);
+    }
+
+    /* 本地排行榜 */
+    .lb-list { font-size: 12px; max-height: 180px; overflow-y: auto; }
+    .lb-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--color-border-light); }
+    .lb-item:last-child { border-bottom: none; }
+    .lb-item .rank { font-family: var(--font-family-display); font-weight: 700; color: var(--color-accent); min-width: 24px; }
+    .lb-item .score { font-family: var(--font-family-display); font-weight: 700; color: var(--color-text-primary); }
+    .lb-item .meta { font-size: 10px; color: var(--color-text-tertiary); }
+    .lb-empty { text-align: center; color: var(--color-text-tertiary); font-size: 12px; padding: 16px 0; }
   </style>
 </head>
 <body>
@@ -463,6 +542,14 @@
           <span class="info-label">奖励球</span>
           <span class="info-value" id="bonus">0</span>
         </div>
+        <div class="info-item" id="timeItem" style="display:none">
+          <span class="info-label">时间</span>
+          <span class="info-value" id="timeLeft">60</span>
+        </div>
+        <div class="info-item" id="p2Item" style="display:none">
+          <span class="info-label">P2 分数</span>
+          <span class="info-value" id="score2">0</span>
+        </div>
         <div class="info-item">
           <span class="info-label">状态</span>
           <span class="info-value status-text" id="status">就绪</span>
@@ -482,6 +569,14 @@
         </div>
       </div>
 
+      <!-- 挑战模式选择 -->
+      <div class="challenge-selector" id="challengeSelector">
+        <button class="challenge-btn is-active" data-challenge="classic"><span class="ico">🐍</span>经典</button>
+        <button class="challenge-btn" data-challenge="time"><span class="ico">⏱️</span>限时</button>
+        <button class="challenge-btn" data-challenge="wrap"><span class="ico">🌀</span>穿墙</button>
+        <button class="challenge-btn" data-challenge="duo"><span class="ico">👥</span>双人</button>
+      </div>
+
       <!-- 游戏画布 -->
       <div class="canvas-wrap">
         <canvas id="gameCanvas" width="500" height="500"></canvas>
@@ -492,6 +587,9 @@
         <div class="control-buttons">
           <button class="btn btn-primary" id="startBtn">开始游戏</button>
           <button class="btn btn-secondary" id="restartBtn">重新开始</button>
+          <button class="btn" id="btnDaily" title="每日挑战（同一天所有人关卡相同，仅一次）">🏆 今日</button>
+          <button class="btn" id="btnShot" title="截图" aria-label="截图">📷</button>
+          <button class="btn" id="btnFs" title="全屏" aria-label="全屏" onclick="if(window.GameUtils)GameUtils.toggleFullscreen()">⛶ 全屏</button>
         </div>
 
         <div class="controls-hint">
@@ -521,9 +619,25 @@
           </span>
         </div>
       </div>
+
+      <!-- 成绩历史趋势 -->
+      <div class="trend-panel" id="trendPanel" style="margin-top:var(--spacing-md);padding:var(--spacing-md);background:var(--color-bg-secondary);border:1px solid var(--color-border-light);border-radius:var(--radius-md)">
+        <div style="font-family:var(--font-family-base);font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--color-text-tertiary);margin-bottom:4px">成绩历史</div>
+        <div id="trendChart"></div>
+      </div>
+
+      <!-- 本地排行榜 -->
+      <div class="panel-card" style="margin-top:var(--spacing-md);padding:var(--spacing-md);background:var(--color-bg-secondary);border:1px solid var(--color-border-light);border-radius:var(--radius-md)">
+        <h3 style="margin:0 0 6px;font-family:var(--font-family-display);font-size:14px;color:var(--color-text-primary)">排行榜</h3>
+        <div class="lb-list" id="lbList"></div>
+      </div>
     </div>
   </main>
 
+  <!-- 反馈入口 -->
+  <div id="feedbackSlot" style="text-align:center;padding:12px 0;border-top:1px solid var(--color-border-light);margin-top:24px"></div>
+
+  <script src="../assets/js/game-utils.js"></script>
   <script>
     /* ============================================================
      * 主题切换（与主页面一致：localStorage key='theme'，默认 dark）
@@ -545,6 +659,7 @@
         document.documentElement.setAttribute('data-theme', next);
         localStorage.setItem('theme', next);
         applyIcon();
+        if (window.GameUtils) GameUtils.unlock('try_skin', '换个皮肤', '切换过一次游戏皮肤');
       });
     })();
 
@@ -566,6 +681,10 @@
       var startBtn = document.getElementById('startBtn');
       var restartBtn = document.getElementById('restartBtn');
       var bonusEl = document.getElementById('bonus');
+      var timeLeftEl = document.getElementById('timeLeft');
+      var timeItemEl = document.getElementById('timeItem');
+      var score2El = document.getElementById('score2');
+      var p2ItemEl = document.getElementById('p2Item');
 
       // ----- 速度参数：初始 140ms，每吃 5 个食物加速 8ms，最快 70ms -----
       var INITIAL_SPEED = 140;
@@ -580,6 +699,42 @@
       var BONUS_MAX_SIZE = CELL * 1.6;  // 大球最大直径，比普通食物明显更大
       var BONUS_POP_IN_MS = 300;        // 出现时 0.3 秒弹出动画
       var BONUS_BLINK_MS = 1500;        // 剩余 1.5 秒开始闪烁
+
+      // ----- 挑战模式配置 -----
+      var CHALLENGE_STORAGE_KEY = 'snake_challenge_v1';
+      var challengeMode = 'classic'; // classic | time | wrap | duo
+      var TIME_ATTACK_DURATION = 60; // 限时模式 60 秒
+      var TIME_ATTACK_FOOD_COUNT = 5; // 限时模式同时出现 5 个食物
+      var TIME_ATTACK_BONUS_INTERVAL = 3000; // 限时模式奖励球 3 秒一个
+
+      // ----- 每日挑战（种子化食物生成）-----
+      var dailySeed = null;        // 非 null 时启用种子化食物生成
+      var _seedState = 0;          // 种子化伪随机内部状态
+      function setDailySeed(seed) {
+        dailySeed = seed;
+        _seedState = (seed >>> 0) || 1;
+      }
+      function clearDailySeed() { dailySeed = null; }
+      // mulberry32：同种子生成相同序列
+      function seededRand() {
+        _seedState = (_seedState + 0x6D2B79F5) | 0;
+        var t = Math.imul(_seedState ^ (_seedState >>> 15), 1 | _seedState);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      }
+      function pickRand() { return dailySeed ? seededRand() : Math.random(); }
+
+      // 双人模式 P2 状态
+      var snake2 = [];
+      var dir2 = { x: -1, y: 0 };
+      var nextDir2 = { x: -1, y: 0 };
+      var score2 = 0;
+      var winner = 0; // 0=无, 1=P1, 2=P2
+
+      // 限时模式多食物
+      var foods = []; // [{x, y}, ...]
+      var timeLeft = 0;
+      var timeUp = false; // 限时模式时间用尽标志
 
       // ----- 游戏状态 -----
       // state: 'ready' | 'playing' | 'paused' | 'over'
@@ -607,11 +762,17 @@
       // ----- 读取最高分 -----
       var HIGH_SCORE_KEY = 'snakeHighScore';
       function loadHighScore() {
-        var v = parseInt(localStorage.getItem(HIGH_SCORE_KEY), 10);
-        return isNaN(v) ? 0 : v;
+        try {
+          var v = parseInt(localStorage.getItem(HIGH_SCORE_KEY), 10);
+          return isNaN(v) ? 0 : v;
+        } catch (e) {
+          return 0;
+        }
       }
       function saveHighScore(v) {
-        localStorage.setItem(HIGH_SCORE_KEY, String(v));
+        try {
+          localStorage.setItem(HIGH_SCORE_KEY, String(v));
+        } catch (e) {}
       }
       var highScore = loadHighScore();
 
@@ -639,11 +800,11 @@
 
       // ----- 初始化一局新游戏 -----
       function resetGame() {
-        // 清除可能存在的倒计时
         if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-        // 清除游戏循环定时器
         if (timer) { clearTimeout(timer); timer = null; }
-        // 蛇初始 3 节，位于画布中央，向右移动
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        lastFrameTs = 0;
+        clearDailySeed(); // 常规重开不保留每日种子（每日挑战会在重开后重新注入）
         var mid = Math.floor(GRID / 2);
         snake = [
           { x: mid, y: mid },
@@ -655,30 +816,87 @@
         score = 0;
         foodEaten = 0;
         currentSpeed = INITIAL_SPEED;
-        // 清空奖励球状态，防止上一局残留
+        winner = 0;
+
+        if (challengeMode === 'duo') {
+          snake2 = [
+            { x: mid, y: mid + 4 },
+            { x: mid + 1, y: mid + 4 },
+            { x: mid + 2, y: mid + 4 }
+          ];
+          dir2 = { x: -1, y: 0 };
+          nextDir2 = { x: -1, y: 0 };
+          score2 = 0;
+        } else {
+          snake2 = [];
+          score2 = 0;
+        }
+
         bonusBall = null;
-        bonusCountdown = BONUS_INTERVAL;
+        bonusCountdown = challengeMode === 'time' ? TIME_ATTACK_BONUS_INTERVAL : BONUS_INTERVAL;
         bonusEaten = 0;
         floatTexts = [];
         particles = [];
-        placeFood();
+
+        if (challengeMode === 'time') {
+          timeLeft = TIME_ATTACK_DURATION;
+          timeUp = false;
+          foods = [];
+          placeFood();
+          for (var fi = 0; fi < TIME_ATTACK_FOOD_COUNT; fi++) {
+            placeFoodMulti();
+          }
+        } else {
+          timeLeft = 0;
+          timeUp = false;
+          foods = [];
+          placeFood();
+        }
+
         updateHUD();
         state = 'ready';
         setStatus('就绪');
         startBtn.textContent = '开始游戏';
         draw();
+        // 记录游玩次数
+        if (window.GameUtils) {
+          GameUtils.recordPlay('snake', 0);
+          // 成就：首次启动游戏
+          try {
+            if (!GameUtils.isUnlocked('first_play')) {
+              GameUtils.unlock('first_play', '初次到访', '第一次游玩任意游戏');
+            }
+          } catch (e) {}
+        }
       }
 
-      // ----- 随机生成食物（不能落在蛇身或大球上） -----
-      function placeFood() {
+      // ----- 获取所有被占用的格子（蛇身 + 大球 + 其他食物） -----
+      function getOccupied(excludeFoodIdx) {
         var occupied = {};
         for (var i = 0; i < snake.length; i++) {
           occupied[snake[i].x + ',' + snake[i].y] = true;
         }
-        // 大球存活时，食物也不生成在大球位置
+        if (challengeMode === 'duo') {
+          for (var j = 0; j < snake2.length; j++) {
+            occupied[snake2[j].x + ',' + snake2[j].y] = true;
+          }
+        }
         if (bonusBall) {
           occupied[bonusBall.x + ',' + bonusBall.y] = true;
         }
+        if (challengeMode === 'time') {
+          for (var k = 0; k < foods.length; k++) {
+            if (k !== excludeFoodIdx) {
+              occupied[foods[k].x + ',' + foods[k].y] = true;
+            }
+          }
+        }
+        return occupied;
+      }
+
+      // ----- 随机生成食物（不能落在蛇身或大球上） -----
+      function placeFood() {
+        var occupied = getOccupied();
         var candidates = [];
         for (var x = 0; x < GRID; x++) {
           for (var y = 0; y < GRID; y++) {
@@ -686,18 +904,59 @@
           }
         }
         if (candidates.length === 0) {
-          // 蛇填满整个画布 - 胜利场景，理论上极少触发
           food = { x: -1, y: -1 };
           return;
         }
-        food = candidates[Math.floor(Math.random() * candidates.length)];
+        food = candidates[Math.floor(pickRand() * candidates.length)];
       }
 
-      // ----- 更新 HUD（分数 / 最高分 / 状态） -----
+      // ----- 限时模式：往 foods 数组追加一个随机食物 -----
+      function placeFoodMulti() {
+        var occupied = getOccupied();
+        occupied[food.x + ',' + food.y] = true;
+        var candidates = [];
+        for (var x = 0; x < GRID; x++) {
+          for (var y = 0; y < GRID; y++) {
+            if (!occupied[x + ',' + y]) candidates.push({ x: x, y: y });
+          }
+        }
+        if (candidates.length === 0) return;
+        foods.push(candidates[Math.floor(pickRand() * candidates.length)]);
+      }
+
+      // ----- 更新 HUD（分数 / 最高分 / 状态 / 时间 / P2分数） -----
       function updateHUD() {
         scoreEl.textContent = score;
         highScoreEl.textContent = highScore;
         bonusEl.textContent = bonusEaten;
+
+        // 限时模式显示时间
+        if (timeItemEl) {
+          timeItemEl.style.display = challengeMode === 'time' ? '' : 'none';
+          if (challengeMode === 'time') {
+            timeLeftEl.textContent = Math.ceil(timeLeft);
+          }
+        }
+
+        // 双人模式显示 P2 分数
+        if (p2ItemEl) {
+          p2ItemEl.style.display = challengeMode === 'duo' ? '' : 'none';
+          if (challengeMode === 'duo') {
+            score2El.textContent = score2;
+          }
+        }
+
+        // 成就：单局分数首次≥50/100（在分数更新处检测）
+        if (window.GameUtils) {
+          try {
+            if (score >= 50 && !GameUtils.isUnlocked('snake_score_50')) {
+              GameUtils.unlock('snake_score_50', '小蛇出山', '贪吃蛇单局达 50 分');
+            }
+            if (score >= 100 && !GameUtils.isUnlocked('snake_score_100')) {
+              GameUtils.unlock('snake_score_100', '蛇王', '贪吃蛇单局达 100 分');
+            }
+          } catch (e) {}
+        }
       }
 
       function setStatus(text, isOver) {
@@ -707,25 +966,41 @@
 
       // ----- 设置方向（支持 WASD 与方向键，禁止反向掉头） -----
       function setDirection(nx, ny) {
-        // 关键：与"当前已应用方向"dir 比较，而非 nextDir。
-        // 这样连按两键（如向右时快速按上再按左）也不会因第二键覆盖 nextDir 而掉头。
         if (nx === -dir.x && ny === -dir.y) return;
         nextDir = { x: nx, y: ny };
       }
 
+      // ----- 玩家2方向控制 -----
+      function setDirection2(nx, ny) {
+        if (nx === -dir2.x && ny === -dir2.y) return;
+        nextDir2 = { x: nx, y: ny };
+      }
+
       // ----- 单帧更新 -----
       function update() {
-        dir = nextDir;
-        var head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
-
-        // 撞墙判定
-        if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID) {
-          gameOver();
+        if (challengeMode === 'duo') {
+          updateDuo();
           return;
         }
 
-        // 撞自己判定（尾巴在移动，检查除尾巴外的身体）
-        // 注意：若吃到食物则尾巴不移动，这里保守地检查全部身体
+        dir = nextDir;
+        var head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+        // 穿墙模式：出界后从对面出来
+        if (challengeMode === 'wrap') {
+          if (head.x < 0) head.x = GRID - 1;
+          else if (head.x >= GRID) head.x = 0;
+          if (head.y < 0) head.y = GRID - 1;
+          else if (head.y >= GRID) head.y = 0;
+        } else {
+          // 撞墙判定
+          if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID) {
+            gameOver();
+            return;
+          }
+        }
+
+        // 撞自己判定
         for (var i = 0; i < snake.length; i++) {
           if (snake[i].x === head.x && snake[i].y === head.y) {
             gameOver();
@@ -735,14 +1010,13 @@
 
         snake.unshift(head);
 
-        // 吃到普通食物
+        // 吃到普通食物（经典模式只有 1 个）
         var ateFood = (head.x === food.x && head.y === food.y);
         if (ateFood) {
           score += 1;
           foodEaten += 1;
           spawnParticles(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, colors().accent, 10);
           if (window.SnakeBGM) { try { window.SnakeBGM.playEat(); } catch (e) {} }
-          // 每吃 5 个食物加速 8ms，最快 70ms
           if (foodEaten % SPEED_UP_EVERY === 0 && currentSpeed > MIN_SPEED) {
             currentSpeed = Math.max(MIN_SPEED, currentSpeed - SPEED_STEP);
           }
@@ -750,7 +1024,26 @@
           placeFood();
         }
 
-        // 吃到奖励球（大球）：+5 分，不增长蛇身，立即消失并重置倒计时
+        // 限时模式：检查额外的食物
+        if (challengeMode === 'time') {
+          for (var fi = foods.length - 1; fi >= 0; fi--) {
+            if (head.x === foods[fi].x && head.y === foods[fi].y) {
+              score += 1;
+              foodEaten += 1;
+              spawnParticles(foods[fi].x * CELL + CELL / 2, foods[fi].y * CELL + CELL / 2, colors().accent, 10);
+              if (window.SnakeBGM) { try { window.SnakeBGM.playEat(); } catch (e) {} }
+              if (foodEaten % SPEED_UP_EVERY === 0 && currentSpeed > MIN_SPEED) {
+                currentSpeed = Math.max(MIN_SPEED, currentSpeed - SPEED_STEP);
+              }
+              foods.splice(fi, 1);
+              placeFoodMulti();
+              updateHUD();
+              ateFood = true;
+            }
+          }
+        }
+
+        // 吃到奖励球
         if (bonusBall && head.x === bonusBall.x && head.y === bonusBall.y) {
           score += BONUS_SCORE;
           bonusEaten += 1;
@@ -762,24 +1055,125 @@
           );
           if (window.SnakeBGM) { try { window.SnakeBGM.playBonus(); } catch (e) {} }
           bonusBall = null;
-          bonusCountdown = BONUS_INTERVAL;
+          bonusCountdown = challengeMode === 'time' ? TIME_ATTACK_BONUS_INTERVAL : BONUS_INTERVAL;
           updateHUD();
         }
 
         if (!ateFood) {
-          // 没吃到普通食物，去掉尾巴保持长度（奖励球不影响身长）
           snake.pop();
         }
+      }
+
+      // ----- 双人模式更新 -----
+      function updateDuo() {
+        dir = nextDir;
+        dir2 = nextDir2;
+
+        var head1 = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+        var head2 = { x: snake2[0].x + dir2.x, y: snake2[0].y + dir2.y };
+
+        var p1Dead = false;
+        var p2Dead = false;
+
+        // 撞墙判定
+        if (head1.x < 0 || head1.x >= GRID || head1.y < 0 || head1.y >= GRID) p1Dead = true;
+        if (head2.x < 0 || head2.x >= GRID || head2.y < 0 || head2.y >= GRID) p2Dead = true;
+
+        // 撞自己判定
+        if (!p1Dead) {
+          for (var i = 0; i < snake.length; i++) {
+            if (snake[i].x === head1.x && snake[i].y === head1.y) { p1Dead = true; break; }
+          }
+        }
+        if (!p2Dead) {
+          for (var j = 0; j < snake2.length; j++) {
+            if (snake2[j].x === head2.x && snake2[j].y === head2.y) { p2Dead = true; break; }
+          }
+        }
+
+        // 撞对方判定
+        if (!p1Dead) {
+          for (var k = 0; k < snake2.length; k++) {
+            if (snake2[k].x === head1.x && snake2[k].y === head1.y) { p1Dead = true; break; }
+          }
+        }
+        if (!p2Dead) {
+          for (var m = 0; m < snake.length; m++) {
+            if (snake[m].x === head2.x && snake[m].y === head2.y) { p2Dead = true; break; }
+          }
+        }
+
+        // 头对头相撞
+        if (!p1Dead && !p2Dead && head1.x === head2.x && head1.y === head2.y) {
+          p1Dead = true;
+          p2Dead = true;
+        }
+
+        if (p1Dead || p2Dead) {
+          if (p1Dead && !p2Dead) winner = 2;
+          else if (!p1Dead && p2Dead) winner = 1;
+          else winner = 0;
+          gameOver();
+          return;
+        }
+
+        snake.unshift(head1);
+        snake2.unshift(head2);
+
+        var ate1 = (head1.x === food.x && head1.y === food.y);
+        var ate2 = (head2.x === food.x && head2.y === food.y);
+
+        if (ate1) {
+          score += 1;
+          foodEaten += 1;
+          spawnParticles(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, colors().accent, 10);
+          if (window.SnakeBGM) { try { window.SnakeBGM.playEat(); } catch (e) {} }
+          placeFood();
+          updateHUD();
+        }
+        if (ate2) {
+          score2 += 1;
+          foodEaten += 1;
+          spawnParticles(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, '#3498db', 10);
+          if (window.SnakeBGM) { try { window.SnakeBGM.playEat(); } catch (e) {} }
+          placeFood();
+          updateHUD();
+        }
+
+        // 双人模式下加速
+        if ((ate1 || ate2) && foodEaten % SPEED_UP_EVERY === 0 && currentSpeed > MIN_SPEED) {
+          currentSpeed = Math.max(MIN_SPEED, currentSpeed - SPEED_STEP);
+        }
+
+        // 奖励球两人都可以吃
+        if (bonusBall && head1.x === bonusBall.x && head1.y === bonusBall.y) {
+          score += BONUS_SCORE;
+          bonusEaten += 1;
+          spawnFloatText(bonusBall.x * CELL + CELL / 2, bonusBall.y * CELL + CELL / 2, '+' + BONUS_SCORE, cssVar('--color-accent'));
+          if (window.SnakeBGM) { try { window.SnakeBGM.playBonus(); } catch (e) {} }
+          bonusBall = null;
+          bonusCountdown = BONUS_INTERVAL;
+          updateHUD();
+        }
+        if (bonusBall && head2.x === bonusBall.x && head2.y === bonusBall.y) {
+          score2 += BONUS_SCORE;
+          bonusEaten += 1;
+          spawnFloatText(bonusBall.x * CELL + CELL / 2, bonusBall.y * CELL + CELL / 2, '+' + BONUS_SCORE, '#3498db');
+          if (window.SnakeBGM) { try { window.SnakeBGM.playBonus(); } catch (e) {} }
+          bonusBall = null;
+          bonusCountdown = BONUS_INTERVAL;
+          updateHUD();
+        }
+
+        if (!ate1) snake.pop();
+        if (!ate2) snake2.pop();
       }
 
       // ----- 奖励球（大球）相关函数 -----
 
       // 随机生成大球位置（不能落在蛇身或普通食物上）
       function spawnBonusBall() {
-        var occupied = {};
-        for (var i = 0; i < snake.length; i++) {
-          occupied[snake[i].x + ',' + snake[i].y] = true;
-        }
+        var occupied = getOccupied();
         occupied[food.x + ',' + food.y] = true;
         var candidates = [];
         for (var x = 0; x < GRID; x++) {
@@ -787,7 +1181,7 @@
             if (!occupied[x + ',' + y]) candidates.push({ x: x, y: y });
           }
         }
-        if (candidates.length === 0) return;  // 空间不足就不生成
+        if (candidates.length === 0) return;
         var pos = candidates[Math.floor(Math.random() * candidates.length)];
         bonusBall = {
           x: pos.x,
@@ -947,21 +1341,14 @@
 
         // 食物（沙弗朗金圆点 + 微光晕）
         if (food.x >= 0) {
-          var fx = food.x * CELL + CELL / 2;
-          var fy = food.y * CELL + CELL / 2;
-          ctx.save();
-          ctx.shadowColor = c.accent;
-          ctx.shadowBlur = 12;
-          ctx.fillStyle = c.accent;
-          ctx.beginPath();
-          ctx.arc(fx, fy, CELL / 2 - PAD - 2, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-          // 内部高光
-          ctx.fillStyle = 'rgba(255,255,255,0.35)';
-          ctx.beginPath();
-          ctx.arc(fx - CELL / 8, fy - CELL / 8, CELL / 7, 0, Math.PI * 2);
-          ctx.fill();
+          drawFood(food.x, food.y, c.accent);
+        }
+
+        // 限时模式额外食物
+        if (challengeMode === 'time') {
+          for (var fi = 0; fi < foods.length; fi++) {
+            drawFood(foods[fi].x, foods[fi].y, c.accent);
+          }
         }
 
         // 奖励球（大球）
@@ -982,7 +1369,28 @@
 
         // 蛇头眼睛
         if (snake.length > 0) {
-          drawEyes(snake[0]);
+          drawEyes(snake[0], dir);
+        }
+
+        // 双人模式：第二条蛇（蓝色系）
+        if (challengeMode === 'duo' && snake2.length > 0) {
+          var p2Color = '#3498db';
+          var p2ColorLight = '#5dade2';
+          for (var s2 = 0; s2 < snake2.length; s2++) {
+            var seg2 = snake2[s2];
+            var isHead2 = s2 === 0;
+            var rx2 = seg2.x * CELL + PAD;
+            var ry2 = seg2.y * CELL + PAD;
+            var rw2 = CELL - PAD * 2;
+            var radius2 = Math.max(3, CELL / 4);
+            ctx.fillStyle = isHead2 ? p2ColorLight : p2Color;
+            roundRect(ctx, rx2, ry2, rw2, rw2, radius2);
+            ctx.fill();
+          }
+          // P2 蛇头眼睛
+          if (snake2.length > 0) {
+            drawEyes(snake2[0], dir2);
+          }
         }
 
         // 覆盖层：暂停 / 结束
@@ -995,14 +1403,39 @@
           ctx.textBaseline = 'middle';
           ctx.fillStyle = c.text;
           ctx.font = '600 30px ' + getComputedStyle(document.body).fontFamily;
-          var title = state === 'over' ? '游戏结束' : '已暂停';
+          var title = '游戏结束';
+          var hint = '';
+          if (state === 'paused') {
+            title = '已暂停';
+            hint = '按 Space 继续';
+          } else {
+            if (challengeMode === 'duo') {
+              if (winner === 1) {
+                title = '🏆 玩家 1 胜利';
+                hint = 'P1 ' + score + ' 分 · P2 ' + score2 + ' 分 · 按 R 重开';
+              } else if (winner === 2) {
+                title = '🏆 玩家 2 胜利';
+                hint = 'P1 ' + score + ' 分 · P2 ' + score2 + ' 分 · 按 R 重开';
+              } else {
+                title = '平局';
+                hint = 'P1 ' + score + ' 分 · P2 ' + score2 + ' 分 · 按 R 重开';
+              }
+            } else if (challengeMode === 'time') {
+              if (timeUp) {
+                title = '时间到';
+              } else {
+                title = '游戏结束';
+              }
+              hint = '最终分数 ' + score + ' · 按 R 或点击「重新开始」';
+            } else {
+              title = '游戏结束';
+              hint = '最终分数 ' + score + ' · 按 R 或点击「重新开始」';
+            }
+          }
           ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 22);
 
           ctx.font = '500 15px ' + getComputedStyle(document.body).fontFamily;
           ctx.fillStyle = c.textSecondary;
-          var hint = state === 'over'
-            ? '最终分数 ' + score + ' · 按 R 或点击「重新开始」'
-            : '按 Space 继续';
           ctx.fillText(hint, canvas.width / 2, canvas.height / 2 + 16);
         }
 
@@ -1026,7 +1459,27 @@
       }
 
       // 蛇头眼睛 - 根据方向定位
-      function drawEyes(head) {
+      // ----- 绘制单个食物 -----
+      function drawFood(x, y, color) {
+        var fx = x * CELL + CELL / 2;
+        var fy = y * CELL + CELL / 2;
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(fx, fy, CELL / 2 - PAD - 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath();
+        ctx.arc(fx - CELL / 8, fy - CELL / 8, CELL / 7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // ----- 绘制蛇头眼睛 -----
+      function drawEyes(head, d) {
+        if (!d) d = dir;
         var hx = head.x * CELL;
         var hy = head.y * CELL;
         var cx = hx + CELL / 2;
@@ -1036,12 +1489,12 @@
 
         // 垂直方向移动时眼睛左右分布，水平方向时上下分布
         var e1, e2;
-        if (dir.x !== 0) {
-          var fwd = dir.x * off / 2;
+        if (d.x !== 0) {
+          var fwd = d.x * off / 2;
           e1 = { x: cx + fwd, y: cy - off };
           e2 = { x: cx + fwd, y: cy + off };
         } else {
-          var fwd2 = dir.y * off / 2;
+          var fwd2 = d.y * off / 2;
           e1 = { x: cx - off, y: cy + fwd2 };
           e2 = { x: cx + off, y: cy + fwd2 };
         }
@@ -1070,15 +1523,91 @@
         if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
         // 取消 rAF 主循环：游戏结束后不再重绘，节省 CPU
         if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-        if (score > highScore) {
-          highScore = score;
+        var bestScore = score;
+        if (challengeMode === 'duo' && score2 > bestScore) {
+          bestScore = score2;
+        }
+        if (bestScore > highScore) {
+          highScore = bestScore;
           saveHighScore(highScore);
         }
+        // ----- 成就解锁 -----
+        if (window.GameUtils) {
+          if (challengeMode === 'duo' && !GameUtils.isUnlocked('snake_dual_win')) GameUtils.unlock('snake_dual_win', '双雄对决', '完成一局双人模式');
+          // 成绩历史曲线（项13）
+          GameUtils.recordScore('snake', bestScore);
+          renderTrend();
+          // 本地排行榜（分数越高越好，记录挑战模式）
+          GameUtils.saveLeaderboard('snake', bestScore, { mode: challengeMode });
+          renderLb();
+          // 每日挑战成绩记录（项11）
+          if (dailySeed) {
+            var ok = GameUtils.recordDaily('snake', bestScore);
+            if (ok) GameUtils._toast('🏆 今日挑战成绩已记录：' + bestScore + ' 分', 2500);
+            clearDailySeed();
+          }
+        }
         if (window.SnakeBGM) { try { window.SnakeBGM.playGameOver(); } catch (e) {} }
+        if (challengeMode === 'duo' && winner > 0 && window.GameUtils) GameUtils.celebrate();
         updateHUD();
         setStatus('结束', true);
         startBtn.textContent = '再来一局';
         draw();
+      }
+
+      // ----- 渲染成绩历史趋势曲线 -----
+      function renderTrend() {
+        var el = document.getElementById('trendChart');
+        if (el && window.GameUtils) el.innerHTML = GameUtils.renderTrendChart('snake');
+      }
+
+      // ----- 渲染本地排行榜（meta 显示挑战模式 + 日期）-----
+      function renderLb() {
+        var el = document.getElementById('lbList');
+        if (el && window.GameUtils) {
+          el.innerHTML = GameUtils.renderLeaderboard('snake', {
+            meta: function (r) {
+              var modeMap = { classic: '经典', time: '限时', wrap: '穿墙', duo: '双人' };
+              var m = (r.extra && r.extra.mode && modeMap[r.extra.mode]) ? modeMap[r.extra.mode] : '经典';
+              var d = new Date(r.date);
+              return m + ' · ' + (d.getMonth() + 1) + '/' + d.getDate();
+            }
+          });
+        }
+      }
+
+      // ----- 每日挑战 -----
+      function startDailyChallenge() {
+        if (!window.GameUtils) return;
+        var seed = GameUtils.getDailySeed();
+        var st = GameUtils.getDailyStatus('snake');
+        if (st.played) {
+          GameUtils._toast('今日已挑战过，成绩 ' + st.score + ' 分，明天再来', 2800);
+          return;
+        }
+        // 切到经典模式（setChallengeMode 会 resetGame，此时无种子）
+        if (challengeMode !== 'classic') setChallengeMode('classic');
+        else resetGame();
+        // 注入每日种子并重新布置食物，保证全员关卡一致
+        setDailySeed(seed);
+        foods = [];
+        placeFood();
+        if (challengeMode === 'time') {
+          for (var fi = 0; fi < TIME_ATTACK_FOOD_COUNT; fi++) placeFoodMulti();
+        }
+        updateHUD();
+        draw();
+        renderTrend();
+        GameUtils._toast('🏆 每日挑战开始！今日所有玩家关卡相同，仅一次机会', 3000);
+        // 自动开始倒计时
+        startCountdown(function () {
+          state = 'playing';
+          setStatus('进行中');
+          startBtn.textContent = '暂停';
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(loop, currentSpeed);
+          if (!rafId) rafId = requestAnimationFrame(animLoop);
+        });
       }
 
       // ----- 开始 / 继续 / 暂停 控制 -----
@@ -1166,17 +1695,34 @@
           ctx.fill();
         }
         if (snake.length > 0) drawEyes(snake[0]);
+
+        // 双人模式：第二条蛇
+        if (challengeMode === 'duo' && snake2.length > 0) {
+          var p2Color = '#3498db';
+          var p2ColorLight = '#5dade2';
+          for (var s2 = 0; s2 < snake2.length; s2++) {
+            var seg2 = snake2[s2];
+            var isHead2 = s2 === 0;
+            var rx2 = seg2.x * CELL + PAD;
+            var ry2 = seg2.y * CELL + PAD;
+            var rw2 = CELL - PAD * 2;
+            var radius2 = Math.max(3, CELL / 4);
+            ctx.fillStyle = isHead2 ? p2ColorLight : p2Color;
+            roundRect(ctx, rx2, ry2, rw2, rw2, radius2);
+            ctx.fill();
+          }
+          if (snake2.length > 0) drawEyes(snake2[0], dir2);
+        }
+
         if (food.x >= 0) {
-          var fx = food.x * CELL + CELL / 2;
-          var fy = food.y * CELL + CELL / 2;
-          ctx.save();
-          ctx.shadowColor = c.accent;
-          ctx.shadowBlur = 12;
-          ctx.fillStyle = c.accent;
-          ctx.beginPath();
-          ctx.arc(fx, fy, CELL / 2 - PAD - 2, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
+          drawFood(food.x, food.y, c.accent);
+        }
+
+        // 限时模式额外食物
+        if (challengeMode === 'time') {
+          for (var fi = 0; fi < foods.length; fi++) {
+            drawFood(foods[fi].x, foods[fi].y, c.accent);
+          }
         }
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1197,25 +1743,48 @@
       document.addEventListener('keydown', function (e) {
         var key = e.key;
 
-        // 方向键 / WASD
         var handled = true;
-        switch (key) {
-          case 'ArrowUp': case 'w': case 'W': setDirection(0, -1); break;
-          case 'ArrowDown': case 's': case 'S': setDirection(0, 1); break;
-          case 'ArrowLeft': case 'a': case 'A': setDirection(-1, 0); break;
-          case 'ArrowRight': case 'd': case 'D': setDirection(1, 0); break;
-          case ' ':
-            // 空格：暂停 / 继续 / 就绪时开始；游戏结束时不响应（用 R）
-            if (state === 'over') { handled = false; }
-            else { startOrToggle(); }
-            break;
-          case 'r': case 'R':
-            restart();
-            break;
-          default:
-            handled = false;
+
+        // 双人模式：WASD 玩家1，方向键 玩家2
+        if (challengeMode === 'duo') {
+          switch (key) {
+            case 'w': case 'W': setDirection(0, -1); break;
+            case 's': case 'S': setDirection(0, 1); break;
+            case 'a': case 'A': setDirection(-1, 0); break;
+            case 'd': case 'D': setDirection(1, 0); break;
+            case 'ArrowUp': setDirection2(0, -1); break;
+            case 'ArrowDown': setDirection2(0, 1); break;
+            case 'ArrowLeft': setDirection2(-1, 0); break;
+            case 'ArrowRight': setDirection2(1, 0); break;
+            case ' ':
+              if (state === 'over') { handled = false; }
+              else { startOrToggle(); }
+              break;
+            case 'r': case 'R':
+              restart();
+              break;
+            default:
+              handled = false;
+          }
+        } else {
+          // 单人模式：WASD 和方向键都控制玩家1
+          switch (key) {
+            case 'ArrowUp': case 'w': case 'W': setDirection(0, -1); break;
+            case 'ArrowDown': case 's': case 'S': setDirection(0, 1); break;
+            case 'ArrowLeft': case 'a': case 'A': setDirection(-1, 0); break;
+            case 'ArrowRight': case 'd': case 'D': setDirection(1, 0); break;
+            case ' ':
+              if (state === 'over') { handled = false; }
+              else { startOrToggle(); }
+              break;
+            case 'r': case 'R':
+              restart();
+              break;
+            default:
+              handled = false;
+          }
         }
-        // 阻止方向键与空格滚动页面
+
         if (handled) {
           e.preventDefault();
         }
@@ -1224,6 +1793,73 @@
       // ----- 按钮事件 -----
       startBtn.addEventListener('click', startOrToggle);
       restartBtn.addEventListener('click', restart);
+
+      // ----- 截图按钮 -----
+      var btnShot = document.getElementById('btnShot');
+      if (btnShot) {
+        btnShot.addEventListener('click', function () {
+          if (window.GameUtils) {
+            GameUtils.screenshotCanvas(canvas, '贪吃蛇', '得分 ' + score);
+            GameUtils.unlock('use_screenshot', '定格瞬间', '使用截图功能分享一次');
+          }
+        });
+      }
+
+      // ----- 每日挑战按钮 -----
+      var btnDaily = document.getElementById('btnDaily');
+      if (btnDaily) {
+        btnDaily.addEventListener('click', function () {
+          if (state === 'playing' || state === 'paused') {
+            if (window.GameUtils) GameUtils._toast('请先结束当前一局再开始每日挑战', 2000);
+            return;
+          }
+          startDailyChallenge();
+        });
+      }
+
+      // ----- 挑战模式选择 -----
+      function setChallengeMode(mode) {
+        challengeMode = mode;
+        try { localStorage.setItem(CHALLENGE_STORAGE_KEY, mode); } catch (e) {}
+
+        // 更新按钮激活状态
+        var btns = document.querySelectorAll('.challenge-btn');
+        for (var i = 0; i < btns.length; i++) {
+          btns[i].classList.toggle('is-active', btns[i].getAttribute('data-challenge') === mode);
+        }
+
+        // 移动端双人模式提示（双人模式需要键盘）
+        if (mode === 'duo' && window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+          if (window.GameUtils) GameUtils._toast('💡 双人模式需要键盘，建议在电脑上游玩', 3000);
+        }
+
+        // 重置游戏以应用新模式
+        resetGame();
+        draw();
+        updateHUD();
+      }
+
+      var challengeBtns = document.querySelectorAll('.challenge-btn');
+      for (var ci = 0; ci < challengeBtns.length; ci++) {
+        challengeBtns[ci].addEventListener('click', function (e) {
+          var mode = e.currentTarget.getAttribute('data-challenge');
+          if (mode) setChallengeMode(mode);
+        });
+      }
+
+      // 从 localStorage 加载挑战模式
+      try {
+        var saved = localStorage.getItem(CHALLENGE_STORAGE_KEY);
+        if (saved && (saved === 'classic' || saved === 'time' || saved === 'wrap' || saved === 'duo')) {
+          challengeMode = saved;
+        }
+      } catch (e) {}
+
+      // 初始化按钮状态
+      var initBtns = document.querySelectorAll('.challenge-btn');
+      for (var ii = 0; ii < initBtns.length; ii++) {
+        initBtns[ii].classList.toggle('is-active', initBtns[ii].getAttribute('data-challenge') === challengeMode);
+      }
 
       // ----- 移动端滑动控制 -----
       var touchStartX = 0, touchStartY = 0;
@@ -1262,23 +1898,31 @@
 
         // 仅在游戏中推进大球时间（暂停 / 结束时自动冻结）
         if (state === 'playing') {
+          // 限时模式倒计时
+          if (challengeMode === 'time') {
+            timeLeft -= dt / 1000;
+            if (timeLeft <= 0) {
+              timeLeft = 0;
+              timeUp = true;
+              gameOver();
+            }
+          }
+
           if (!bonusBall) {
             // 倒计时生成下一个大球
             bonusCountdown -= dt;
             if (bonusCountdown <= 0) {
               spawnBonusBall();
               if (!bonusBall) {
-                // 空间不足未生成，延后重试
-                bonusCountdown = BONUS_INTERVAL;
+                bonusCountdown = challengeMode === 'time' ? TIME_ATTACK_BONUS_INTERVAL : BONUS_INTERVAL;
               }
             }
           } else {
             // 大球存活计时
             bonusBall.remaining -= dt;
             if (bonusBall.remaining <= 0) {
-              // 自然消失，重置倒计时
               bonusBall = null;
-              bonusCountdown = BONUS_INTERVAL;
+              bonusCountdown = challengeMode === 'time' ? TIME_ATTACK_BONUS_INTERVAL : BONUS_INTERVAL;
             }
           }
         }
@@ -1290,6 +1934,12 @@
         // 每帧重绘，保证大球呼吸 / 闪烁 / 缩小动画流畅
         draw();
 
+        // 游戏结束后停止 rAF 循环，节省 CPU
+        if (state === 'over') {
+          rafId = null;
+          return;
+        }
+
         rafId = requestAnimationFrame(animLoop);
       }
 
@@ -1300,9 +1950,53 @@
       });
       themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
+      // ----- 页面可见性变化：隐藏时自动暂停，返回时保持暂停状态 -----
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+          if (state === 'playing') {
+            state = 'paused';
+            if (timer) { clearTimeout(timer); timer = null; }
+            setStatus('已暂停');
+            startBtn.textContent = '继续';
+            draw();
+          }
+        }
+      });
+
       // ----- 启动 -----
       resetGame();
       rafId = requestAnimationFrame(animLoop);
+      renderTrend(); // 显示已有成绩历史曲线
+      renderLb(); // 显示本地排行榜
+
+      // ----- 全局快捷键（? 唤起玩法提示 · L 跳转排行榜）-----
+      if (window.GameUtils && GameUtils.registerGlobalShortcuts) {
+        GameUtils.registerGlobalShortcuts({
+          onHelp: function () {
+            GameUtils.showHowtoPopup('方向键/WASD 控制方向 · 吃食物长大 · 撞墙或自身结束 · 含限时/穿墙/双人模式');
+          },
+          onLeaderboard: function () {
+            var lb = document.getElementById('lbList');
+            if (lb) {
+              lb.scrollIntoView({ behavior: 'smooth' });
+              lb.style.transition = 'box-shadow .3s';
+              lb.style.boxShadow = '0 0 0 2px var(--color-accent)';
+              setTimeout(function () { lb.style.boxShadow = ''; }, 800);
+            }
+          }
+        });
+      }
+
+      // ----- 新手引导（教学弹层，首次进入显示）-----
+      if (window.GameUtils) {
+        GameUtils.showTutorial('snake', '贪吃蛇 · 玩法指南', [
+          { step: '控制方向', desc: '使用方向键 ↑↓←→ 或 WASD 控制蛇的移动方向' },
+          { step: '吃食物', desc: '吃到食物得 1 分，蛇身变长一节，速度会逐渐加快' },
+          { step: '金色奖励', desc: '每 10 秒出现金色奖励球，5 秒内吃到额外加 5 分' },
+          { step: '避免撞墙', desc: '撞到墙壁或自己的身体游戏结束' },
+          { step: '挑战模式', desc: '可切换限时/穿墙/双人模式，体验不同乐趣' }
+        ]);
+      }
     })();
 
     /* ============================================================
@@ -1990,6 +2684,7 @@
               audioCtx.resume().catch(function () {});
             }
             play();
+            if (window.GameUtils) GameUtils.unlock('enable_bgm', '奏响旋律', '开启任意游戏的 BGM');
           } else {
             stop();
           }
@@ -2044,10 +2739,17 @@
       window.SnakeBGM = {
         play: play,
         stop: stop,
+        toggle: function () { if (isPlaying) stop(); else play(); },
         setVolume: setVolume,
+        setEnabled: function (v) {
+          isUserEnabled = !!v;
+          if (isUserEnabled) play(); else stop();
+          try { localStorage.setItem('snake_bgm_v1', JSON.stringify({ enabled: isUserEnabled, volume: volume })); } catch (e) {}
+        },
         playEat: playEat,
         playBonus: playBonus,
         playGameOver: playGameOver,
+        isPlaying: function () { return isPlaying; },
         isEnabled: function () { return isUserEnabled; }
       };
 
@@ -2058,6 +2760,26 @@
         initUI();
       }
     })();
+
+    // 弹窗 Esc 关闭 + 焦点管理
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        var openModal = document.querySelector('.modal-mask.show, .modal.show');
+        if (openModal) {
+          var closeBtn = openModal.querySelector('[data-close], .modal-close, .btn-close, button[aria-label="关闭"]');
+          if (closeBtn) closeBtn.click();
+          else openModal.classList.remove('show');
+        }
+      }
+    });
+
+    // PWA：注册 Service Worker + 注入反馈入口
+    if (window.GameUtils) {
+      document.documentElement.setAttribute('data-sw-root', '../');
+      GameUtils.registerSW();
+      var fbSlot = document.getElementById('feedbackSlot');
+      if (fbSlot) GameUtils.injectFeedback('#feedbackSlot');
+    }
   </script>
 </body>
 </html>

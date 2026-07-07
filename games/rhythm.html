@@ -18,11 +18,17 @@
   <link rel="stylesheet" href="../assets/css/animations.css">
 
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <meta name="theme-color" content="#d4ab6a">
 
   <script>
     (function () {
-      var saved = localStorage.getItem('theme');
-      document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      try {
+        var saved = localStorage.getItem('theme');
+        document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
     })();
   </script>
 
@@ -427,6 +433,15 @@
       margin: 0 0 var(--spacing-sm); color: var(--color-text-primary);
     }
     .modal p { color: var(--color-text-secondary); font-size: 13px; line-height: 1.6; margin: 0 0 var(--spacing-md); }
+
+    /* 本地排行榜 */
+    .lb-list { font-size: 12px; max-height: 180px; overflow-y: auto; }
+    .lb-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--color-border-light); }
+    .lb-item:last-child { border-bottom: none; }
+    .lb-item .rank { font-family: var(--font-family-display); font-weight: 700; color: var(--color-accent); min-width: 24px; }
+    .lb-item .score { font-family: var(--font-family-display); font-weight: 700; color: var(--color-text-primary); }
+    .lb-item .meta { font-size: 10px; color: var(--color-text-tertiary); }
+    .lb-empty { text-align: center; color: var(--color-text-tertiary); font-size: 12px; padding: 16px 0; }
   </style>
 </head>
 <body>
@@ -450,6 +465,7 @@
           <div class="status-chip"><span class="lbl">BPM</span><span class="val" id="bpmVal">—</span></div>
           <div class="status-chip"><span class="lbl">能量</span><span class="val" id="energyVal">0</span></div>
           <div class="status-chip"><span class="lbl">粒子</span><span class="val" id="particleVal">0</span></div>
+          <div class="status-chip"><span class="lbl">得分</span><span class="val" id="scoreVal">0</span></div>
         </div>
         <div class="spectrum-bars" id="spectrumBars">
           <div class="bar" style="height:5%"></div>
@@ -556,6 +572,8 @@
           <div class="btn-row" style="margin-top: 6px;">
             <button class="btn" id="clearBtn">清空</button>
             <button class="btn primary" id="exportBtn">导出 PNG</button>
+            <button class="btn" id="btnShot" aria-label="截图">📷</button>
+            <button class="btn" id="btnFs" title="全屏" aria-label="全屏" onclick="if(window.GameUtils)GameUtils.toggleFullscreen()">⛶ 全屏</button>
           </div>
           <div class="opt-row" style="margin-top: 8px;">
             <span class="opt-label">画质</span>
@@ -573,6 +591,12 @@
           <div class="history-list" id="historyList">
             <div class="history-empty">暂无记录</div>
           </div>
+        </div>
+
+        <!-- 本地排行榜 -->
+        <div class="panel-card">
+          <h3>排行榜</h3>
+          <div class="lb-list" id="lbList"></div>
         </div>
 
         <!-- 玩法 -->
@@ -605,6 +629,11 @@
       </div>
     </div>
   </div>
+
+  <!-- 反馈入口 -->
+  <div id="feedbackSlot" style="text-align:center;padding:12px 0;border-top:1px solid var(--color-border-light);margin-top:24px"></div>
+
+  <script src="../assets/js/game-utils.js"></script>
 
   <script>
   /* ============================================================
@@ -658,7 +687,9 @@
       // 录制
       recording: false, recordEvents: [], recordStart: 0,
       // 自动模式
-      autoT: 0
+      autoT: 0,
+      // 单局得分（成就与截图用）
+      score: 0
     };
 
     /* ========== Canvas 渲染层 ========== */
@@ -1109,12 +1140,16 @@
         const boost = this.isOnBeat();
         renderer.spawnBurst(x, y, state.particleCount, boost);
         if (boost) renderer.spawnRipple(x, y);
+        state.score += boost ? 20 : 10;
+        this._checkScore();
       },
       onDrag(x, y, speed) {
         renderer.addLinePoint(x, y, speed);
       },
       onDragEnd() {
         renderer.endLine();
+        state.score += 5;
+        this._checkScore();
       },
       onLongPress(x, y) {
         renderer.spawnRipple(x, y);
@@ -1122,6 +1157,13 @@
         if (Math.random() < 0.3) {
           renderer.spawnBurst(x, y, Math.floor(state.particleCount * 0.3), this.isOnBeat());
         }
+        state.score += this.isOnBeat() ? 8 : 4;
+        this._checkScore();
+      },
+      _checkScore() {
+        if (!window.GameUtils) return;
+        if (!GameUtils.isUnlocked('rhythm_500') && state.score >= 500) GameUtils.unlock('rhythm_500', '节奏初成', '节奏线条单局 500 分');
+        if (!GameUtils.isUnlocked('rhythm_2000') && state.score >= 2000) GameUtils.unlock('rhythm_2000', '律动大师', '节奏线条单局 2000 分');
       },
       // 录制事件
       recordEvent(type, data) {
@@ -1160,7 +1202,7 @@
 
       ensureCtx() {
         if (!this.ctx) this.init();
-        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(function () {});
       },
 
       // 程序生成示例音乐（AudioBuffer）
@@ -1306,6 +1348,11 @@
         this.startTime = this.ctx.currentTime - offset;
         this.source.start(0, offset);
         state.playing = true;
+        if (!offset) {
+          state.score = 0;
+          if (window.GameUtils) GameUtils.recordPlay('rhythm', 0);
+        }
+        if (window.GameUtils) GameUtils.unlock('enable_bgm', '奏响旋律', '开启任意游戏的 BGM');
         ui.updatePlayBtn();
       },
 
@@ -1660,6 +1707,15 @@
           this.renderHistory();
           this.toast('PNG 已导出');
         };
+        document.getElementById('btnShot').onclick = function() {
+          var canvas = document.querySelector('canvas');
+          if (canvas) {
+            if (window.GameUtils) {
+              GameUtils.screenshotCanvas(canvas, '节奏线条生成器', '得分 ' + (state.score || 0));
+              GameUtils.unlock('use_screenshot', '定格瞬间', '使用截图功能分享一次');
+            }
+          }
+        };
         // 导出质量
         document.getElementById('exportQualSeg').addEventListener('click', e => {
           const btn = e.target.closest('button'); if (!btn) return;
@@ -1771,8 +1827,16 @@
         document.getElementById('modalTitle').textContent = '🎶 创作完成';
         document.getElementById('modalText').textContent = '音乐结束，你的专属抽象画已生成，是否导出保存？';
         document.getElementById('modalMask').classList.add('show');
+        if (window.GameUtils) GameUtils.celebrate();
         const trackName = state.curTrack >= 0 ? CONFIG.TRACKS[state.curTrack]?.name : '上传曲目';
         storage.saveHistory({ name: trackName || '上传曲目', date: Date.now() });
+        // 成绩历史曲线（项13）：记录本局得分
+        if (window.GameUtils) GameUtils.recordScore('rhythm', state.score || 0);
+        // 本地排行榜（分数越高越好）
+        if (window.GameUtils) {
+          GameUtils.saveLeaderboard('rhythm', state.score || 0);
+          renderLb();
+        }
         this.renderHistory();
       },
 
@@ -1842,6 +1906,7 @@
         // 状态
         document.getElementById('energyVal').textContent = Math.round(state.energy * 100);
         document.getElementById('particleVal').textContent = renderer.particles.length;
+        document.getElementById('scoreVal').textContent = state.score || 0;
         if (state.bpm) document.getElementById('bpmVal').textContent = state.bpm;
         // 节拍指示（使用 CSS transition，只在 beat 起始帧加 class，靠 CSS 自动回弹）
         const led = document.getElementById('beatLed');
@@ -1871,12 +1936,13 @@
       renderHistory() {
         const list = storage.loadHistory();
         const el = document.getElementById('historyList');
-        if (!list.length) { el.innerHTML = '<div class="history-empty">暂无记录</div>'; return; }
+        const trendHtml = window.GameUtils ? GameUtils.renderTrendChart('rhythm') : '';
+        if (!list.length) { el.innerHTML = '<div class="history-empty">暂无记录</div>' + trendHtml; return; }
         el.innerHTML = list.slice(-10).reverse().map(r => {
           const d = new Date(r.date);
           const ds = `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
           return `<div class="history-item"><span class="name">${r.name}</span><span class="date">${ds}</span></div>`;
-        }).join('');
+        }).join('') + trendHtml;
       }
     };
 
@@ -1945,6 +2011,12 @@
       }
     });
 
+    // ----- 渲染本地排行榜 -----
+    function renderLb() {
+      var el = document.getElementById('lbList');
+      if (el && window.GameUtils) el.innerHTML = GameUtils.renderLeaderboard('rhythm');
+    }
+
     /* ========== 启动 ========== */
     storage.load();
     ui.init();
@@ -1963,7 +2035,57 @@
       b.classList.toggle('active', parseInt(b.dataset.qual, 10) === state.exportQuality);
     });
     rafId = requestAnimationFrame(loop);
+    renderLb(); // 显示本地排行榜
+
+    // 新手引导
+    if (window.GameUtils) {
+      GameUtils.showTutorial('rhythm', '节奏线条生成器 · 玩法指南', [
+        { step: '开始音乐', desc: '点击播放按钮启动背景音乐，节拍会驱动视觉' },
+        { step: '点击爆发', desc: '点击画面产生粒子爆发，配合节拍有加成' },
+        { step: '滑动绘线', desc: '按住拖动绘制流动线条，线条会随节奏脉动' },
+        { step: '长按波纹', desc: '长按生成环形波纹，扩散效果与节拍同步' },
+        { step: '导出作品', desc: '音乐结束后可导出你的抽象画作为 PNG 图片' }
+      ]);
+    }
+
+    // 成就：首次游玩
+    if (window.GameUtils && !GameUtils.isUnlocked('first_play')) {
+      GameUtils.unlock('first_play', '初次到访', '第一次游玩任意游戏');
+    }
+
+    // 全局快捷键：? 玩法提示 / L 排行榜
+    if (window.GameUtils && GameUtils.registerGlobalShortcuts) {
+      GameUtils.registerGlobalShortcuts({
+        onHelp: function () {
+          GameUtils.showHowtoPopup('点击爆发粒子 · 拖拽绘制线条 · 长按生成环形波纹 · 跟节拍得分翻倍 · 导出抽象画');
+        },
+        onLeaderboard: function () {
+          var lb = document.getElementById('lbList');
+          if (lb) { lb.scrollIntoView({ behavior: 'smooth', block: 'center' }); lb.style.transition = 'box-shadow .3s'; lb.style.boxShadow = '0 0 0 2px var(--color-accent)'; setTimeout(function(){ lb.style.boxShadow = ''; }, 800); }
+        }
+      });
+    }
   })();
+
+  // 弹窗 Esc 关闭 + 焦点管理
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var openModal = document.querySelector('.modal-mask.show, .modal.show');
+      if (openModal) {
+        var closeBtn = openModal.querySelector('[data-close], .modal-close, .btn-close, button[aria-label="关闭"]');
+        if (closeBtn) closeBtn.click();
+        else openModal.classList.remove('show');
+      }
+    }
+  });
+
+  // PWA：注册 Service Worker + 注入反馈入口
+  if (window.GameUtils) {
+    document.documentElement.setAttribute('data-sw-root', '../');
+    GameUtils.registerSW();
+    var fbSlot = document.getElementById('feedbackSlot');
+    if (fbSlot) GameUtils.injectFeedback('#feedbackSlot');
+  }
   </script>
 </body>
 </html>

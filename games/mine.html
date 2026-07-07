@@ -22,12 +22,18 @@
 
   <!-- 网站图标 -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💣</text></svg>">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <meta name="theme-color" content="#d4ab6a">
 
   <!-- 主题预载：避免刷新闪烁，读取 localStorage 的 theme（默认 dark） -->
   <script>
     (function () {
-      var saved = localStorage.getItem('theme');
-      document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      try {
+        var saved = localStorage.getItem('theme');
+        document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
     })();
   </script>
 
@@ -296,6 +302,69 @@
       border-color: var(--color-accent);
       background: var(--color-bg-card);
       outline: none;
+    }
+
+    /* ========== 挑战模式选择条 ========== */
+    .challenge-selector {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .challenge-label {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-right: var(--spacing-xs);
+      display: flex;
+      align-items: center;
+    }
+
+    .challenge-btn {
+      padding: 6px 14px;
+      font-size: var(--text-sm);
+      border-radius: var(--radius-full);
+      border: 1px solid var(--color-border-medium);
+      background: var(--color-bg-card);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .challenge-btn:hover {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+
+    .challenge-btn.is-active {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: #fff;
+    }
+
+    .challenge-btn .ico {
+      margin-right: 4px;
+    }
+
+    /* 限时模式倒计时样式 */
+    .timer-num.is-time-attack {
+      color: var(--color-danger, #e74c3c);
+      font-weight: 700;
+    }
+
+    .timer-num.is-time-attack.warning {
+      animation: timerPulse 0.8s ease-in-out infinite;
+    }
+
+    @keyframes timerPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* 无旗模式禁用右键的光标提示 */
+    .no-flag-mode .mine-cell {
+      cursor: crosshair;
     }
 
     /* ========== 扫雷棋盘 ========== */
@@ -699,6 +768,15 @@
         font-size: var(--font-size-2xl);
       }
     }
+
+    /* 本地排行榜 */
+    .lb-list { font-size: 12px; max-height: 180px; overflow-y: auto; }
+    .lb-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--color-border-light); }
+    .lb-item:last-child { border-bottom: none; }
+    .lb-item .rank { font-family: var(--font-family-display); font-weight: 700; color: var(--color-accent); min-width: 24px; }
+    .lb-item .score { font-family: var(--font-family-display); font-weight: 700; color: var(--color-text-primary); }
+    .lb-item .meta { font-size: 10px; color: var(--color-text-tertiary); }
+    .lb-empty { text-align: center; color: var(--color-text-tertiary); font-size: 12px; padding: 16px 0; }
   </style>
 </head>
 <body>
@@ -781,6 +859,15 @@
         <button class="btn btn-primary btn-sm" id="customConfirm">确认</button>
       </div>
 
+      <!-- 挑战模式选择 -->
+      <div class="challenge-selector" id="challengeSelector">
+        <span class="challenge-label">挑战模式：</span>
+        <button class="challenge-btn is-active" data-challenge="normal"><span class="ico">🎯</span>普通</button>
+        <button class="challenge-btn" data-challenge="time"><span class="ico">⏱️</span>限时</button>
+        <button class="challenge-btn" data-challenge="noflag"><span class="ico">🚫</span>无旗</button>
+        <button class="challenge-btn" id="btnDaily" title="每日挑战（同一天所有人雷区相同，仅一次）"><span class="ico">🏆</span>今日</button>
+      </div>
+
       <!-- 棋盘 -->
       <div class="mine-board-wrapper">
         <div id="mineBoard" class="mine-grid"></div>
@@ -790,6 +877,7 @@
             <div class="overlay-icon" id="overlayIcon">😎</div>
             <div class="overlay-title" id="overlayTitle">胜利</div>
             <div class="overlay-desc" id="overlayDesc">用时 0 秒</div>
+            <div id="overlayTrend" style="margin:10px 0;max-width:280px;width:100%"></div>
             <button class="btn btn-primary" id="overlayRestart">再来一局</button>
           </div>
         </div>
@@ -797,6 +885,9 @@
 
       <!-- 操作说明 -->
       <div class="game-controls">
+        <div class="control-buttons" style="margin-bottom:8px">
+          <button class="btn" id="btnFs" title="全屏" aria-label="全屏" onclick="if(window.GameUtils)GameUtils.toggleFullscreen()">⛶ 全屏</button>
+        </div>
         <div class="controls-hint">
           <span class="hint-item">
             <span class="key-cap">左键</span>
@@ -820,9 +911,19 @@
           </span>
         </div>
       </div>
+
+      <!-- 本地排行榜 -->
+      <div class="panel-card" style="margin-top:var(--spacing-md);padding:var(--spacing-md);background:var(--color-bg-secondary);border:1px solid var(--color-border-light);border-radius:var(--radius-md)">
+        <h3 style="margin:0 0 6px;font-family:var(--font-family-display);font-size:14px;color:var(--color-text-primary)">排行榜</h3>
+        <div class="lb-list" id="lbList"></div>
+      </div>
     </div>
   </main>
 
+  <!-- 反馈入口 -->
+  <div id="feedbackSlot" style="text-align:center;padding:12px 0;border-top:1px solid var(--color-border-light);margin-top:24px"></div>
+
+  <script src="../assets/js/game-utils.js"></script>
   <script>
     /* ============================================================
      * 主题切换（与主页面一致：localStorage key='theme'，默认 dark）
@@ -844,6 +945,7 @@
         document.documentElement.setAttribute('data-theme', next);
         localStorage.setItem('theme', next);
         applyIcon();
+        if (window.GameUtils) GameUtils.unlock('try_skin', '换个皮肤', '切换过一次游戏皮肤');
       });
     })();
 
@@ -857,6 +959,41 @@
         intermediate: { rows: 16, cols: 16, mines: 40, cellSize: 26, label: '中级' },
         expert:       { rows: 16, cols: 22, mines: 99, cellSize: 24, label: '高级' }
       };
+
+      // ----- 限时模式时间配置（秒）-----
+      var TIME_LIMITS = {
+        beginner: 120,
+        intermediate: 300,
+        expert: 600,
+        custom: 480
+      };
+
+      // ----- 挑战模式状态 -----
+      var CHALLENGE_STORAGE_KEY = 'mine_challenge_v1';
+      var challengeMode = 'normal'; // normal | time | noflag
+      var timeLeft = 0;
+
+      // ----- 每日挑战（种子化布雷）-----
+      var dailySeed = null;        // 非 null 时启用种子化布雷
+      var _seedState = 0;
+      function setDailySeed(seed) { dailySeed = seed; _seedState = (seed >>> 0) || 1; }
+      function clearDailySeed() { dailySeed = null; }
+      // mulberry32：同种子生成相同序列
+      function seededRand() {
+        _seedState = (_seedState + 0x6D2B79F5) | 0;
+        var t = Math.imul(_seedState ^ (_seedState >>> 15), 1 | _seedState);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      }
+      function pickRand() { return dailySeed ? seededRand() : Math.random(); }
+
+      // 读取保存的挑战模式
+      try {
+        var savedCh = localStorage.getItem(CHALLENGE_STORAGE_KEY);
+        if (savedCh && (savedCh === 'normal' || savedCh === 'time' || savedCh === 'noflag')) {
+          challengeMode = savedCh;
+        }
+      } catch (e) {}
 
       // ----- DOM 元素 -----
       var boardEl = document.getElementById('mineBoard');
@@ -981,7 +1118,7 @@
 
         // Fisher-Yates 洗牌取前 mineCount 个
         for (var i = candidates.length - 1; i > 0; i--) {
-          var j = Math.floor(Math.random() * (i + 1));
+          var j = Math.floor(pickRand() * (i + 1));
           var tmp = candidates[i]; candidates[i] = candidates[j]; candidates[j] = tmp;
         }
         for (var k = 0; k < mineCount; k++) {
@@ -1039,7 +1176,18 @@
       function updateHUD() {
         var remaining = totalMines - flagsPlaced;
         mineCountNumEl.textContent = Math.max(0, remaining);
-        timerNumEl.textContent = elapsed;
+        if (challengeMode === 'time') {
+          timerNumEl.textContent = Math.max(0, timeLeft);
+          timerNumEl.classList.add('is-time-attack');
+          if (timeLeft <= 10 && state === 'playing') {
+            timerNumEl.classList.add('warning');
+          } else {
+            timerNumEl.classList.remove('warning');
+          }
+        } else {
+          timerNumEl.textContent = elapsed;
+          timerNumEl.classList.remove('is-time-attack', 'warning');
+        }
       }
 
       // ----- 笑脸状态 -----
@@ -1052,10 +1200,23 @@
       function startTimer() {
         stopTimer();
         elapsed = 0;
+        if (challengeMode === 'time') {
+          timeLeft = TIME_LIMITS[currentDiff] || TIME_LIMITS.custom;
+        }
         updateHUD();
         timerId = setInterval(function () {
           elapsed++;
           if (elapsed > 999) elapsed = 999;
+          if (challengeMode === 'time') {
+            timeLeft--;
+            if (timeLeft <= 0) {
+              timeLeft = 0;
+              updateHUD();
+              stopTimer();
+              timeUp();
+              return;
+            }
+          }
           updateHUD();
         }, 1000);
       }
@@ -1113,6 +1274,7 @@
       // ----- 切换旗帜 -----
       function toggleFlag(x, y) {
         if (state === 'won' || state === 'lost') return;
+        if (challengeMode === 'noflag') return;
         var c = cells[x][y];
         if (c.revealed) return;
         // 首次操作前也允许预先标记（不启动计时）
@@ -1166,20 +1328,38 @@
         state = 'won';
         stopTimer();
         setSmiley(SMILEY.win);
-        // 自动给剩余的雷补上旗帜
-        for (var x = 0; x < cols; x++) {
-          for (var y = 0; y < rows; y++) {
-            var c = cells[x][y];
-            if (c.mine && !c.flagged) {
-              c.flagged = true;
-              flagsPlaced++;
-              renderCell(x, y);
+        if (challengeMode !== 'noflag') {
+          for (var x = 0; x < cols; x++) {
+            for (var y = 0; y < rows; y++) {
+              var c = cells[x][y];
+              if (c.mine && !c.flagged) {
+                c.flagged = true;
+                flagsPlaced++;
+                renderCell(x, y);
+              }
             }
           }
         }
         updateHUD();
+        // ----- 成就解锁 -----
+        if (window.GameUtils) {
+          if (!GameUtils.isUnlocked('mine_first_clear')) GameUtils.unlock('mine_first_clear', '初探雷区', '完成首局扫雷');
+          if (currentDiff === 'expert' && !GameUtils.isUnlocked('mine_hard_clear')) GameUtils.unlock('mine_hard_clear', '扫雷专家', '通关高级难度');
+          if (challengeMode === 'noflag' && !GameUtils.isUnlocked('mine_no_flag')) GameUtils.unlock('mine_no_flag', '记忆大师', '禁标记模式通关');
+          // 成绩历史曲线（项13）：记录通关用时，越低越好
+          GameUtils.recordScore('mine', elapsed);
+          // 本地排行榜（用时越短越好，记录难度）
+          GameUtils.saveLeaderboard('mine', elapsed, { difficulty: currentDiff }, { lowerBetter: true });
+          renderLb();
+          // 每日挑战成绩记录（项11）
+          if (dailySeed) {
+            var ok = GameUtils.recordDaily('mine', elapsed);
+            if (ok) GameUtils._toast('🏆 今日挑战成绩已记录：' + elapsed + ' 秒', 2500);
+            clearDailySeed();
+          }
+        }
         showOverlay(true);
-        // 胜利音效
+        if (window.GameUtils) GameUtils.celebrate();
         if (window.MineBGM) {
           try { window.MineBGM.playWin(); } catch (e) {}
         }
@@ -1190,7 +1370,6 @@
         state = 'lost';
         stopTimer();
         setSmiley(SMILEY.lose);
-        // 揭示所有雷；错误旗帜标记为 wrong-flag
         for (var x = 0; x < cols; x++) {
           for (var y = 0; y < rows; y++) {
             var c = cells[x][y];
@@ -1198,7 +1377,6 @@
               c.revealed = true;
             } else if (!c.mine && c.flagged) {
               c.flagged = false;
-              // 错误旗帜：该格其实没有雷，显示暗淡 ✕
               renderCell(x, y);
               cellEls[x][y].classList.add('wrong-flag');
               cellEls[x][y].textContent = '✕';
@@ -1207,26 +1385,119 @@
             renderCell(x, y);
           }
         }
-        // 确保踩中的雷爆炸样式优先
         renderCell(exX, exY);
-        showOverlay(false);
-        // 失败音效
+        // 每日挑战：失败也计入"已挑战"（仅一次机会）
+        if (window.GameUtils && dailySeed) {
+          GameUtils.recordDaily('mine', elapsed);
+          clearDailySeed();
+        }
+        showOverlay(false, 'mine');
+        if (window.MineBGM) {
+          try { window.MineBGM.playLose(); } catch (e) {}
+        }
+      }
+
+      // ----- 超时失败 -----
+      function timeUp() {
+        state = 'lost';
+        setSmiley(SMILEY.lose);
+        for (var x = 0; x < cols; x++) {
+          for (var y = 0; y < rows; y++) {
+            var c = cells[x][y];
+            if (c.mine && !c.flagged) {
+              c.revealed = true;
+              renderCell(x, y);
+            } else if (!c.mine && c.flagged) {
+              c.flagged = false;
+              renderCell(x, y);
+              cellEls[x][y].classList.add('wrong-flag');
+              cellEls[x][y].textContent = '✕';
+            }
+          }
+        }
+        // 每日挑战：超时也计入"已挑战"
+        if (window.GameUtils && dailySeed) {
+          GameUtils.recordDaily('mine', elapsed);
+          clearDailySeed();
+        }
+        showOverlay(false, 'time');
         if (window.MineBGM) {
           try { window.MineBGM.playLose(); } catch (e) {}
         }
       }
 
       // ----- 显示遮罩 -----
-      function showOverlay(isWin) {
+      function showOverlay(isWin, loseType) {
         overlayIcon.textContent = isWin ? '😎' : '😵';
-        overlayTitle.textContent = isWin ? '胜利' : '游戏结束';
+        var desc = '';
+        if (isWin) {
+          overlayTitle.textContent = '挑战成功';
+          if (challengeMode === 'time') {
+            desc = '限时模式 · 用时 ' + elapsed + ' 秒 · 剩余 ' + timeLeft + ' 秒';
+          } else if (challengeMode === 'noflag') {
+            desc = '无旗模式 · 用时 ' + elapsed + ' 秒';
+          } else {
+            overlayTitle.textContent = '胜利';
+            desc = '用时 ' + elapsed + ' 秒';
+          }
+        } else {
+          overlayTitle.textContent = '游戏结束';
+          if (loseType === 'time') {
+            overlayTitle.textContent = '时间到';
+            desc = '限时挑战失败 · 再来一局';
+          } else if (challengeMode === 'noflag') {
+            desc = '无旗模式 · 触雷身亡 · 再来一局';
+          } else if (challengeMode === 'time') {
+            desc = '限时模式 · 触雷身亡 · 再来一局';
+          } else {
+            desc = '触雷身亡 · 再来一局';
+          }
+        }
         overlayTitle.classList.toggle('is-win', isWin);
-        overlayDesc.textContent = (isWin ? '用时 ' + elapsed + ' 秒' : '触雷身亡 · 再来一局');
+        overlayDesc.textContent = desc;
+        // 渲染成绩历史趋势曲线（用时越低越好）
+        var trendEl = document.getElementById('overlayTrend');
+        if (trendEl && window.GameUtils) {
+          trendEl.innerHTML = GameUtils.renderTrendChart('mine', { lowerBetter: true });
+        }
         overlay.classList.add('show');
       }
 
       function hideOverlay() {
         overlay.classList.remove('show');
+      }
+
+      // ----- 渲染本地排行榜（meta 显示难度 + 日期）-----
+      function renderLb() {
+        var el = document.getElementById('lbList');
+        if (el && window.GameUtils) {
+          el.innerHTML = GameUtils.renderLeaderboard('mine', {
+            lowerBetter: true,
+            meta: function (r) {
+              var d = new Date(r.date);
+              return (r.extra && r.extra.difficulty || '') + ' · ' + (d.getMonth() + 1) + '/' + d.getDate();
+            }
+          });
+        }
+      }
+
+      // ----- 每日挑战 -----
+      function startDailyChallenge() {
+        if (!window.GameUtils) return;
+        var seed = GameUtils.getDailySeed();
+        var st = GameUtils.getDailyStatus('mine');
+        if (st.played) {
+          GameUtils._toast('今日已挑战过，成绩 ' + st.score + ' 秒，明天再来', 2800);
+          return;
+        }
+        // 每日挑战固定用中级难度 + 普通模式，确保全员雷区一致
+        challengeMode = 'normal';
+        try { localStorage.setItem(CHALLENGE_STORAGE_KEY, 'normal'); } catch (e) {}
+        syncChallengeButtons();
+        newGame('intermediate');
+        // newGame 会 clearDailySeed，这里在重开之后注入种子（布雷在首点时发生）
+        setDailySeed(seed);
+        GameUtils._toast('🏆 每日挑战开始！中级难度 · 今日雷区全员相同 · 仅一次机会', 3000);
       }
 
       // ----- 开新一局 -----
@@ -1237,6 +1508,7 @@
         cols = cfg.cols;
         totalMines = cfg.mines;
         cellSize = cfg.cellSize;
+        clearDailySeed(); // 常规新局不保留每日种子（每日挑战会在 newGame 后重新注入）
 
         // 同步难度按钮高亮
         var btns = diffSelector.querySelectorAll('.project-cat-btn');
@@ -1246,11 +1518,15 @@
         // 自定义面板仅在 custom 时展开
         customPanel.classList.toggle('is-open', currentDiff === 'custom');
 
+        // 挑战模式棋盘样式
+        boardEl.classList.toggle('no-flag-mode', challengeMode === 'noflag');
+
         state = 'ready';
         firstClick = true;
         flagsPlaced = 0;
         revealedCount = 0;
         elapsed = 0;
+        timeLeft = challengeMode === 'time' ? (TIME_LIMITS[currentDiff] || TIME_LIMITS.custom) : 0;
         stopTimer();
         setSmiley(SMILEY.normal);
         hideOverlay();
@@ -1258,6 +1534,16 @@
         buildBoard();
         renderAll();
         updateHUD();
+        // 记录游玩次数
+        if (window.GameUtils) {
+          GameUtils.recordPlay('mine', 0);
+          // 成就：首次启动游戏
+          try {
+            if (!GameUtils.isUnlocked('first_play')) {
+              GameUtils.unlock('first_play', '初次到访', '第一次游玩任意游戏');
+            }
+          } catch (e) {}
+        }
       }
 
       // ----- 自定义确认 -----
@@ -1378,7 +1664,6 @@
         if (!btn) return;
         var diff = btn.dataset.diff;
         if (diff === 'custom') {
-          // 展开面板，等玩家点确认再开新局
           customPanel.classList.add('is-open');
           var btns = diffSelector.querySelectorAll('.project-cat-btn');
           for (var i = 0; i < btns.length; i++) {
@@ -1387,6 +1672,38 @@
           return;
         }
         newGame(diff);
+      });
+
+      // ----- 事件：挑战模式选择 -----
+      var challengeSelector = document.getElementById('challengeSelector');
+
+      // 同步挑战模式按钮高亮（读取 localStorage 后）
+      function syncChallengeButtons() {
+        var btns = challengeSelector.querySelectorAll('.challenge-btn');
+        for (var i = 0; i < btns.length; i++) {
+          btns[i].classList.toggle('is-active', btns[i].dataset.challenge === challengeMode);
+        }
+      }
+      syncChallengeButtons();
+
+      challengeSelector.addEventListener('click', function (e) {
+        var btn = e.target.closest('.challenge-btn');
+        if (!btn) return;
+        // 每日挑战按钮单独处理（无 data-challenge）
+        if (btn.id === 'btnDaily') {
+          if (state === 'playing') {
+            if (window.GameUtils) GameUtils._toast('请先完成当前一局再开始每日挑战', 2000);
+            return;
+          }
+          startDailyChallenge();
+          return;
+        }
+        var mode = btn.dataset.challenge;
+        if (!mode) return;
+        challengeMode = mode;
+        try { localStorage.setItem(CHALLENGE_STORAGE_KEY, mode); } catch (e) {}
+        syncChallengeButtons();
+        newGame();
       });
 
       customConfirm.addEventListener('click', applyCustom);
@@ -1434,6 +1751,36 @@
 
       // ----- 启动：默认初级 -----
       newGame('beginner');
+      renderLb(); // 显示本地排行榜
+
+      // ----- 全局快捷键（? 唤起玩法提示 · L 跳转排行榜）-----
+      if (window.GameUtils && GameUtils.registerGlobalShortcuts) {
+        GameUtils.registerGlobalShortcuts({
+          onHelp: function () {
+            GameUtils.showHowtoPopup('左键翻开格子 · 右键标记雷 · 数字提示周围雷数 · 翻开所有非雷格通关');
+          },
+          onLeaderboard: function () {
+            var lb = document.getElementById('lbList');
+            if (lb) {
+              lb.scrollIntoView({ behavior: 'smooth' });
+              lb.style.transition = 'box-shadow .3s';
+              lb.style.boxShadow = '0 0 0 2px var(--color-accent)';
+              setTimeout(function () { lb.style.boxShadow = ''; }, 800);
+            }
+          }
+        });
+      }
+
+      // ----- 新手引导（教学弹层，首次进入显示）-----
+      if (window.GameUtils) {
+        GameUtils.showTutorial('mine', '扫雷 · 玩法指南', [
+          { step: '左键揭开', desc: '左键点击格子揭开，数字表示周围 8 格的雷数' },
+          { step: '右键标记', desc: '右键标记疑似雷格（移动端长按），再点一次取消' },
+          { step: '首点安全', desc: '第一次点击保证不踩雷，且会自动展开周围空白区' },
+          { step: '智能展开', desc: '已标完雷的数字格双击可一键展开周围非雷格' },
+          { step: '难度选择', desc: '初级 9×9/10 雷，中级 16×16/40 雷，高级 16×30/99 雷' }
+        ]);
+      }
     })();
 
     /* ============================================================
@@ -2089,6 +2436,7 @@
               audioCtx.resume().catch(function () {});
             }
             play();
+            if (window.GameUtils) GameUtils.unlock('enable_bgm', '奏响旋律', '开启任意游戏的 BGM');
           } else {
             stop();
           }
@@ -2143,9 +2491,16 @@
       window.MineBGM = {
         play: play,
         stop: stop,
+        toggle: function () { if (isPlaying) stop(); else play(); },
         setVolume: setVolume,
+        setEnabled: function (v) {
+          isUserEnabled = !!v;
+          if (isUserEnabled) play(); else stop();
+          try { localStorage.setItem('mine_bgm_v3', JSON.stringify({ enabled: isUserEnabled, volume: volume })); } catch (e) {}
+        },
         playWin: playWinFanfare,
         playLose: playLoseSting,
+        isPlaying: function () { return isPlaying; },
         isEnabled: function () { return isUserEnabled; }
       };
 
@@ -2156,6 +2511,26 @@
         initUI();
       }
     })();
+
+    // 弹窗 Esc 关闭 + 焦点管理
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        var openModal = document.querySelector('.modal-mask.show, .modal.show');
+        if (openModal) {
+          var closeBtn = openModal.querySelector('[data-close], .modal-close, .btn-close, button[aria-label="关闭"]');
+          if (closeBtn) closeBtn.click();
+          else openModal.classList.remove('show');
+        }
+      }
+    });
+
+    // PWA：注册 Service Worker + 注入反馈入口
+    if (window.GameUtils) {
+      document.documentElement.setAttribute('data-sw-root', '../');
+      GameUtils.registerSW();
+      var fbSlot = document.getElementById('feedbackSlot');
+      if (fbSlot) GameUtils.injectFeedback('#feedbackSlot');
+    }
   </script>
 </body>
 </html>

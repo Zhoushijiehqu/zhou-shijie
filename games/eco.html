@@ -8,6 +8,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="微型生态瓶模拟器 - 治愈系放置模拟，构建稳定的水生微型生态">
   <title>微型生态瓶 · 游戏小屋</title>
+  <link rel="manifest" href="../manifest.webmanifest">
+  <meta name="theme-color" content="#d4ab6a">
 
   <!-- 字体：与主站一致 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,8 +28,12 @@
   <!-- 主题预载 -->
   <script>
     (function () {
-      var saved = localStorage.getItem('theme');
-      document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      try {
+        var saved = localStorage.getItem('theme');
+        document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
     })();
   </script>
 
@@ -366,6 +372,15 @@
       font-size: var(--font-size-sm);
       letter-spacing: 0.02em;
     }
+
+    /* ===== 本地排行榜（复用 GameUtils.renderLeaderboard） ===== */
+    .lb-list { font-size: 12px; max-height: 180px; overflow-y: auto; }
+    .lb-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--color-border-light); }
+    .lb-item:last-child { border-bottom: none; }
+    .lb-item .rank { font-family: var(--font-family-display); font-weight: 700; color: var(--color-accent); min-width: 24px; }
+    .lb-item .score { font-family: var(--font-family-display); font-weight: 700; color: var(--color-text-primary); }
+    .lb-item .meta { font-size: 10px; color: var(--color-text-tertiary); }
+    .lb-empty { text-align: center; color: var(--color-text-tertiary); font-size: 12px; padding: 16px 0; }
   </style>
 </head>
 <body>
@@ -452,6 +467,8 @@
             <button class="ctrl-btn" id="btnReset">重置</button>
             <button class="ctrl-btn" id="btnSeed">初始生态</button>
           </div>
+          <button class="ctrl-btn" id="btnShot" style="margin-top:6px;width:100%;box-sizing:border-box">📷 截图</button>
+          <button class="ctrl-btn" id="btn-fullscreen" style="margin-top:6px;width:100%;box-sizing:border-box">⛶ 全屏</button>
         </div>
 
         <div class="panel-section">
@@ -513,8 +530,15 @@
             </div>
           </div>
         </div>
+
+        <div class="panel-section">
+          <h3>排行榜</h3>
+          <div class="lb-list" id="lbList"></div>
+        </div>
       </aside>
     </section>
+
+  <script src="../assets/js/game-utils.js"></script>
 
     <footer class="eco-footer">
       <p>提示：投放藻类产氧、浮游生物吃藻类、小鱼吃浮游生物、微生物分解有机物维持营养盐循环。维持三类生物数量稳定 30 秒可解锁生态点奖励。</p>
@@ -1148,12 +1172,20 @@
           }
         }
       }
+      var prevHealth = state.health;
       if (ox > 50 && hasAllSpecies && vol < 0.3 && state.turbidity < 50) {
         state.health = 'good';
       } else if (ox > 25 && (algae > 0 || plankton > 0) && vol < 0.6) {
         state.health = 'warn';
       } else {
         state.health = 'bad';
+      }
+      // 排行榜接入：从 good 跌出时记录平衡时长
+      if (prevHealth === 'good' && state.health !== 'good' && window.GameUtils && state.runtime > 10) {
+        GameUtils.saveLeaderboard('eco', Math.floor(state.runtime), { points: state.ecoPoints });
+        GameUtils.recordScore('eco', Math.floor(state.runtime));
+        var lbEl = document.getElementById('lbList');
+        if (lbEl) lbEl.innerHTML = GameUtils.renderLeaderboard('eco', { meta: function(r){ return '平衡 ' + r.score + ' 秒 · ' + (r.extra && r.extra.points != null ? r.extra.points : '-') + ' 点'; } });
       }
     },
     checkAchievements() {
@@ -1164,12 +1196,20 @@
       };
       if (state.runtime > 10 && this.countByType('algae') > 5 && this.countByType('plankton') > 2 && this.countByType('fish') > 0) {
         add('first_balance', '成就：初次平衡', '三类生物共存，建立完整食物链');
+        if (window.GameUtils) GameUtils.celebrate();
       }
       if (state.runtime > 600) {
         add('ten_min', '成就：长期演化', '生态系统持续运行 10 分钟');
       }
       if (state.ecoPoints >= 50) {
         add('points50', '成就：生态积蓄', '累积 50 生态点');
+      }
+      // 全局成就接入
+      if (window.GameUtils && !GameUtils.isUnlocked('eco_balance_1m') && state.runtime >= 60 && state.health === 'good') {
+        GameUtils.unlock('eco_balance_1m', '生态守衡', '生态瓶维持平衡 1 分钟');
+      }
+      if (window.GameUtils && !GameUtils.isUnlocked('eco_3_species') && this.countByType('algae') > 0 && this.countByType('plankton') > 0 && this.countByType('fish') > 0) {
+        GameUtils.unlock('eco_3_species', '物种丰饶', '生态瓶同时存在 3 种生物');
       }
     },
     reset() {
@@ -1620,6 +1660,15 @@
           this.toast('生态点不足', '一键投放初始生态需要 15 点');
         }
       });
+      // 截图按钮
+      document.getElementById('btnShot').addEventListener('click', () => {
+        if (!window.GameUtils) return;
+        const canvas = document.querySelector('canvas');
+        if (canvas) {
+          GameUtils.screenshotCanvas(canvas, '微型生态瓶', '生态点 ' + state.ecoPoints);
+          GameUtils.unlock('use_screenshot', '定格瞬间', '使用截图功能分享一次');
+        }
+      });
       // 主题切换
       this.initThemeToggle();
       // Canvas 点击/触摸：投放藻类（点哪投哪）
@@ -2003,8 +2052,647 @@
     renderer.buildBottleCache();
   });
   // 页面关闭时存档
-  window.addEventListener('beforeunload', () => storage.save());
+  window.addEventListener('beforeunload', () => {
+    // 排行榜接入：运行超过 30 秒则记录平衡时长
+    if (window.GameUtils && state.runtime > 30) {
+      GameUtils.saveLeaderboard('eco', Math.floor(state.runtime), { points: state.ecoPoints });
+      GameUtils.recordScore('eco', Math.floor(state.runtime));
+    }
+    storage.save();
+  });
   requestAnimationFrame(loop);
+
+  // 全局成就系统接入
+  if (window.GameUtils) GameUtils.recordPlay('eco', 0);
+  // 成就：首次游玩
+  if (window.GameUtils && !GameUtils.isUnlocked('first_play')) {
+    GameUtils.unlock('first_play', '初次到访', '第一次游玩任意游戏');
+  }
+  // 新手引导
+  if (window.GameUtils) {
+    GameUtils.showTutorial('eco', '微型生态瓶 · 玩法指南', [
+    { step: '投放生物', desc: '点击下方按钮投放藻类、浮游生物和小鱼' },
+    { step: '食物链', desc: '藻类→浮游生物→小鱼，形成完整食物链' },
+    { step: '调节环境', desc: '滑动光照和温度调节器，不同生物有偏好范围' },
+    { step: '维持平衡', desc: '观察种群数量曲线，避免某一环节断裂' },
+    { step: '放置观察', desc: '生态瓶会自动演化，可放置不管观察自然演化' }
+  ]);
+  }
+
+  // 全局快捷键：? 玩法提示 / L 排行榜
+  if (window.GameUtils && GameUtils.registerGlobalShortcuts) {
+    GameUtils.registerGlobalShortcuts({
+      onHelp: function () {
+        GameUtils.showHowtoPopup('投放藻类/浮游/小鱼 · 调节光照温度 · 维持食物链平衡 · 平衡越久排名越高');
+      },
+      onLeaderboard: function () {
+        var lb = document.getElementById('lbList');
+        if (lb) { lb.scrollIntoView({ behavior: 'smooth', block: 'center' }); lb.style.transition = 'box-shadow .3s'; lb.style.boxShadow = '0 0 0 2px var(--color-accent)'; setTimeout(function(){ lb.style.boxShadow = ''; }, 800); }
+      }
+    });
+  }
+
+  // 弹窗 Esc 关闭 + 焦点管理
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      var openModal = document.querySelector('.modal-mask.show, .modal.show');
+      if (openModal) {
+        var closeBtn = openModal.querySelector('[data-close], .modal-close, .btn-close, button[aria-label="关闭"]');
+        if (closeBtn) closeBtn.click();
+        else openModal.classList.remove('show');
+      }
+    }
+  });
+
+  // 全屏按钮
+  var btnFs = document.getElementById('btn-fullscreen');
+  if (btnFs) {
+    btnFs.addEventListener('click', function () {
+      if (window.GameUtils) GameUtils.toggleFullscreen(document.querySelector('.eco-stage') || document.documentElement);
+    });
+  }
+
+  // 反馈入口注入
+  if (window.GameUtils) {
+    GameUtils.injectFeedback('#feedbackSlot');
+  }
+
+  // 页面初始化时渲染排行榜
+  if (window.GameUtils) {
+    var lbEl = document.getElementById('lbList');
+    if (lbEl) lbEl.innerHTML = GameUtils.renderLeaderboard('eco', { meta: function(r){ return '平衡 ' + r.score + ' 秒 · ' + (r.extra && r.extra.points != null ? r.extra.points : '-') + ' 点'; } });
+  }
+
+  // PWA Service Worker 注册
+  if (window.GameUtils) {
+    document.documentElement.setAttribute('data-sw-root', '../');
+    GameUtils.registerSW();
+  }
   </script>
+
+<script>
+/* ============================================================
+ * 背景音乐系统 - 纯代码生成（Web Audio API）
+ * 风格：治愈系 · 水环境氛围 · 自然宁静 · 60BPM · 自由流动
+ * ============================================================ */
+(function bgmSystem() {
+  // ---------- 配置 ----------
+  var STORAGE_KEY = 'eco_bgm_v1';
+  var BPM = 60;
+  var BEAT = 60 / BPM;
+
+  // 频率表（C大调五声为主，温暖治愈）
+  var NOTE_FREQS = {
+    'C2': 65.41,  'D2': 73.42,  'E2': 82.41,  'F2': 87.31,  'G2': 98.00,
+    'A2': 110.00, 'B2': 123.47, 'C3': 130.81, 'D3': 146.83, 'E3': 164.81,
+    'G3': 196.00, 'A3': 220.00, 'C4': 261.63, 'D4': 293.66, 'E4': 329.63,
+    'G4': 392.00, 'A4': 440.00, 'C5': 523.25, 'D5': 587.33, 'E5': 659.25,
+    'G5': 783.99, 'A5': 880.00, 'C6': 1046.50, 'E6': 1318.51, 'G6': 1567.98
+  };
+
+  function freqOf(name) {
+    return NOTE_FREQS[name] || 261.63;
+  }
+
+  // 五声音阶池（C大调五声：C D E G A）
+  var PENTATONIC = ['C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5', 'G5', 'A5'];
+
+  // 和弦进行：C - G - Am - F · 温暖治愈流行进行
+  var CHORDS = [
+    { name: 'C',  tones: ['C3', 'E3', 'G3'], root: 'C2' },
+    { name: 'C',  tones: ['C3', 'E3', 'G3'], root: 'C2' },
+    { name: 'G',  tones: ['G2', 'B2', 'D3'], root: 'G2' },
+    { name: 'Am', tones: ['A2', 'C3', 'E3'], root: 'A2' },
+    { name: 'F',  tones: ['F2', 'A2', 'C3'], root: 'F2' },
+    { name: 'F',  tones: ['F2', 'A2', 'C3'], root: 'F2' },
+    { name: 'C',  tones: ['C3', 'E3', 'G3'], root: 'C2' },
+    { name: 'G',  tones: ['G2', 'B2', 'D3'], root: 'G2' },
+    // === 第二轮变化 ===
+    { name: 'C',  tones: ['C3', 'E3', 'G3'], root: 'C2' },
+    { name: 'Am', tones: ['A2', 'C3', 'E3'], root: 'A2' },
+    { name: 'F',  tones: ['F2', 'A2', 'C3'], root: 'F2' },
+    { name: 'G',  tones: ['G2', 'B2', 'D3'], root: 'G2' },
+    { name: 'C',  tones: ['C3', 'E3', 'G3'], root: 'C2' },
+    { name: 'Em', tones: ['E2', 'G2', 'B2'], root: 'E2' },
+    { name: 'F',  tones: ['F2', 'A2', 'C3'], root: 'F2' },
+    { name: 'G',  tones: ['G2', 'B2', 'D3'], root: 'G2' }
+  ];
+
+  // ---------- 状态 ----------
+  var audioCtx = null;
+  var masterGain = null;
+  var isUserEnabled = false;
+  var isPlaying = false;
+  var userVolume = 0.25;
+
+  var barIndex = 0;
+  var beatInBar = 0;
+  var lastBeatNum = -1;
+  var nextNoteTime = 0;
+  var schedulerTimer = null;
+  var TICK = 0.08;
+  var nextWaterDrop = 0;
+  var nextMelodyNote = 0;
+
+  // ---------- 音色 ----------
+  // 音色：水琴（柔和正弦 + 泛音，模拟水铃）
+  function playWaterBell(freq, startTime, duration, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc1 = audioCtx.createOscillator();
+    var osc2 = audioCtx.createOscillator();
+    var osc3 = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+
+    osc1.type = 'sine';
+    osc1.frequency.value = freq;
+    osc2.type = 'sine';
+    osc2.frequency.value = freq * 2.01;
+    osc3.type = 'sine';
+    osc3.frequency.value = freq * 3.02;
+
+    var t = startTime;
+    var attack = 0.01;
+    var release = duration * 0.8;
+
+    noteGain.gain.setValueAtTime(0.0001, t);
+    noteGain.gain.linearRampToValueAtTime(0.2 * gain, t + attack);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+    // 分别设置泛音的音量
+    var g2 = audioCtx.createGain();
+    var g3 = audioCtx.createGain();
+    g2.gain.value = 0.4;
+    g3.gain.value = 0.15;
+
+    osc1.connect(noteGain);
+    osc2.connect(g2);
+    g2.connect(noteGain);
+    osc3.connect(g3);
+    g3.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc1.start(t);
+    osc2.start(t);
+    osc3.start(t);
+    osc1.stop(t + duration + 0.05);
+    osc2.stop(t + duration + 0.05);
+    osc3.stop(t + duration + 0.05);
+  }
+
+  // 音色：水垫（多层失谐正弦 + 缓慢低通调制）
+  function playWaterPad(freq, startTime, duration, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc1 = audioCtx.createOscillator();
+    var osc2 = audioCtx.createOscillator();
+    var osc3 = audioCtx.createOscillator();
+    var osc4 = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+    var filter = audioCtx.createBiquadFilter();
+
+    osc1.type = 'sine';
+    osc1.frequency.value = freq;
+    osc2.type = 'sine';
+    osc2.frequency.value = freq * 1.004;
+    osc3.type = 'sine';
+    osc3.frequency.value = freq * 0.996;
+    osc4.type = 'sine';
+    osc4.frequency.value = freq * 1.99;
+
+    var lfo = audioCtx.createOscillator();
+    var lfoGain = audioCtx.createGain();
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.05;
+    lfoGain.gain.value = freq * 0.008;
+    lfo.connect(lfoGain);
+    lfoGain.connect(filter.frequency);
+
+    filter.type = 'lowpass';
+    filter.frequency.value = freq * 1.5;
+    filter.Q.value = 0.2;
+
+    var t = startTime;
+    var attack = duration * 0.3;
+    var release = duration * 0.35;
+
+    noteGain.gain.setValueAtTime(0.0001, t);
+    noteGain.gain.linearRampToValueAtTime(0.15 * gain, t + attack);
+    noteGain.gain.setValueAtTime(0.15 * gain, t + duration - release);
+    noteGain.gain.linearRampToValueAtTime(0.0001, t + duration);
+
+    var g4 = audioCtx.createGain();
+    g4.gain.value = 0.25;
+
+    osc1.connect(filter);
+    osc2.connect(filter);
+    osc3.connect(filter);
+    osc4.connect(g4);
+    g4.connect(filter);
+    filter.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc1.start(t);
+    osc2.start(t);
+    osc3.start(t);
+    osc4.start(t);
+    lfo.start(t);
+    osc1.stop(t + duration + 0.1);
+    osc2.stop(t + duration + 0.1);
+    osc3.stop(t + duration + 0.1);
+    osc4.stop(t + duration + 0.1);
+    lfo.stop(t + duration + 0.1);
+  }
+
+  // 音色：水下低音（纯净正弦，非常深沉）
+  function playDeepBass(freq, startTime, duration, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+
+    var t = startTime;
+    var attack = 0.15;
+    var release = duration * 0.3;
+
+    noteGain.gain.setValueAtTime(0.0001, t);
+    noteGain.gain.linearRampToValueAtTime(0.35 * gain, t + attack);
+    noteGain.gain.linearRampToValueAtTime(0.3 * gain, t + attack + 0.2);
+    noteGain.gain.setValueAtTime(0.3 * gain, t + duration - release);
+    noteGain.gain.linearRampToValueAtTime(0.0001, t + duration);
+
+    osc.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc.start(t);
+    osc.stop(t + duration + 0.1);
+  }
+
+  // 音色：水滴声（快速正弦扫频）
+  function playWaterDrop(startTime, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+
+    osc.type = 'sine';
+    var startFreq = 1200 + Math.random() * 800;
+    osc.frequency.setValueAtTime(startFreq, startTime);
+    osc.frequency.exponentialRampToValueAtTime(startFreq * 0.5, startTime + 0.08);
+
+    noteGain.gain.setValueAtTime(0.0001, startTime);
+    noteGain.gain.linearRampToValueAtTime(0.1 * gain, startTime + 0.003);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.12);
+
+    osc.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc.start(startTime);
+    osc.stop(startTime + 0.15);
+  }
+
+  // 音色：气泡上升（正弦波上扫）
+  function playBubble(startTime, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+
+    osc.type = 'sine';
+    var startFreq = 200 + Math.random() * 300;
+    osc.frequency.setValueAtTime(startFreq, startTime);
+    osc.frequency.exponentialRampToValueAtTime(startFreq * 2.5, startTime + 0.15);
+
+    noteGain.gain.setValueAtTime(0.0001, startTime);
+    noteGain.gain.linearRampToValueAtTime(0.05 * gain, startTime + 0.01);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.18);
+
+    osc.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc.start(startTime);
+    osc.stop(startTime + 0.2);
+  }
+
+  // ---------- 调度 ----------
+  function scheduler() {
+    if (!isPlaying || !audioCtx) return;
+    var now = audioCtx.currentTime;
+    while (nextNoteTime < now + 0.4) {
+      scheduleTick(nextNoteTime);
+      nextNoteTime += TICK;
+    }
+    schedulerTimer = setTimeout(scheduler, 40);
+  }
+
+  function scheduleTick(t) {
+    var chord = CHORDS[barIndex];
+
+    // === 水垫和弦（每小节触发，长持续音）===
+    var beatNum = Math.floor(beatInBar);
+    if (beatNum !== lastBeatNum) {
+      if (beatNum === 0) {
+        // Pad 和弦
+        for (var i = 0; i < chord.tones.length; i++) {
+          var padFreq = freqOf(chord.tones[i]);
+          playWaterPad(padFreq, t, BEAT * 3.9, 0.18);
+        }
+        // 低音
+        if (chord.root) {
+          playDeepBass(freqOf(chord.root), t, BEAT * 3.8, 0.35);
+        }
+      }
+      lastBeatNum = beatNum;
+    }
+
+    // === 随机水铃声（旋律，五声音阶，稀疏自由）===
+    if (t >= nextMelodyNote) {
+      // 从当前和弦音 + 五声音阶中选一个
+      var notePool = [];
+      for (var j = 0; j < chord.tones.length; j++) {
+        notePool.push(chord.tones[j]);
+      }
+      // 加上高八度的五声音阶
+      var pentHigh = ['C5', 'D5', 'E5', 'G5', 'A5'];
+      for (var k = 0; k < pentHigh.length; k++) {
+        notePool.push(pentHigh[k]);
+      }
+      var chosenNote = notePool[Math.floor(Math.random() * notePool.length)];
+      var noteDur = BEAT * (0.8 + Math.random() * 1.5);
+      playWaterBell(freqOf(chosenNote), t, noteDur, 0.22 + Math.random() * 0.1);
+      // 下一个音符的间隔：1-3 拍，非常稀疏
+      nextMelodyNote = t + BEAT * (1 + Math.random() * 2.5);
+    }
+
+    // === 水滴声（随机触发，增加水环境感）===
+    if (t >= nextWaterDrop) {
+      if (Math.random() < 0.6) {
+        playWaterDrop(t + Math.random() * 0.1, 0.15);
+      }
+      if (Math.random() < 0.3) {
+        playBubble(t + 0.1 + Math.random() * 0.2, 0.1);
+      }
+      nextWaterDrop = t + BEAT * (0.8 + Math.random() * 2);
+    }
+
+    // 推进节拍
+    beatInBar += TICK / BEAT;
+    if (beatInBar >= 4) {
+      beatInBar -= 4;
+      barIndex++;
+      if (barIndex >= CHORDS.length) {
+        barIndex = 0;
+      }
+    }
+  }
+
+  // ---------- 控制 ----------
+  function initAudio() {
+    if (audioCtx) return true;
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return false;
+      audioCtx = new Ctx();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = isUserEnabled ? userVolume : 0;
+      masterGain.connect(audioCtx.destination);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function play() {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (isPlaying) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+
+    masterGain.gain.setTargetAtTime(userVolume, audioCtx.currentTime, 0.3);
+
+    barIndex = 0;
+    beatInBar = 0;
+    lastBeatNum = -1;
+    nextNoteTime = audioCtx.currentTime + 0.15;
+    nextWaterDrop = nextNoteTime + BEAT * 0.5;
+    nextMelodyNote = nextNoteTime + BEAT * 1;
+    isPlaying = true;
+    scheduler();
+  }
+
+  function stop() {
+    isPlaying = false;
+    if (schedulerTimer) {
+      clearTimeout(schedulerTimer);
+      schedulerTimer = null;
+    }
+    if (masterGain && audioCtx) {
+      masterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.3);
+    }
+  }
+
+  function toggle() {
+    if (isPlaying) {
+      stop();
+    } else {
+      play();
+    }
+    return isPlaying;
+  }
+
+  function setVolume(v) {
+    userVolume = Math.max(0, Math.min(1, v));
+    if (masterGain && audioCtx) {
+      masterGain.gain.setTargetAtTime(isUserEnabled ? userVolume : 0, audioCtx.currentTime, 0.08);
+    }
+    saveSettings();
+  }
+
+  function setEnabled(enabled) {
+    isUserEnabled = enabled;
+    if (masterGain && audioCtx) {
+      masterGain.gain.setTargetAtTime(enabled ? userVolume : 0, audioCtx.currentTime, 0.08);
+    }
+    if (enabled) {
+      if (window.GameUtils) GameUtils.unlock('enable_bgm', '奏响旋律', '开启任意游戏的 BGM');
+      play();
+    } else {
+      stop();
+    }
+    saveSettings();
+  }
+
+  // ---------- 存档 ----------
+  function loadSettings() {
+    try {
+      var saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        var obj = JSON.parse(saved);
+        if (typeof obj.enabled === 'boolean') isUserEnabled = obj.enabled;
+        if (typeof obj.volume === 'number') userVolume = Math.max(0, Math.min(1, obj.volume));
+      }
+    } catch (e) {}
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        enabled: isUserEnabled,
+        volume: userVolume
+      }));
+    } catch (e) {}
+  }
+
+  // ---------- 音效 ----------
+  // 投放生物
+  function playSpawn(type) {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+    var t = audioCtx.currentTime;
+    var noteMap = {
+      algae: 'C5',
+      plankton: 'E5',
+      fish: 'G5',
+      microbe: 'A4'
+    };
+    var note = noteMap[type] || 'C5';
+    playWaterBell(freqOf(note), t, 0.6, 0.3);
+    playBubble(t + 0.05, 0.15);
+  }
+
+  // 重置生态
+  function playReset() {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+    var t = audioCtx.currentTime;
+    playWaterBell(freqOf('C4'), t, 0.4, 0.25);
+    playWaterBell(freqOf('G4'), t + 0.1, 0.5, 0.2);
+  }
+
+  // ---------- UI 绑定 ----------
+  function initUI() {
+    // 找到控制面板
+    var ctrlSection = document.querySelector('.panel-section .ctrl-row');
+    if (!ctrlSection || !ctrlSection.parentNode) return;
+
+    // 创建 BGM 设置行
+    var bgmSection = document.createElement('div');
+    bgmSection.className = 'panel-section';
+
+    var bgmTitle = document.createElement('h3');
+    bgmTitle.textContent = '背景音乐';
+    bgmSection.appendChild(bgmTitle);
+
+    var bgmRow = document.createElement('div');
+    bgmRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;';
+
+    var bgmLabel = document.createElement('span');
+    bgmLabel.style.cssText = 'font-size:13px;color:var(--color-text-secondary);';
+    bgmLabel.textContent = '环境音效';
+
+    var bgmControls = document.createElement('div');
+    bgmControls.style.cssText = 'display:flex;align-items:center;gap:10px;';
+
+    var btnOn = document.createElement('button');
+    btnOn.className = 'ctrl-btn';
+    btnOn.style.cssText = 'padding:4px 12px;font-size:12px;';
+    btnOn.textContent = '开';
+    if (isUserEnabled) {
+      btnOn.classList.add('active');
+    }
+
+    var btnOff = document.createElement('button');
+    btnOff.className = 'ctrl-btn';
+    btnOff.style.cssText = 'padding:4px 12px;font-size:12px;';
+    btnOff.textContent = '关';
+    if (!isUserEnabled) {
+      btnOff.classList.add('active');
+    }
+
+    var volSlider = document.createElement('input');
+    volSlider.type = 'range';
+    volSlider.min = '0';
+    volSlider.max = '100';
+    volSlider.value = Math.round(userVolume * 100);
+    volSlider.style.cssText = 'width:80px;';
+
+    bgmControls.appendChild(btnOn);
+    bgmControls.appendChild(btnOff);
+    bgmControls.appendChild(volSlider);
+
+    bgmRow.appendChild(bgmLabel);
+    bgmRow.appendChild(bgmControls);
+    bgmSection.appendChild(bgmRow);
+
+    // 插入到"模拟控制"部分前面
+    ctrlSection.parentNode.parentNode.insertBefore(bgmSection, ctrlSection.parentNode);
+
+    btnOn.addEventListener('click', function () {
+      setEnabled(true);
+      btnOn.classList.add('active');
+      btnOff.classList.remove('active');
+    });
+
+    btnOff.addEventListener('click', function () {
+      setEnabled(false);
+      btnOff.classList.add('active');
+      btnOn.classList.remove('active');
+    });
+
+    volSlider.addEventListener('input', function (e) {
+      setVolume(parseInt(e.target.value) / 100);
+    });
+
+    // 绑定投放音效
+    document.querySelectorAll('.spawn-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var type = btn.dataset.spawn;
+        if (window.EcoBGM && typeof window.EcoBGM.playSpawn === 'function') {
+          window.EcoBGM.playSpawn(type);
+        }
+      });
+    });
+
+    // 绑定重置音效
+    var btnReset = document.getElementById('btnReset');
+    if (btnReset) {
+      btnReset.addEventListener('click', function () {
+        if (window.EcoBGM && typeof window.EcoBGM.playReset === 'function') {
+          window.EcoBGM.playReset();
+        }
+      });
+    }
+  }
+
+  // ---------- 暴露给外部 ----------
+  window.EcoBGM = {
+    play: play,
+    stop: stop,
+    toggle: toggle,
+    setVolume: setVolume,
+    setEnabled: setEnabled,
+    playSpawn: playSpawn,
+    playReset: playReset,
+    isPlaying: function () { return isPlaying; },
+    isEnabled: function () { return isUserEnabled; }
+  };
+
+  // ---------- 初始化 ----------
+  loadSettings();
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      initUI();
+      if (isUserEnabled) play();
+    });
+  } else {
+    initUI();
+    if (isUserEnabled) play();
+  }
+})();
+</script>
+
+<!-- 反馈入口 -->
+<div id="feedbackSlot" style="text-align:center;padding:12px 0;border-top:1px solid var(--color-border-light);margin-top:24px"></div>
 </body>
 </html>

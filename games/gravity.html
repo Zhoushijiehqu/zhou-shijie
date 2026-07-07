@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>引力弹弓航天挑战 | Gravity Slingshot</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<meta name="theme-color" content="#d4ab6a">
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   img, video { max-width: 100%; height: auto; display: block; }
@@ -18,6 +20,12 @@
     --white: #e0e0f0;
     --muted: #6a6a8a;
     --border: #1a1a3a;
+    /* 排行榜/反馈复用的标准变量（映射到本游戏主题） */
+    --color-border-light: var(--border);
+    --color-accent: #d4ab6a;
+    --color-text-primary: var(--white);
+    --color-text-tertiary: var(--muted);
+    --font-family-display: 'Fraunces', 'Songti SC', 'STSong', Georgia, serif;
   }
 
   body {
@@ -319,6 +327,15 @@
     .panel h1 { font-size: 22px; }
     .btn { padding: 10px 20px; font-size: 13px; min-width: 110px; }
   }
+
+  /* ========== 本地排行榜（复用 GameUtils.renderLeaderboard） ========== */
+  .lb-list { font-size: 12px; max-height: 180px; overflow-y: auto; }
+  .lb-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--color-border-light); }
+  .lb-item:last-child { border-bottom: none; }
+  .lb-item .rank { font-family: var(--font-family-display); font-weight: 700; color: var(--color-accent); min-width: 24px; }
+  .lb-item .score { font-family: var(--font-family-display); font-weight: 700; color: var(--color-text-primary); }
+  .lb-item .meta { font-size: 10px; color: var(--color-text-tertiary); }
+  .lb-empty { text-align: center; color: var(--color-text-tertiary); font-size: 12px; padding: 16px 0; }
 </style>
 </head>
 <body>
@@ -332,7 +349,10 @@
     <div class="hud-btns">
       <button class="hud-btn" id="btnRetry">↻ 重试</button>
       <button class="hud-btn accent-hint" id="btnHint">💡 航线提示</button>
+      <button class="hud-btn" id="btn-hint-daily" title="每日 3 次免费提示">💡 卡关提示(<span id="hint-count">3</span>)</button>
+      <button class="hud-btn" id="btn-screenshot" title="截图分享">📷 截图</button>
       <button class="hud-btn accent-skip" id="btnAutoComplete">✨ 自动通关</button>
+      <button class="hud-btn" id="btn-fullscreen" title="全屏">⛶ 全屏</button>
       <button class="hud-btn" id="btnMenu">☰ 菜单</button>
     </div>
   </div>
@@ -349,6 +369,10 @@
         <button class="btn" id="btnSettings">⚙ 游戏设置</button>
       </div>
       <p style="margin-top:16px;font-size:12px;" id="bestInfo">最高通关：—</p>
+      <div class="panel-card" style="margin-top:16px;text-align:left;padding:12px 16px;border:1px solid var(--color-border-light);border-radius:8px;background:rgba(13,13,36,0.6)">
+        <h3 style="margin:0 0 6px;font-family:var(--font-family-display);font-size:13px;color:var(--cyan);letter-spacing:0.06em">排行榜</h3>
+        <div class="lb-list" id="lbList"></div>
+      </div>
     </div>
   </div>
 
@@ -783,6 +807,8 @@ let screenShake = 0;          // 屏幕震动强度（0~1，衰减）
 let blackHolePull = null;     // 黑洞吸入动画 {x, y, t, duration}
 let lastPredictTime = 0;      // 预测计算上次时间（节流用）
 let particlePool = [];        // 粒子对象池
+let attempts = 0;             // 本关发射尝试次数（用于星级评价）
+let usedAutocomplete = false; // 本关是否使用自动通关（用于星级评价）
 
 // ─── 粒子系统 ───────────────────────────────────────────────
 let particles = [];           // [{x, y, vx, vy, life, maxLife, color, size}]
@@ -836,6 +862,8 @@ function loadLevel(index) {
   idealPathDirty = true;
   showGoalHint = true;
   physicsAccumulator = 0;     // 物理累加器清零，避免上一关残留步进
+  attempts = 0;               // 重置尝试次数
+  usedAutocomplete = false;   // 重置自动通关标志
   gameState = State.AIMING;
   updateHUD();
 }
@@ -919,7 +947,7 @@ function initAudio() {
 }
 function playSound(type) {
   if (!soundEnabled || !audioCtx) return;
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
   const now = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
@@ -980,6 +1008,9 @@ function triggerBlackHolePull(x, y) {
   spawnParticles(x, y, 30, '#8844ff', 80, 0.6);
   triggerShake(0.6);
   playSound('crash');
+  if (window.GravityBGM && typeof window.GravityBGM.playCrash === 'function') {
+    window.GravityBGM.playCrash();
+  }
 }
 
 // ─── 计算预测轨迹（脏标记 + 节流机制）─────────────────────────
@@ -1196,11 +1227,51 @@ function triggerWin(force) {
   spawnParticles(player.x, player.y, 80, '#ffd740', 300, 3);
   spawnParticles(player.x, player.y, 40, '#ffffff', 200, 2);
   playSound('win');
+  if (window.GravityBGM && typeof window.GravityBGM.playWin === 'function') {
+    window.GravityBGM.playWin();
+  }
   updateHUD();
 
   if (!force && currentLevel + 1 > bestLevel) {
     bestLevel = currentLevel + 1;
     saveBest();
+  }
+
+  // 排行榜接入：记录最远通关数（自动通关 force 不计入）
+  if (!force && window.GameUtils) {
+    GameUtils.saveLeaderboard('gravity', bestLevel);
+    GameUtils.recordScore('gravity', bestLevel);
+    var lbEl = document.getElementById('lbList');
+    if (lbEl) lbEl.innerHTML = GameUtils.renderLeaderboard('gravity', { meta: function(r){ return '通关 ' + r.score + ' / 20 关'; } });
+  }
+
+  // —— 关卡星级评价 + 渐进解锁（同步至 GameUtils 全局进度）——
+  try {
+    if (window.GameUtils) {
+      let gStars;
+      if (force) {
+        gStars = 1; // 自动通关 = 1 星
+      } else if (attempts <= 1) {
+        gStars = 3; // 一次到达 = 3 星
+      } else {
+        gStars = 2; // 多次尝试后到达 = 2 星
+      }
+      GameUtils.saveLevelStars('gravity', currentLevel + 1, gStars, currentLevel + 2);
+    }
+  } catch (e) { console.warn('星级保存失败', e); }
+
+  // —— 成就接入 ——（仅非自动通关 force 才判定，避免重复/作弊解锁）
+  if (!force) {
+    try {
+      if (window.GameUtils) {
+        if (!GameUtils.isUnlocked('gravity_lv10') && bestLevel >= 10) {
+          GameUtils.unlock('gravity_lv10', '星际旅行者', '引力弹弓通关 10 关');
+        }
+        if (!GameUtils.isUnlocked('gravity_all') && bestLevel >= LEVELS.length) {
+          GameUtils.unlock('gravity_all', '宇宙导航员', '引力弹弓全 20 关通关');
+        }
+      }
+    } catch (e) { console.warn('成就解锁失败', e); }
   }
 
   if (currentLevel >= LEVELS.length - 1) {
@@ -1212,6 +1283,7 @@ function triggerWin(force) {
       ? '✨ 自动通关！第 ' + (currentLevel + 1) + ' 关已跳过。'
       : '探测器精准抵达目标！第 ' + (currentLevel + 1) + ' 关通过。';
   }
+  if (window.GameUtils) GameUtils.celebrate();
 }
 
 // ─── 持久化（带版本号和数据校验）────────────────────────────
@@ -1981,12 +2053,16 @@ function launch() {
   aimCurrent = null;
   predictPath = [];
   predictDirty = true;
+  attempts++;  // 计入一次发射尝试（用于星级评价）
   updateHUD();
 
   // 发射粒子
   spawnParticles(player.x, player.y, 15, '#00e5ff', 80, 0.6);
   playSound('launch');
   initAudio(); // 确保音频上下文已创建
+  if (window.GravityBGM && typeof window.GravityBGM.playLaunch === 'function') {
+    window.GravityBGM.playLaunch();
+  }
 }
 
 // ─── 输入处理（Pointer Events 统一桌面+移动）─────────────────
@@ -2103,7 +2179,8 @@ document.addEventListener('keydown', function(e) {
         gameState === State.GAME_OVER || gameState === State.WIN) {
       e.preventDefault();
       if (currentLevel > 0) {
-        const canPlay = freeSelectMode || currentLevel <= bestLevel;
+        const canPlay = freeSelectMode || currentLevel <= bestLevel ||
+          (window.GameUtils && GameUtils.isLevelUnlocked('gravity', currentLevel));
         if (canPlay) {
           hideAllOverlays();
           currentLevel--;
@@ -2119,7 +2196,8 @@ document.addEventListener('keydown', function(e) {
         gameState === State.GAME_OVER || gameState === State.WIN) {
       e.preventDefault();
       if (currentLevel < LEVELS.length - 1) {
-        const canPlay = freeSelectMode || (currentLevel + 1) <= bestLevel;
+        const canPlay = freeSelectMode || (currentLevel + 1) <= bestLevel ||
+          (window.GameUtils && GameUtils.isLevelUnlocked('gravity', currentLevel + 2));
         if (canPlay) {
           hideAllOverlays();
           currentLevel++;
@@ -2136,7 +2214,8 @@ document.addEventListener('keydown', function(e) {
     if (num === 0) num = 10;
     if (num >= 1 && num <= LEVELS.length) {
       const targetIdx = num - 1;
-      const canPlay = freeSelectMode || (targetIdx + 1) <= bestLevel + 1;
+      const canPlay = freeSelectMode || (targetIdx + 1) <= bestLevel + 1 ||
+        (window.GameUtils && GameUtils.isLevelUnlocked('gravity', targetIdx + 1));
       if (canPlay && (gameState === State.AIMING || gameState === State.FLYING ||
           gameState === State.GAME_OVER || gameState === State.WIN)) {
         hideAllOverlays();
@@ -2181,6 +2260,7 @@ document.getElementById('btnStart').addEventListener('click', function() {
   hideAllOverlays();
   currentLevel = 0;
   loadLevel(0);
+  if (window.GameUtils) GameUtils.recordPlay('gravity', 0);
 });
 
 document.getElementById('btnTutorial').addEventListener('click', function() {
@@ -2211,6 +2291,10 @@ function buildLevelGrid() {
   if (!grid) return;
   grid.innerHTML = '';
 
+  // 读取 GameUtils 关卡进度（星级数据），兼容 GameUtils 缺失场景
+  const guProgress = (window.GameUtils && GameUtils.getLevelProgress) ? GameUtils.getLevelProgress('gravity') : { stars: {} };
+  const starsMap = (guProgress && guProgress.stars) ? guProgress.stars : {};
+
   // 更新进度统计
   const progressText = document.getElementById('progressText');
   const progressBar = document.getElementById('progressBar');
@@ -2224,12 +2308,29 @@ function buildLevelGrid() {
 
   for (let i = 0; i < LEVELS.length; i++) {
     const cell = document.createElement('button');
-    const completed = (i + 1) <= bestLevel;
-    const unlocked  = freeSelectMode || (i + 1) <= bestLevel + 1;
+    const levelNum = i + 1;
+    const completed = levelNum <= bestLevel;
+    // 锁定判定：优先 GameUtils 全局进度，兼容 freeSelectMode 与本地 bestLevel
+    const unlocked = freeSelectMode ||
+      (window.GameUtils && GameUtils.isLevelUnlocked && GameUtils.isLevelUnlocked('gravity', levelNum)) ||
+      levelNum <= bestLevel + 1;
+    const stars = starsMap[levelNum] || 0;
     cell.className = 'level-cell' + (unlocked ? '' : ' locked') + (completed ? ' completed' : '');
-    cell.textContent = unlocked ? (i + 1) : '🔒';
+    cell.textContent = '';
+    // 关号 / 锁定图标
+    const numEl = document.createElement('span');
+    numEl.textContent = unlocked ? levelNum : '🔒';
+    cell.appendChild(numEl);
+    // 星级显示（已通关关卡）
+    if (stars > 0 && unlocked) {
+      const starEl = document.createElement('span');
+      starEl.className = 'level-stars';
+      starEl.textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
+      starEl.style.cssText = 'font-size:8px;color:var(--gold);margin-top:2px;letter-spacing:1px;line-height:1;';
+      cell.appendChild(starEl);
+    }
     if (completed) {
-      cell.title = LEVELS[i].name + ' ✓ 已通关';
+      cell.title = LEVELS[i].name + ' · ' + stars + '星 已通关';
     } else if (unlocked) {
       cell.title = LEVELS[i].name;
     } else {
@@ -2281,6 +2382,7 @@ document.getElementById('btnHint').addEventListener('click', function() {
 // ─── 自动通关按钮 ───────────────────────────────────────────
 document.getElementById('btnAutoComplete').addEventListener('click', function() {
   if (gameState !== State.AIMING && gameState !== State.FLYING) return;
+  usedAutocomplete = true;  // 标记本关使用了自动通关（星级评价 = 1 星）
   hideAllOverlays();
   triggerWin(true);
 });
@@ -2291,6 +2393,8 @@ document.getElementById('chkFreeSelect').addEventListener('change', function() {
   saveGame();
   buildLevelGrid();
   playSound('click');
+  // 自由选关模式切换视为"换肤/换模式"，触发 try_skin 成就（本游戏无主题切换，以此替代）
+  if (window.GameUtils) GameUtils.unlock('try_skin', '换个皮肤', '切换过一次游戏皮肤');
 });
 
 document.getElementById('chkSound').addEventListener('change', function() {
@@ -2365,6 +2469,688 @@ updateHUD();
 initSettingsUI();
 lastTime = performance.now();
 animFrameId = requestAnimationFrame(gameLoop);
+
+// ============ 新手引导 / 提示 / 截图 / 成就接入 ============
+function updateHintCount() {
+  var el = document.getElementById('hint-count');
+  if (el && window.GameUtils) el.textContent = GameUtils.getHintCount();
+}
+
+// 每日卡关提示按钮（绑定可立即执行，点击时 GameUtils 已加载）
+var btnHintDaily = document.getElementById('btn-hint-daily');
+if (btnHintDaily) {
+  btnHintDaily.addEventListener('click', function () {
+    if (!window.GameUtils) return;
+    if (!GameUtils.useHint()) {
+      GameUtils._toast('今日提示次数已用完，明天再来');
+      return;
+    }
+    updateHintCount();
+    GameUtils.unlock('use_hint', '不耻下问', '使用一次提示功能');
+    var lv = LEVELS[currentLevel];
+    var tip = '尝试调整发射角度和力度，让探测器掠过行星借力加速';
+    if (lv && lv.planets && lv.planets.length > 0) {
+      tip = '本关有 ' + lv.planets.length + ' 颗行星可借力；先开 💡航线提示看理想路径，再调整蓄力方向';
+    }
+    GameUtils._toast('💡 ' + tip, 4500);
+  });
+}
+
+// 截图按钮
+var btnShot = document.getElementById('btn-screenshot');
+if (btnShot) {
+  btnShot.addEventListener('click', function () {
+    if (!window.GameUtils) return;
+    GameUtils.screenshotCanvas(canvas, '引力弹弓航天挑战', '第 ' + (currentLevel + 1) + ' 关 · 最高 ' + bestLevel + '/' + LEVELS.length);
+    GameUtils.unlock('use_screenshot', '定格瞬间', '使用截图功能分享一次');
+  });
+}
+
+// 全屏按钮
+var btnFs = document.getElementById('btn-fullscreen');
+if (btnFs) {
+  btnFs.addEventListener('click', function () {
+    if (window.GameUtils) GameUtils.toggleFullscreen(document.getElementById('game-wrapper'));
+  });
+}
+
+// 新手教学弹层与提示次数显示需等 game-utils.js 加载完成（DOMContentLoaded 后触发）
+document.addEventListener('DOMContentLoaded', function () {
+  if (!window.GameUtils) return;
+  // —— 成就：首次游玩 + 全局快捷键 ——
+  if (!GameUtils.isUnlocked('first_play')) {
+    GameUtils.unlock('first_play', '初次到访', '第一次游玩任意游戏');
+  }
+  GameUtils.registerGlobalShortcuts({
+    onHelp: function () {
+      GameUtils.showHowtoPopup('拖拽设定初速度 · 利用行星引力弹弓变轨 · 探测器到达目标通关 · 自动通关可跳关');
+    },
+    onLeaderboard: function () {
+      var lb = document.getElementById('lbList');
+      if (lb) { lb.scrollIntoView({behavior:'smooth'}); lb.style.transition='box-shadow .3s'; lb.style.boxShadow='0 0 0 2px var(--color-accent)'; setTimeout(function(){lb.style.boxShadow='';},800); }
+    },
+    onEsc: function () {
+      if (gameState !== State.MENU) {
+        goToMenu();
+      }
+    }
+  });
+  updateHintCount();
+  GameUtils.showTutorial('gravity', '引力弹弓 · 玩法指南', [
+    { step: '目标', desc: '将探测器送入右侧金色虫洞（带光晕的圆环）即可通关。' },
+    { step: '操作', desc: '按住画布任意位置向后拖拽蓄力，松开发射（类似弹弓）。' },
+    { step: '引力', desc: '飞越行星时引力会弯曲轨迹并加速——多颗行星叠加可实现"免费加速"。' },
+    { step: '辅助', desc: '💡航线提示显示理想路径；✨自动通关可跳过当前关。' },
+    { step: '提示', desc: '卡关时点 💡卡关提示（每日 3 次免费）；📷截图可保存分享画面。' }
+  ]);
+
+  // 反馈入口注入
+  GameUtils.injectFeedback('#feedbackSlot');
+
+  // 页面初始化时渲染排行榜
+  var lbEl = document.getElementById('lbList');
+  if (lbEl) lbEl.innerHTML = GameUtils.renderLeaderboard('gravity', { meta: function(r){ return '通关 ' + r.score + ' / 20 关'; } });
+});
+
+// PWA Service Worker 注册
+if (window.GameUtils) {
+  document.documentElement.setAttribute('data-sw-root', '../');
+  GameUtils.registerSW();
+}
 </script>
+
+<script>
+/* ============================================================
+ * 背景音乐系统 - 纯代码生成（Web Audio API）
+ * 风格：宇宙太空 · 空灵飘渺 · Ambient · 68BPM · 16小节循环
+ * ============================================================ */
+(function bgmSystem() {
+  // ---------- 配置 ----------
+  var STORAGE_KEY = 'gravity_bgm_v1';
+  var BPM = 68;
+  var BEAT = 60 / BPM;
+
+  // 频率表（D小调，宇宙神秘色彩）
+  var NOTE_FREQS = {
+    'D1': 36.71,  'A1': 55.00,  'D2': 73.42,  'F2': 87.31,  'G2': 98.00,
+    'A2': 110.00, 'Bf2': 116.54, 'C3': 130.81, 'D3': 146.83, 'F3': 174.61,
+    'G3': 196.00, 'A3': 220.00, 'Bf3': 233.08, 'C4': 261.63, 'D4': 293.66,
+    'E4': 329.63, 'F4': 349.23, 'G4': 392.00, 'A4': 440.00, 'Bf4': 466.16,
+    'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99,
+    'A5': 880.00, 'Bf5': 932.33, 'C6': 1046.50, 'D6': 1174.66, 'F6': 1396.91
+  };
+
+  function freqOf(name) {
+    return NOTE_FREQS[name] || 220;
+  }
+
+  // 和弦进行：Dm - Bbmaj7 - Am - Gm · 宇宙神秘色彩
+  var CHORDS = [
+    // === A段：深邃宇宙 (1-4)
+    { name: 'Dm',  tones: ['D3', 'F3', 'A3'], bar: 1 },
+    { name: 'Dm',  tones: ['D3', 'F3', 'A3'], bar: 2 },
+    { name: 'Bbm', tones: ['Bf3', 'D4', 'F4'], bar: 3 },
+    { name: 'Am',  tones: ['A3', 'C4', 'E4'], bar: 4 },
+    // === B段：星云漂流 (5-8)
+    { name: 'Gm',  tones: ['G3', 'Bf3', 'D4'], bar: 5 },
+    { name: 'Dm',  tones: ['D3', 'F3', 'A3'], bar: 6 },
+    { name: 'Bbm', tones: ['Bf3', 'D4', 'F4'], bar: 7 },
+    { name: 'Am',  tones: ['A3', 'C4', 'E4'], bar: 8 },
+    // === A'段：引力场 (9-12)
+    { name: 'Dm',  tones: ['D3', 'F3', 'A3'], bar: 9 },
+    { name: 'Gm',  tones: ['G3', 'Bf3', 'D4'], bar: 10 },
+    { name: 'Bbm', tones: ['Bf3', 'D4', 'F4'], bar: 11 },
+    { name: 'Am',  tones: ['A3', 'C4', 'E4'], bar: 12 },
+    // === B'段：虫洞穿越 (13-16)
+    { name: 'Dm',  tones: ['D3', 'F3', 'A3'], bar: 13 },
+    { name: 'Bbm', tones: ['Bf3', 'D4', 'F4'], bar: 14 },
+    { name: 'Gm',  tones: ['G3', 'Bf3', 'D4'], bar: 15 },
+    { name: 'Am',  tones: ['A3', 'C4', 'E4'], bar: 16 }
+  ];
+
+  // 旋律（空灵铃铛音色，慢速漂浮感）
+  var MELODY = [
+    // A段
+    [['D5', 1.5], [0, 0.5], ['F5', 1], ['A5', 1]],
+    [['E5', 1], ['D5', 1], ['C5', 0.5], ['A4', 0.5], ['D5', 1]],
+    [['F5', 1.5], ['E5', 0.5], ['D5', 1], ['Bf4', 1]],
+    [['A4', 1.5], [0, 0.5], ['C5', 1], ['D5', 1]],
+    // B段
+    [['G4', 1], ['Bf4', 1], ['D5', 0.5], ['F5', 0.5], ['E5', 1]],
+    [['D5', 1.5], ['F5', 0.5], ['A5', 1], ['D5', 1]],
+    [['Bf4', 1], ['D5', 1], ['F5', 0.5], ['E5', 0.5], ['D5', 1]],
+    [['A4', 2], [0, 0.5], ['C5', 0.5], ['E5', 1]],
+    // A'段
+    [['D5', 1], ['F5', 1], ['A5', 0.5], ['F5', 0.5], ['D5', 1]],
+    [['G4', 1], ['Bf4', 1], ['D5', 1], ['G5', 1]],
+    [['F5', 1.5], ['D5', 0.5], ['Bf4', 1], ['F4', 1]],
+    [['E5', 1], ['C5', 1], ['A4', 0.5], ['D5', 0.5], ['A4', 1]],
+    // B'段
+    [['D6', 1], [0, 0.5], ['A5', 0.5], ['F5', 1], ['D5', 1]],
+    [['Bf4', 1], ['D5', 1], ['F5', 1], ['Bf5', 1]],
+    [['G4', 1], ['Bf4', 0.5], ['D5', 0.5], ['F5', 0.5], ['E5', 0.5], ['D5', 1]],
+    [['D5', 2], ['A4', 1], ['D4', 1]]
+  ];
+
+  // 低音（每小节一个，深沉宇宙低频）
+  var BASSLINE = [
+    'D2', 'D2', 'Bf2', 'A2',
+    'G2', 'D2', 'Bf2', 'A2',
+    'D2', 'G2', 'Bf2', 'A2',
+    'D2', 'Bf2', 'G2', 'A2'
+  ];
+
+  // ---------- 状态 ----------
+  var audioCtx = null;
+  var masterGain = null;
+  var isUserEnabled = false;
+  var isPlaying = false;
+  var userVolume = 0.28;
+
+  var barIndex = 0;
+  var beatInBar = 0;
+  var lastBeatNum = -1;
+  var melodyStep = 0;
+  var melodyTimeInBar = 0;
+  var nextNoteTime = 0;
+  var schedulerTimer = null;
+  var TICK = 0.06;
+
+  // 音色：星空铃铛（正弦波 + 高频泛音）
+  function playBellNote(freq, startTime, duration, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc1 = audioCtx.createOscillator();
+    var osc2 = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+
+    osc1.type = 'sine';
+    osc1.frequency.value = freq;
+    osc2.type = 'sine';
+    osc2.frequency.value = freq * 2.01;
+
+    var t = startTime;
+    var attack = 0.008;
+    var release = duration * 0.7;
+
+    noteGain.gain.setValueAtTime(0.0001, t);
+    noteGain.gain.linearRampToValueAtTime(0.25 * gain, t + attack);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+    osc1.connect(noteGain);
+    osc2.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc1.start(t);
+    osc2.start(t);
+    osc1.stop(t + duration + 0.05);
+    osc2.stop(t + duration + 0.05);
+  }
+
+  // 音色：宇宙Pad（多个失谐正弦波 + 低通滤波）
+  function playPadNote(freq, startTime, duration, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc1 = audioCtx.createOscillator();
+    var osc2 = audioCtx.createOscillator();
+    var osc3 = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+    var filter = audioCtx.createBiquadFilter();
+
+    osc1.type = 'sine';
+    osc1.frequency.value = freq;
+    osc2.type = 'sine';
+    osc2.frequency.value = freq * 1.003;
+    osc3.type = 'sine';
+    osc3.frequency.value = freq * 0.997;
+
+    var lfo = audioCtx.createOscillator();
+    var lfoGain = audioCtx.createGain();
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.06;
+    lfoGain.gain.value = freq * 0.003;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc1.frequency);
+    lfoGain.connect(osc2.frequency);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(freq * 1.8, startTime);
+    filter.frequency.linearRampToValueAtTime(freq * 2.2, startTime + duration * 0.5);
+    filter.frequency.linearRampToValueAtTime(freq * 1.6, startTime + duration);
+    filter.Q.value = 0.3;
+
+    var t = startTime;
+    var attack = duration * 0.25;
+    var release = duration * 0.3;
+
+    noteGain.gain.setValueAtTime(0.0001, t);
+    noteGain.gain.linearRampToValueAtTime(0.18 * gain, t + attack);
+    noteGain.gain.setValueAtTime(0.18 * gain, t + duration - release);
+    noteGain.gain.linearRampToValueAtTime(0.0001, t + duration);
+
+    osc1.connect(filter);
+    osc2.connect(filter);
+    osc3.connect(filter);
+    filter.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc1.start(t);
+    osc2.start(t);
+    osc3.start(t);
+    lfo.start(t);
+    osc1.stop(t + duration + 0.1);
+    osc2.stop(t + duration + 0.1);
+    osc3.stop(t + duration + 0.1);
+    lfo.stop(t + duration + 0.1);
+  }
+
+  // 音色：深空低音（正弦波 + 缓慢调制）
+  function playBassNote(freq, startTime, duration, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc1 = audioCtx.createOscillator();
+    var osc2 = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+
+    osc1.type = 'sine';
+    osc1.frequency.value = freq;
+    osc2.type = 'triangle';
+    osc2.frequency.value = freq * 0.5;
+
+    var t = startTime;
+    var attack = 0.08;
+    var release = duration * 0.25;
+
+    noteGain.gain.setValueAtTime(0.0001, t);
+    noteGain.gain.linearRampToValueAtTime(0.4 * gain, t + attack);
+    noteGain.gain.linearRampToValueAtTime(0.32 * gain, t + attack + 0.2);
+    noteGain.gain.setValueAtTime(0.32 * gain, t + duration - release);
+    noteGain.gain.linearRampToValueAtTime(0.0001, t + duration);
+
+    osc1.connect(noteGain);
+    osc2.connect(noteGain);
+    noteGain.connect(masterGain);
+
+    osc1.start(t);
+    osc2.start(t);
+    osc1.stop(t + duration + 0.1);
+    osc2.stop(t + duration + 0.1);
+  }
+
+  // 音色：星星闪烁（高频短音，随机触发）
+  function playStarTwinkle(startTime, gain) {
+    if (!audioCtx || !masterGain) return;
+    var osc = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+    osc.type = 'sine';
+    var baseFreq = 2000 + Math.random() * 2500;
+    osc.frequency.setValueAtTime(baseFreq, startTime);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.9, startTime + 0.12);
+
+    noteGain.gain.setValueAtTime(0.0001, startTime);
+    noteGain.gain.linearRampToValueAtTime(0.06 * gain, startTime + 0.01);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.15);
+
+    osc.connect(noteGain);
+    noteGain.connect(masterGain);
+    osc.start(startTime);
+    osc.stop(startTime + 0.18);
+  }
+
+  // ---------- 调度 ----------
+  function scheduler() {
+    if (!isPlaying || !audioCtx) return;
+    var now = audioCtx.currentTime;
+    while (nextNoteTime < now + 0.3) {
+      scheduleTick(nextNoteTime);
+      nextNoteTime += TICK;
+    }
+    schedulerTimer = setTimeout(scheduler, 30);
+  }
+
+  function scheduleTick(t) {
+    var chord = CHORDS[barIndex];
+
+    // === 旋律（按时长推进）===
+    if (melodyTimeInBar <= 0.001) {
+      var barMelody = MELODY[barIndex];
+      if (barMelody && melodyStep < barMelody.length) {
+        var mNote = barMelody[melodyStep];
+        if (mNote[0] !== 0 && mNote[0]) {
+          var mfreq = freqOf(mNote[0]);
+          playBellNote(mfreq, t, BEAT * mNote[1] * 0.9, 0.35);
+        }
+        melodyTimeInBar = mNote[1];
+        melodyStep++;
+        if (melodyStep >= barMelody.length) {
+          melodyStep = 0;
+        }
+      }
+    }
+    melodyTimeInBar -= TICK / BEAT;
+    if (melodyTimeInBar < 0) melodyTimeInBar = 0;
+
+    // === Pad 长音 & 低音（每小节触发）===
+    var beatNum = Math.floor(beatInBar);
+    if (beatNum !== lastBeatNum) {
+      if (beatNum === 0) {
+        // Pad 和弦
+        for (var i = 0; i < chord.tones.length; i++) {
+          var padFreq = freqOf(chord.tones[i]);
+          playPadNote(padFreq, t, BEAT * 3.9, 0.2);
+        }
+        // 低音（每小节一个）
+        var bassNote = BASSLINE[barIndex];
+        if (bassNote) {
+          var bfreq = freqOf(bassNote);
+          playBassNote(bfreq, t, BEAT * 3.8, 0.45);
+        }
+      }
+      // 星星闪烁（随机触发，增加宇宙感）
+      if (Math.random() < 0.3) {
+        playStarTwinkle(t + Math.random() * BEAT * 0.5, 0.12);
+      }
+      if (Math.random() < 0.2) {
+        setTimeout(function () {
+          playStarTwinkle(audioCtx.currentTime + Math.random() * 0.3, 0.08);
+        }, Math.random() * 200);
+      }
+      lastBeatNum = beatNum;
+    }
+
+    // 推进节拍
+    beatInBar += TICK / BEAT;
+    if (beatInBar >= 4) {
+      beatInBar -= 4;
+      barIndex++;
+      if (barIndex >= CHORDS.length) {
+        barIndex = 0;
+      }
+      melodyStep = 0;
+      melodyTimeInBar = 0;
+    }
+  }
+
+  // ---------- 控制 ----------
+  function initAudio() {
+    if (audioCtx) return true;
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return false;
+      audioCtx = new Ctx();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = isUserEnabled ? userVolume : 0;
+      masterGain.connect(audioCtx.destination);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function play() {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (isPlaying) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+
+    masterGain.gain.setTargetAtTime(userVolume, audioCtx.currentTime, 0.3);
+
+    barIndex = 0;
+    beatInBar = 0;
+    lastBeatNum = -1;
+    melodyStep = 0;
+    melodyTimeInBar = 0;
+    nextNoteTime = audioCtx.currentTime + 0.1;
+    isPlaying = true;
+    scheduler();
+  }
+
+  function stop() {
+    isPlaying = false;
+    if (schedulerTimer) {
+      clearTimeout(schedulerTimer);
+      schedulerTimer = null;
+    }
+    if (masterGain && audioCtx) {
+      masterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.3);
+    }
+  }
+
+  function toggle() {
+    if (isPlaying) {
+      stop();
+    } else {
+      play();
+    }
+    return isPlaying;
+  }
+
+  function setVolume(v) {
+    userVolume = Math.max(0, Math.min(1, v));
+    if (masterGain && audioCtx) {
+      masterGain.gain.setTargetAtTime(isUserEnabled ? userVolume : 0, audioCtx.currentTime, 0.05);
+    }
+    saveSettings();
+  }
+
+  function setEnabled(enabled) {
+    isUserEnabled = enabled;
+    if (masterGain && audioCtx) {
+      masterGain.gain.setTargetAtTime(enabled ? userVolume : 0, audioCtx.currentTime, 0.05);
+    }
+    if (enabled) {
+      play();
+    } else {
+      stop();
+    }
+    saveSettings();
+  }
+
+  // ---------- 存档 ----------
+  function loadSettings() {
+    try {
+      var saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        var obj = JSON.parse(saved);
+        if (typeof obj.enabled === 'boolean') isUserEnabled = obj.enabled;
+        if (typeof obj.volume === 'number') userVolume = Math.max(0, Math.min(1, obj.volume));
+      }
+    } catch (e) {}
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        enabled: isUserEnabled,
+        volume: userVolume
+      }));
+    } catch (e) {}
+  }
+
+  // ---------- 音效 ----------
+  // 发射探测器
+  function playLaunch() {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+    var t = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(200, t);
+    osc.frequency.exponentialRampToValueAtTime(800, t + 0.2);
+    noteGain.gain.setValueAtTime(0.0001, t);
+    noteGain.gain.linearRampToValueAtTime(0.2, t + 0.01);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    osc.connect(noteGain);
+    noteGain.connect(masterGain);
+    osc.start(t);
+    osc.stop(t + 0.3);
+  }
+
+  // 过关胜利
+  function playWin() {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+    var t = audioCtx.currentTime;
+    var notes = [
+      ['D5', 0.18], ['F5', 0.18], ['A5', 0.18], ['D6', 0.3],
+      ['A5', 0.15], ['F5', 0.15], ['D5', 0.3]
+    ];
+    var time = t;
+    for (var i = 0; i < notes.length; i++) {
+      playBellNote(freqOf(notes[i][0]), time, notes[i][1] * 0.85, 0.4);
+      time += notes[i][1];
+    }
+    playBassNote(freqOf('D2'), t + 0.2, 1.5, 0.4);
+  }
+
+  // 坠毁失败
+  function playCrash() {
+    if (!isUserEnabled) return;
+    if (!initAudio()) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
+    var t = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var noteGain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(250, t);
+    osc.frequency.exponentialRampToValueAtTime(60, t + 0.4);
+    noteGain.gain.setValueAtTime(0.0001, t);
+    noteGain.gain.linearRampToValueAtTime(0.25, t + 0.01);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    osc.connect(noteGain);
+    noteGain.connect(masterGain);
+    osc.start(t);
+    osc.stop(t + 0.5);
+  }
+
+  // ---------- UI 绑定 ----------
+  function initUI() {
+    var settingsOverlay = document.getElementById('overlaySettings');
+    if (!settingsOverlay) return;
+
+    var soundRow = settingsOverlay.querySelector('.setting-row');
+    if (!soundRow || !soundRow.parentNode) return;
+
+    // 创建 BGM 设置行
+    var bgmRow = document.createElement('div');
+    bgmRow.className = 'setting-row';
+    bgmRow.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin:8px 0;';
+
+    var bgmLabel = document.createElement('span');
+    bgmLabel.textContent = '🎵 背景音乐';
+
+    var bgmControls = document.createElement('div');
+    bgmControls.style.cssText = 'display:flex;flex-direction:column;gap:6px;align-items:flex-end;';
+
+    var toggleRow = document.createElement('div');
+    toggleRow.style.cssText = 'display:flex;gap:8px;';
+
+    var btnOn = document.createElement('button');
+    btnOn.className = 'btn';
+    btnOn.style.cssText = 'padding:4px 12px;font-size:12px;width:auto;';
+    btnOn.textContent = '开启';
+    if (isUserEnabled) {
+      btnOn.style.borderColor = 'var(--gold)';
+      btnOn.style.color = 'var(--gold)';
+      btnOn.style.boxShadow = '0 0 10px rgba(255,215,64,0.3)';
+    }
+
+    var btnOff = document.createElement('button');
+    btnOff.className = 'btn';
+    btnOff.style.cssText = 'padding:4px 12px;font-size:12px;width:auto;';
+    btnOff.textContent = '关闭';
+    if (!isUserEnabled) {
+      btnOff.style.borderColor = 'var(--gold)';
+      btnOff.style.color = 'var(--gold)';
+      btnOff.style.boxShadow = '0 0 10px rgba(255,215,64,0.3)';
+    }
+
+    toggleRow.appendChild(btnOn);
+    toggleRow.appendChild(btnOff);
+
+    var volRow = document.createElement('div');
+    volRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+
+    var volLabel = document.createElement('span');
+    volLabel.style.cssText = 'font-size:11px;color:var(--muted);';
+    volLabel.textContent = '音量';
+
+    var volSlider = document.createElement('input');
+    volSlider.type = 'range';
+    volSlider.min = '0';
+    volSlider.max = '100';
+    volSlider.value = Math.round(userVolume * 100);
+    volSlider.style.width = '100px';
+
+    volRow.appendChild(volLabel);
+    volRow.appendChild(volSlider);
+
+    bgmControls.appendChild(toggleRow);
+    bgmControls.appendChild(volRow);
+
+    bgmRow.appendChild(bgmLabel);
+    bgmRow.appendChild(bgmControls);
+
+    soundRow.parentNode.insertBefore(bgmRow, soundRow);
+
+    btnOn.addEventListener('click', function () {
+      setEnabled(true);
+      btnOn.style.borderColor = 'var(--gold)';
+      btnOn.style.color = 'var(--gold)';
+      btnOn.style.boxShadow = '0 0 10px rgba(255,215,64,0.3)';
+      btnOff.style.borderColor = '';
+      btnOff.style.color = '';
+      btnOff.style.boxShadow = '';
+      // BGM 开启成就
+      if (window.GameUtils) GameUtils.unlock('enable_bgm', '奏响旋律', '开启任意游戏的 BGM');
+    });
+
+    btnOff.addEventListener('click', function () {
+      setEnabled(false);
+      btnOff.style.borderColor = 'var(--gold)';
+      btnOff.style.color = 'var(--gold)';
+      btnOff.style.boxShadow = '0 0 10px rgba(255,215,64,0.3)';
+      btnOn.style.borderColor = '';
+      btnOn.style.color = '';
+      btnOn.style.boxShadow = '';
+    });
+
+    volSlider.addEventListener('input', function (e) {
+      setVolume(parseInt(e.target.value) / 100);
+    });
+  }
+
+  // ---------- 暴露给外部 ----------
+  window.GravityBGM = {
+    play: play,
+    stop: stop,
+    toggle: toggle,
+    setVolume: setVolume,
+    setEnabled: setEnabled,
+    playLaunch: playLaunch,
+    playWin: playWin,
+    playCrash: playCrash,
+    isPlaying: function () { return isPlaying; },
+    isEnabled: function () { return isUserEnabled; }
+  };
+
+  // ---------- 初始化 ----------
+  loadSettings();
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      initUI();
+      if (isUserEnabled) play();
+    });
+  } else {
+    initUI();
+    if (isUserEnabled) play();
+  }
+})();
+</script>
+<script src="../assets/js/game-utils.js"></script>
+
+<!-- 反馈入口 -->
+<div id="feedbackSlot" style="text-align:center;padding:12px 0;border-top:1px solid var(--color-border-light);margin-top:24px"></div>
 </body>
 </html>

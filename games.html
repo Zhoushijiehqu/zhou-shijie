@@ -13,8 +13,12 @@
   <!-- 主题预载：读取 localStorage.theme（无则 dark），避免刷新闪烁 -->
   <script>
     (function () {
-      var saved = localStorage.getItem('theme');
-      document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      try {
+        var saved = localStorage.getItem('theme');
+        document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
     })();
   </script>
 
@@ -820,7 +824,7 @@
             totalStars += s;
             var game = games.find(function (g) { return g.slug === slug; });
             if (game) {
-              starHtml += '<span class="ach-chip unlocked" title="' + esc(game.name + '：已获 ' + s + ' 星")>' +
+              starHtml += '<span class="ach-chip unlocked" title="' + esc(game.name + '：已获 ' + s + ' 星') + '">' +
                 '<span class="icon">⭐</span>' + esc(game.name) + ' ' + s + '</span>';
             }
           }
@@ -1085,18 +1089,21 @@
         document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('revealed'); });
         return;
       }
-      checkExploreAchievements(); // 先解锁，再渲染档案卡，确保成就墙反映最新状态
-      renderPlayerCard();
-      renderFilterBar();
-      renderGames();
-      renderFooter();
-      initThemeToggle();
+      // 游戏列表渲染优先：即使其他功能出错，游戏卡片也要能显示
+      try { renderGames(); } catch (e) { console.error('renderGames error:', e); }
+      try { checkExploreAchievements(); } catch (e) { console.error('checkExploreAchievements error:', e); }
+      try { renderPlayerCard(); } catch (e) { console.error('renderPlayerCard error:', e); }
+      try { renderFilterBar(); } catch (e) { console.error('renderFilterBar error:', e); }
+      try { renderFooter(); } catch (e) { console.error('renderFooter error:', e); }
+      try { initThemeToggle(); } catch (e) { console.error('initThemeToggle error:', e); }
       // initReveal 已在 renderGames 内调用，此处无需重复
       // PWA：注入反馈入口 + 注册 Service Worker
-      if (GU) {
-        GU.injectFeedback('#feedbackSlot');
-        GU.registerSW();
-      }
+      try {
+        if (GU) {
+          GU.injectFeedback('#feedbackSlot');
+          GU.registerSW();
+        }
+      } catch (e) { console.error('PWA init error:', e); }
     })();
   </script>
 </body>

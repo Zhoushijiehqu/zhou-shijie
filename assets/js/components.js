@@ -768,7 +768,12 @@ const Components = {
     }
     
     // 读取保存的主题，默认深色主题
-    const savedTheme = localStorage.getItem('theme');
+    let savedTheme;
+    try {
+      savedTheme = localStorage.getItem('theme');
+    } catch (e) {
+      savedTheme = null;
+    }
     const initialTheme = savedTheme || 'dark'; // 默认深色主题
     
     this.applyTheme(initialTheme, themeIcon);
@@ -779,7 +784,9 @@ const Components = {
       const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
       
       this.applyTheme(newTheme, themeIcon);
-      localStorage.setItem('theme', newTheme);
+      try {
+        localStorage.setItem('theme', newTheme);
+      } catch (e) {}
     });
   },
 

@@ -13,8 +13,12 @@
   <!-- 主题预载：读取 localStorage.theme（无则 dark），避免刷新闪烁 -->
   <script>
     (function () {
-      var saved = localStorage.getItem('theme');
-      document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      try {
+        var saved = localStorage.getItem('theme');
+        document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
     })();
   </script>
 

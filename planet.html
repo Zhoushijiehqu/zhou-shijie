@@ -1,0 +1,2674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>球形星球 · 游戏小屋街道</title>
+<!-- U6：预连接 CDN，加速 three.js 与 addons 模块加载 -->
+<link rel="preconnect" href="https://unpkg.com" crossorigin />
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+
+<!-- es-module-shims：让 importmap 在 file:// 协议下也能工作（polyfill 绕过浏览器对 file:// ESM 的 CORS 限制） -->
+<script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
+<!-- Three.js r160（ES Module，CDN） -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<!-- Cannon.js 物理引擎（UMD 全局 CANNON，经典脚本先于 module 执行） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+
+<!-- F4：加载失败兜底。若 three.js 模块/CDN 不可达，模块脚本不会执行到初始化，
+     8 秒超时或脚本错误时给出明确提示，避免“永久卡在加载屏”且无任何报错。 -->
+<script>
+  window.__planetReady = false;
+  window.__planetFile = (location.protocol === 'file:'); // file:// 直开标记
+  // 屏闪根因修复：错误只显示一次。原代码每收到一个 error 事件就改写 #loading 文本，
+  // file:// 下 es-module-shims 加载模块可能触发多次 error → 文本反复跳变 = "背景板乱跳"。
+  var __planetErrShown = false;
+  window.addEventListener('error', function (e) {
+    if (window.__planetReady || __planetErrShown) return;
+    __planetErrShown = true;
+    var el = document.getElementById('loading');
+    if (!el) return;
+    var msg = e.message || '资源加载错误';
+    el.querySelector('div:last-child').textContent = window.__planetFile
+      ? '场景加载失败：file:// 下 ES 模块加载不稳定，建议用本地服务器打开（如 python3 -m http.server，再访问 http://localhost:8000/planet.html）。错误：' + msg
+      : '场景加载失败：' + msg + '，请检查网络 / CDN';
+  });
+  setTimeout(function () {
+    if (window.__planetReady || __planetErrShown) return;
+    __planetErrShown = true;
+    var el = document.getElementById('loading');
+    if (!el) return;
+    el.querySelector('div:last-child').textContent = window.__planetFile
+      ? '场景加载超时：file:// 下 ES 模块加载不稳定，建议用本地服务器打开（http://localhost:8000/planet.html）'
+      : '场景加载超时，请检查网络或 three.js CDN 是否可达';
+  }, 8000);
+</script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@200..800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1A1510;
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  /* 纸张噪点纹理叠层 */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 28; pointer-events: none;
+    opacity: 0.03; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* 顶部标题与控制说明 - Editorial Atelier 风格 */
+  #hud-top {
+    position: fixed; top: 20px; left: 24px; z-index: 30;
+    color: #ECE5D8; pointer-events: none; user-select: none;
+  }
+  #hud-top .title {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 20px; font-weight: 500;
+    font-variation-settings: 'opsz' 48, 'SOFT' 50;
+    letter-spacing: -0.01em;
+    font-style: italic;
+  }
+  #hud-top .title::before {
+    content: '◆';
+    display: inline-block;
+    font-size: 10px;
+    color: #D4AB6A;
+    margin-right: 10px;
+    font-style: normal;
+    vertical-align: middle;
+    transform: translateY(-2px);
+  }
+  #hud-top .tips {
+    font-size: 11px; opacity: .72; margin-top: 6px;
+    line-height: 1.7;
+    letter-spacing: 0.02em;
+    font-weight: 500;
+  }
+  #hud-top .tips span {
+    display: inline-block;
+    padding: 2px 8px;
+    margin: 0 2px;
+    background: rgba(212, 171, 106, 0.12);
+    border: 1px solid rgba(212, 171, 106, 0.2);
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #D4AB6A;
+    letter-spacing: 0.04em;
+  }
+
+  /* 右下角进入提示 - Editorial 风格 */
+  #enter-prompt {
+    position: fixed; right: 28px; bottom: 32px; z-index: 30;
+    padding: 12px 22px; border-radius: 999px;
+    background: rgba(26, 21, 16, 0.88); color: #ECE5D8;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
+    box-shadow: 0 8px 32px rgba(0,0,0,.45);
+    backdrop-filter: blur(12px) saturate(180%); -webkit-backdrop-filter: blur(12px) saturate(180%);
+    opacity: 0; transform: translateY(10px) scale(0.96);
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+    border: 1px solid rgba(212, 171, 106, 0.25);
+  }
+  #enter-prompt::before {
+    content: '→';
+    display: inline-block;
+    margin-right: 8px;
+    color: #D4AB6A;
+    font-style: italic;
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+  }
+  #enter-prompt b {
+    color: #D4AB6A;
+    font-weight: 700;
+  }
+  #enter-prompt.show {
+    opacity: 1; transform: translateY(0) scale(1);
+  }
+
+  /* 渐黑过渡 */
+  #fade {
+    position: fixed; inset: 0; z-index: 50; background: #0d0a07;
+    opacity: 0; pointer-events: none; transition: opacity .5s ease;
+  }
+  #fade.on { opacity: 1; }
+
+  /* 全屏游戏层（iframe） */
+  #game-layer {
+    position: fixed; inset: 0; z-index: 100; display: none; background: #000;
+  }
+  #game-frame { width: 100%; height: 100%; border: 0; }
+  /* 小游戏加载失败提示覆盖层 */
+  #game-error {
+    position: absolute; inset: 0; z-index: 5; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: #1A1510; color: #ECE5D8; text-align: center; padding: 32px;
+  }
+  #game-error .ge-title {
+    font-family: 'Fraunces', serif;
+    font-size: 22px; font-weight: 500; margin-bottom: 12px;
+    font-style: italic;
+  }
+  #game-error .ge-desc {
+    font-size: 13px; opacity: .75; margin-bottom: 24px;
+    max-width: 320px; line-height: 1.7;
+  }
+  #game-error button {
+    border: 0; border-radius: 999px; padding: 10px 24px; cursor: pointer;
+    background: rgba(212, 171, 106, 0.15); color: #D4AB6A;
+    font-size: 13px; font-weight: 600;
+    border: 1px solid rgba(212, 171, 106, 0.3);
+    transition: all 0.3s ease;
+    letter-spacing: 0.02em;
+  }
+  #game-error button:hover {
+    background: rgba(212, 171, 106, 0.25);
+    transform: translateY(-2px);
+  }
+
+  /* 游戏页“返回星球”按钮 */
+  #return-btn {
+    position: fixed; top: 18px; right: 18px; z-index: 110; display: none;
+    padding: 10px 20px; border: 0; border-radius: 999px; cursor: pointer;
+    background: rgba(26, 21, 16, 0.88); color: #ECE5D8;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
+    box-shadow: 0 6px 24px rgba(0,0,0,.45);
+    backdrop-filter: blur(12px) saturate(180%); -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid rgba(212, 171, 106, 0.2);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #return-btn::before {
+    content: '←';
+    display: inline-block;
+    margin-right: 6px;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    color: #D4AB6A;
+  }
+  #return-btn:hover {
+    background: rgba(26, 21, 16, 0.95);
+    border-color: rgba(212, 171, 106, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 32px rgba(0,0,0,.5);
+  }
+
+  /* 小地图 - Editorial 风格精致化 */
+  #minimap {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 30;
+    width: 140px; height: 140px; border-radius: 50%;
+    background: rgba(26, 21, 16, 0.65);
+    border: 1px solid rgba(212, 171, 106, 0.2);
+    box-shadow: 0 6px 28px rgba(0,0,0,.4), inset 0 0 40px rgba(0,0,0,.3);
+    backdrop-filter: blur(8px) saturate(160%); -webkit-backdrop-filter: blur(8px) saturate(160%);
+    pointer-events: none;
+  }
+  #minimap::before {
+    content: '';
+    position: absolute; inset: 4px;
+    border-radius: 50%;
+    border: 1px solid rgba(212, 171, 106, 0.1);
+    pointer-events: none;
+  }
+  #minimap::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60%; height: 60%;
+    border-radius: 50%;
+    border: 1px dashed rgba(212, 171, 106, 0.15);
+    pointer-events: none;
+  }
+
+  /* 设置按钮与面板 - Editorial 风格 */
+  #settings-btn {
+    position: fixed; top: 54px; right: 20px; z-index: 31;
+    width: 36px; height: 36px; border: 0; border-radius: 50%; cursor: pointer;
+    background: rgba(26, 21, 16, 0.75); color: #ECE5D8; font-size: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.35);
+    backdrop-filter: blur(10px) saturate(160%); -webkit-backdrop-filter: blur(10px) saturate(160%);
+    border: 1px solid rgba(212, 171, 106, 0.18);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #settings-btn:hover {
+    background: rgba(26, 21, 16, 0.9);
+    border-color: rgba(212, 171, 106, 0.35);
+    transform: rotate(30deg) scale(1.05);
+    color: #D4AB6A;
+  }
+  #settings-panel {
+    position: fixed; top: 98px; right: 20px; z-index: 31; display: none;
+    flex-direction: column; gap: 10px;
+    padding: 16px 18px; border-radius: 14px;
+    background: rgba(26, 21, 16, 0.92); color: #ECE5D8;
+    font-size: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    backdrop-filter: blur(16px) saturate(180%); -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(212, 171, 106, 0.18);
+    min-width: 180px;
+    transform-origin: top right;
+    animation: panelIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes panelIn {
+    from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  #settings-panel::before {
+    content: '设置';
+    display: block;
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    font-weight: 500;
+    font-style: italic;
+    color: #D4AB6A;
+    margin-bottom: 6px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(212, 171, 106, 0.15);
+    letter-spacing: 0.02em;
+  }
+  #settings-panel label {
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+    padding: 4px 0;
+    transition: color 0.2s ease;
+    font-weight: 500;
+  }
+  #settings-panel label:hover {
+    color: #D4AB6A;
+  }
+  #settings-panel input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 32px; height: 18px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 999px;
+    position: relative; cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  #settings-panel input[type="checkbox"]::before {
+    content: '';
+    position: absolute;
+    top: 1px; left: 1px;
+    width: 14px; height: 14px;
+    background: rgba(255,255,255,0.6);
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #settings-panel input[type="checkbox"]:checked {
+    background: rgba(212, 171, 106, 0.3);
+    border-color: rgba(212, 171, 106, 0.5);
+  }
+  #settings-panel input[type="checkbox"]:checked::before {
+    left: 15px;
+    background: #D4AB6A;
+    box-shadow: 0 0 10px rgba(212, 171, 106, 0.5);
+  }
+  #settings-panel button {
+    border: 0; border-radius: 10px; padding: 8px 14px; cursor: pointer;
+    background: rgba(212, 171, 106, 0.12); color: #D4AB6A;
+    font-size: 12px; font-weight: 600;
+    border: 1px solid rgba(212, 171, 106, 0.2);
+    transition: all 0.3s ease;
+    margin-top: 4px;
+    letter-spacing: 0.02em;
+  }
+  #settings-panel button:hover {
+    background: rgba(212, 171, 106, 0.22);
+    border-color: rgba(212, 171, 106, 0.4);
+    transform: translateY(-1px);
+  }
+  #settings-panel button:active { transform: translateY(0); }
+
+  /* FPS */
+  #fps {
+    position: fixed; top: 22px; right: 24px; z-index: 30;
+    font-size: 11px; color: #7A7160; opacity: .9; pointer-events: none;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 4px 10px;
+    background: rgba(26, 21, 16, 0.5);
+    border-radius: 999px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(212, 171, 106, 0.1);
+  }
+
+  /* 加载屏 - Editorial Atelier 风格 */
+  #loading {
+    position: fixed; inset: 0; z-index: 200; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(181, 168, 216, 0.15) 0%, transparent 55%),
+      radial-gradient(ellipse at 80% 80%, rgba(212, 171, 106, 0.1) 0%, transparent 60%),
+      linear-gradient(160deg, #1A1510, #0d0a07);
+    color: #ECE5D8;
+    transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #loading.hide { opacity: 0; pointer-events: none; }
+  #loading .spin {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 2px solid rgba(212, 171, 106, 0.2);
+    border-top-color: #D4AB6A;
+    animation: spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  #loading .spin::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    border: 1px solid rgba(181, 168, 216, 0.15);
+    border-left-color: #B5A8D8;
+    animation: spin 2s cubic-bezier(0.4, 0, 0.2, 1) infinite reverse;
+  }
+  #loading .loading-title {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 24px;
+    font-weight: 500;
+    font-style: italic;
+    font-variation-settings: 'opsz' 48, 'SOFT' 50;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+  #loading .loading-title::before {
+    content: '◆';
+    display: inline-block;
+    font-size: 10px;
+    color: #D4AB6A;
+    margin-right: 10px;
+    font-style: normal;
+    vertical-align: middle;
+    transform: translateY(-3px);
+  }
+  #loading .loading-subtitle {
+    font-size: 12px;
+    opacity: 0.6;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 移动端虚拟摇杆与按钮 - Editorial 风格 */
+  #joystick {
+    position: fixed; left: 28px; bottom: 28px; z-index: 35;
+    width: 130px; height: 130px; border-radius: 50%;
+    background: rgba(26, 21, 16, 0.5);
+    border: 1px solid rgba(212, 171, 106, 0.25);
+    touch-action: none; display: none;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(0,0,0,.3);
+  }
+  #joystick .knob {
+    position: absolute; left: 50%; top: 50%; width: 54px; height: 54px;
+    margin: -27px 0 0 -27px; border-radius: 50%;
+    background: rgba(236, 229, 216, 0.9);
+    box-shadow: 0 4px 16px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,0.5);
+    border: 2px solid rgba(212, 171, 106, 0.4);
+  }
+  #mob-btns { position: fixed; right: 24px; bottom: 28px; z-index: 35;
+    display: none; flex-direction: column; gap: 12px; align-items: flex-end; }
+  #mob-btns button {
+    width: 62px; height: 62px; border-radius: 50%; border: 0; cursor: pointer;
+    background: rgba(26, 21, 16, 0.75);
+    color: #D4AB6A; font-size: 11px; font-weight: 700;
+    box-shadow: 0 4px 18px rgba(0,0,0,.35);
+    border: 1px solid rgba(212, 171, 106, 0.25);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    transition: all 0.2s ease;
+    letter-spacing: 0.04em;
+  }
+  #mob-btns button:active {
+    transform: scale(0.94);
+    background: rgba(212, 171, 106, 0.2);
+  }
+  @media (pointer: coarse) {
+    #joystick { display: block; }
+    #mob-btns { display: flex; }
+  }
+  /* Vignette 暗角 - 更柔和的电影感暗角 */
+  #vignette {
+    position: fixed; inset: 0; z-index: 25; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(10,6,4,0.45) 100%);
+  }
+
+  /* 响应式调整 */
+  @media (max-width: 520px) {
+    #return-btn { top: 12px; right: 12px; padding: 8px 16px; font-size: 12px; }
+    #enter-prompt { right: 16px; bottom: 20px; font-size: 12px; padding: 10px 18px; }
+    #hud-top { top: 14px; left: 16px; }
+    #hud-top .title { font-size: 17px; }
+    #hud-top .tips { font-size: 10px; max-width: 65vw; }
+    #fps { top: 16px; right: 16px; font-size: 10px; }
+    #settings-btn { top: 48px; right: 16px; width: 32px; height: 32px; }
+    #settings-panel { top: 88px; right: 16px; }
+    #minimap { width: 120px; height: 120px; bottom: 14px; }
+  }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="vignette"></div>
+
+  <div id="hud-top">
+    <div class="title">球形星球 · 游戏小屋街道</div>
+    <div class="tips"><span>WASD</span> 移动 · <span>Shift</span> 奔跑 · <span>空格</span> 踢球 · <span>C</span> 切换视角 · 靠近小屋按 <span>Enter</span> 进入</div>
+  </div>
+
+  <div id="fps">-- FPS</div>
+  <div id="enter-prompt">按 <b>Enter</b> 键进入</div>
+
+  <div id="fade"></div>
+
+  <div id="game-layer">
+    <iframe id="game-frame" src="about:blank" allow="autoplay; fullscreen"></iframe>
+    <!-- A-6/F-4：小游戏加载失败（超时/跨域/404）时的提示覆盖层 -->
+    <div id="game-error">
+      <div class="ge-title">小游戏加载失败</div>
+      <div class="ge-desc">请确认本文件同级存在 games 目录，并通过本地服务器（http://）打开本页面。</div>
+      <button id="game-error-btn">← 返回星球</button>
+    </div>
+  </div>
+  <button id="return-btn">← 返回星球</button>
+
+  <!-- 小地图（环形 10 屋 + 玩家朝向） -->
+  <canvas id="minimap" width="150" height="150"></canvas>
+  <!-- 设置面板 -->
+  <button id="settings-btn" aria-label="设置">⚙</button>
+  <div id="settings-panel">
+    <label><input type="checkbox" id="set-shadow" checked /> 阴影</label>
+    <label><input type="checkbox" id="set-bloom" /> 泛光</label>
+    <label><input type="checkbox" id="set-ssao" /> 环境光遮蔽</label>
+    <label><input type="checkbox" id="set-dof" /> 景深</label>
+    <button id="set-reset">重置角色位置</button>
+  </div>
+
+  <div id="joystick"><div class="knob" id="joy-knob"></div></div>
+  <div id="mob-btns">
+    <button id="mb-run">奔跑</button>
+    <button id="mb-cam">视角</button>
+    <button id="mb-enter">进入</button>
+    <button id="mb-kick">踢球</button>
+  </div>
+
+  <div id="loading">
+    <div class="spin"></div>
+    <div class="loading-title">球形星球</div>
+    <div class="loading-subtitle">正在搭建小屋街道</div>
+  </div>
+
+<script type="module">
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+// 后处理（U6 泛光/Bloom）—— 增强门/灯箱的霓虹观感；带 try 兜底，失败则退回普通渲染
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+
+// BUG-13 修复：Cannon.js 加载失败时在模块入口立即检测，避免中途 ReferenceError 后被超时兜底覆盖为 three.js 错误
+if (typeof CANNON === 'undefined') {
+  const el = document.getElementById('loading');
+  if (el) el.querySelector('div:last-child').textContent = 'Cannon.js 物理引擎加载失败，请检查网络或 CDN 是否可达';
+  window.__planetReady = true; // 锁定兜底，避免超时覆盖此精确提示
+  throw new Error('CANNON not loaded');
+}
+
+// 是否粗指针（触屏）设备：用于性能档位与操作提示分支（提前定义，供下方 CONFIG 引用）
+const IS_COARSE = matchMedia('(pointer: coarse)').matches;
+// #12：前庭觉敏感用户降级 — 关闭装饰性动画（萤火虫/落叶/植被风感/云呼吸）
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ============================================================
+ * 模块结构总览（C1：单文件内逻辑分区，保持“单文件可直接运行”约束下的可维护性）
+ *   0  CONFIG       —— 小屋配置 / 渲染档位 / 交互常量（单一入口调参）
+ *   1-3 三件套/纹理/灯光/天空
+ *   4-6 物理世界 / 星球 / 环形街道
+ *   7-11 云朵 / 小屋工厂 / 路灯设施 / 自然景观 / 小球
+ *   12-16 角色 / 输入 / 踢球 / 进入返回状态机
+ *   17 每帧更新(物理/行走/相机/交互)  17.5 小地图
+ *   18-20 主循环 / 自适应 / 启动
+ *   （完整多文件拆分需放弃单文件约束，留作独立任务）
+ * ============================================================ */
+
+/* ============================================================
+ * 0. 配置区（可自由修改 10 个小屋的名称 / 网页地址 / 位置）
+ *    - lon：经度（弧度），沿赤道环向分布
+ *    - side：+1 街道北侧 / -1 街道南侧（两侧均匀分布）
+ *    - color：小屋主体马卡龙配色（不填则按顺序取调色板）
+ *    - url：进入后加载的游戏页地址（可配置为任意可嵌入网址）
+ * ============================================================ */
+const CONFIG = {
+  planetRadius: 25,        // 星球半径（直径 50 米）
+  streetHalfWidth: 4,      // 街道半宽（总宽 8 米）
+  hut: { w: 4, d: 4, h: 4, roof: 2.2 },
+  // 渲染配置（A5：集中暴露，便于按设备档位调优；P2/P3/P5/P6 均引用此处）
+  render: {
+    // 性能治理：默认保守档，保证流畅。用户可在设置面板手动开启高级效果。
+    pixelRatioMax: IS_COARSE ? 1.5 : 1.5,          // 统一 1.5，避免 Retina 屏 2× 渲染压垮 GPU
+    shadowSize: IS_COARSE ? 1024 : 1536,           // 桌面 1536（原 2048 过大）
+    shadowHalf: 14,                                // P2/P3：阴影视锥半宽（跟随角色，局部视锥提高有效分辨率）
+    planetSeg: IS_COARSE ? [48, 36] : [48, 36],    // 性能复位：统一 48/36（草地纹理球无需高面数，街道为独立网格）
+    subSteps: IS_COARSE ? 2 : 3,                    // P6：物理子步数
+    fogDensity: 0.0058,
+    // 性能治理：后处理默认全关。SSAO/Bokeh 是 GPU 杀手，Bloom 也有开销。
+    // 用户可在设置面板按需开启。这是卡顿主因。
+    bloom: false,
+    ssao: false,   // 默认关闭，设置面板可开
+    dof: false     // 默认关闭，设置面板可开
+  },
+  enterDist: 2.0,               // 距门进入触发距离
+  ballRecallDist: 45,           // BUG-08 修复：球面最大 3D 距离约 51m，原值 60 永不触发
+  spawnOffset: 1.2,             // 返回后角色归位到门口的偏移
+  // 物理与角色常量（C1：统一入口，避免魔法数字散落全局）
+  physics: {
+    G: 22,                      // 径向重力加速度
+    charR: 0.6,                 // 角色碰撞半径
+    ballR: 0.5,                 // 小球半径
+    speed: 4.5, runSpeed: 9,    // 行走 / 奔跑速度
+    turn: 2.4,                  // 转向角速度 (rad/s)
+    // #9/#11：踢球参数集中配置
+    kick: { range: 3, impulse: 9, liftRatio: 0.3, cooldown: 0.3 }
+  },
+  // #9：相机参数集中配置（原为散落在 update() 中的魔法数字）
+  camera: {
+    thirdUp: 3.0, thirdBack: 6.0,  // 第三人称：上方/后方偏移
+    eyeUp: 1.2, eyeFwd: 0.1,       // 第一人称：眼位上/前偏移
+    lerp: 0.15,                     // #7：切换过渡系数
+    charLift: 0.12,                 // 角色网格沿法线微抬
+    ballLift: 0.06                  // 小球网格沿法线微抬
+  },
+  clouds: 4,                    // 云朵数量
+  scatter: { trees: 24, grass: 280, rocks: 40 }, // 自然景观散落数量（移动端会按比例减量）
+  // 马卡龙调色板（区分度高）
+  palette: [
+    '#AEE0F5', '#FBC8D4', '#BDECCB', '#FFF1B0', '#D9C2F0',
+    '#FFD9B0', '#C2E9E9', '#F5C6E0', '#C9E8C0', '#FFE0A3'
+  ],
+  // ⚠ 单一来源说明（C7）：本数组为 planet.html 内小屋配置的“副本”，
+  //   项目另有 data/profile.js 的 games 列表。当前为保证“单文件可直接运行”而各自维护，
+  //   修改游戏清单时须同步两处；后续若取消单文件约束，可由 profile.js 注入本数组以彻底单一来源。
+  huts: [
+    { name: '贪吃蛇',       url: 'games/snake.html',   lon: 0,                 side:  1 },
+    { name: '扫雷',         url: 'games/mine.html',    lon: Math.PI * 0.2,     side: -1 },
+    { name: '解谜剧场',     url: 'games/puzzle.html',  lon: Math.PI * 0.4,     side:  1 },
+    { name: '记忆拼图',     url: 'games/memory.html',  lon: Math.PI * 0.6,     side: -1 },
+    { name: '光影棱镜',     url: 'games/prism.html',   lon: Math.PI * 0.8,     side:  1 },
+    { name: '声波盲境',     url: 'games/sonic.html',   lon: Math.PI * 1.0,     side: -1 },
+    { name: '引力弹弓',     url: 'games/gravity.html', lon: Math.PI * 1.2,     side:  1 },
+    { name: '微型生态瓶',   url: 'games/eco.html',     lon: Math.PI * 1.4,     side: -1 },
+    { name: '3D折叠魔方',   url: 'games/cube2048.html',lon: Math.PI * 1.6,     side:  1 },
+    { name: '节奏线条',     url: 'games/rhythm.html',  lon: Math.PI * 1.8,     side: -1 }
+  ]
+};
+
+/* ============================================================
+ * 1. 基础三件套：场景 / 相机 / 渲染器（开启 PCFSoft 软阴影）
+ * ============================================================ */
+const container = document.getElementById('app');
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 1000);
+
+let renderer;
+try {
+  // F3：先预检 WebGL 支持，避免在不支持的浏览器上抛错后只给通用超时文案
+  const _gl = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl');
+  if (!_gl) throw new Error('no-webgl');
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+} catch (e) {
+  const el = document.getElementById('loading');
+  if (el) el.querySelector('div:last-child').textContent = '您的浏览器或设备不支持 WebGL，请更换浏览器或开启硬件加速后重试';
+  window.__planetReady = true; // 锁定 F4 兜底，避免被通用超时文案覆盖
+  throw e; // 中断模块，避免后续引用未定义的 renderer
+}
+renderer.setPixelRatio(Math.min(devicePixelRatio, CONFIG.render.pixelRatioMax));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+// 屏闪根因修复：设 clearColor 匹配 body 背景。原默认 clearColor 黑色，
+// #loading 渐隐时 canvas 露出黑屏 → 与紫色 loading 叠加闪烁。设为 body 紫色平滑过渡。
+renderer.setClearColor(0x2a1d4d, 1);
+renderer.shadowMap.enabled = true;          // ✦ 开启阴影贴图
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;  // ✦ 柔和软阴影
+// A2：ACESFilmic 电影感色调映射，增强暗部细节与高光过渡
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+container.appendChild(renderer.domElement);
+
+// U6：后处理管线（Bloom 泛光）。始终构建（移动端默认 bloomEnabled=false → 走普通渲染，无额外开销）；
+// 任何导入/构建失败均安全退回普通渲染。
+let composer = null;
+let bloomEnabled = CONFIG.render.bloom;
+// P1：仅当泛光启用（桌面）时才构建后处理管线，移动端不分配 FBO，省显存/开销
+function buildComposer() {
+  try {
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    // B1：桌面端 SSAO 环境光遮蔽 — 增强小屋角落/底部空间纵深感
+    let ssaoPass = null;
+    if (!IS_COARSE) {
+      try {
+        ssaoPass = new SSAOPass(scene, camera, innerWidth, innerHeight);
+        ssaoPass.kernelRadius = 8;
+        ssaoPass.minDistance = 0.005;
+        ssaoPass.maxDistance = 0.1;
+        composer.addPass(ssaoPass);
+      } catch (e) { /* SSAO 不可用则跳过，不影响其余管线 */ }
+    }
+    // A2：Bloom 增强 — strength 0.55→0.7, radius 0.7→0.6, threshold 0.82→0.75
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.7, 0.6, 0.75));
+    // D1：桌面端景深 DoF — 远处小屋轻微模糊，突出主角
+    let bokehPass = null;
+    if (!IS_COARSE) {
+      try {
+        bokehPass = new BokehPass(scene, camera, {
+          focus: 8.0, aperture: 0.0025, maxblur: 0.6
+        });
+        composer.addPass(bokehPass);
+      } catch (e) { /* BokehPass 不可用则跳过 */ }
+    }
+    composer._bokehPass = bokehPass; // 供每帧更新 focus 用
+    composer._ssaoPass = ssaoPass;   // #3：供设置面板运行时开关
+    // A2：桌面端 SMAA 抗锯齿（移动端 antialias:true 已够）
+    if (!IS_COARSE) composer.addPass(new SMAAPass(innerWidth, innerHeight));
+    composer.addPass(new OutputPass());
+  } catch (e) { composer = null; }
+}
+if (bloomEnabled) buildComposer();
+// 颜色空间切换：普通渲染时天空 Shader 需手动 sRGB；经 Bloom+OutputPass 时输出应为线性（uConvert=0）
+function applyColorMode() {
+  if (skyMat.uniforms.uConvert) skyMat.uniforms.uConvert.value = (composer && bloomEnabled) ? 0 : 1;
+}
+
+// U1：移动端显示对应操作提示（而非桌面 WASD 文案）
+if (IS_COARSE) {
+  const tips = document.querySelector('#hud-top .tips');
+  if (tips) tips.textContent = '左摇杆移动 · 右下方按钮奔跑/视角/进入/踢球 · 靠近小屋按进入';
+}
+
+/* ============================================================
+ * 1.5 程序化 Canvas 纹理（灰度细节图 → 作 map，由顶点色提供色调）
+ *     - 墙面/屋顶/木门/沥青/草地共用少量共享纹理，不增加 DrawCall。
+ *     - 灰度底（偏亮）只做“细节压暗”，保证 ×顶点色 后色调正确、不发黑。
+ * ============================================================ */
+function cv2d(size) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = size;
+  return { cv, ctx: cv.getContext('2d') };
+}
+function finalizeTex(cv, rx, ry) {
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+// 廉价值噪声 0..1（C：复用 fract，避免与下方重复实现）
+function vnoise(x, y, s) {
+  return fract(Math.sin(x * 12.9898 + y * 78.233 + s) * 43758.5453);
+}
+// C2：取小数部分（等价于正数取模）；JS 中 `% 1` 对负数会返回负值，故用 fract 更稳妥
+function fract(x) { return x - Math.floor(x); }
+// 墙面：石膏底 + 砖缝 + 颗粒（V1：512px 高分辨率）
+function makePlasterTexture() {
+  const S = 512;
+  const { cv, ctx } = cv2d(S);
+  ctx.fillStyle = '#ededed'; ctx.fillRect(0, 0, S, S);
+  const img = ctx.getImageData(0, 0, S, S);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (vnoise(i, i >> 3, 1.7) - 0.5) * 20;
+    img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+  ctx.strokeStyle = 'rgba(120,120,120,0.5)'; ctx.lineWidth = 3;
+  const bh = 64, bw = 128;
+  for (let y = 0; y <= S; y += bh) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(S, y); ctx.stroke();
+    const off = (Math.floor(y / bh) % 2) * (bw / 2);
+    for (let x = off; x <= S; x += bw) {
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + bh); ctx.stroke();
+    }
+  }
+  return finalizeTex(cv, 2, 2);
+}
+// 木纹：竖向木板 + 木纹线（V1：512px）
+function makeWoodTexture() {
+  const S = 512;
+  const { cv, ctx } = cv2d(S);
+  ctx.fillStyle = '#e6cda0'; ctx.fillRect(0, 0, S, S);
+  for (let x = 0; x < S; x += 64) {
+    ctx.fillStyle = `rgba(150,110,60,${0.18 + vnoise(x, 3, 2.2) * 0.16})`;
+    ctx.fillRect(x, 0, 64, S);
+    ctx.strokeStyle = 'rgba(90,60,30,0.45)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, S); ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(95,62,30,0.3)'; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 64; i++) {
+    const x = Math.random() * S;
+    ctx.beginPath(); ctx.moveTo(x, 0);
+    ctx.bezierCurveTo(x + 16, 170, x - 16, 340, x + 8, S); ctx.stroke();
+  }
+  return finalizeTex(cv, 1, 1);
+}
+// 屋顶瓦片（V1：512px）
+function makeRoofTexture() {
+  const S = 512;
+  const { cv, ctx } = cv2d(S);
+  ctx.fillStyle = '#b8b8b8'; ctx.fillRect(0, 0, S, S);
+  const rw = 64, rh = 36;
+  for (let y = 0; y < S; y += rh) {
+    const off = (Math.floor(y / rh) % 2) * (rw / 2);
+    for (let x = -rw; x < S; x += rw) {
+      const cx = x + off + rw / 2, cy = y + rh / 2;
+      const grad = ctx.createRadialGradient(cx, cy - 2, 2, cx, cy, rw / 2 - 2);
+      grad.addColorStop(0, 'rgba(255,255,255,0.4)');
+      grad.addColorStop(0.5, 'rgba(180,180,180,0.2)');
+      grad.addColorStop(1, 'rgba(60,60,60,0.6)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rw / 2 - 4, rh / 2 - 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(50,50,50,0.55)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = 'rgba(80,80,80,0.25)';
+      ctx.fillRect(x + off + 4, y + rh / 2 - 1, rw - 8, 1.5);
+    }
+  }
+  const noiseImg = ctx.getImageData(0, 0, S, S);
+  for (let i = 0; i < noiseImg.data.length; i += 4) {
+    const n = (vnoise(i >> 2, i >> 3, 2.7) - 0.5) * 18;
+    noiseImg.data[i] += n; noiseImg.data[i + 1] += n; noiseImg.data[i + 2] += n;
+  }
+  ctx.putImageData(noiseImg, 0, 0);
+  return finalizeTex(cv, 3, 3);
+}
+// 沥青：颗粒 + 裂纹（V1：512px）
+function makeAsphaltTexture() {
+  const S = 512;
+  const { cv, ctx } = cv2d(S);
+  ctx.fillStyle = '#cfcfcf'; ctx.fillRect(0, 0, S, S);
+  const img = ctx.getImageData(0, 0, S, S);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (vnoise(i, i >> 2, 5.1) - 0.5) * 34;
+    img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+  ctx.strokeStyle = 'rgba(55,55,55,0.5)'; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 20; i++) {
+    let x = Math.random() * S, y = Math.random() * S;
+    ctx.beginPath(); ctx.moveTo(x, y);
+    for (let k = 0; k < 6; k++) { x += (Math.random() - 0.5) * 64; y += (Math.random() - 0.5) * 64; ctx.lineTo(x, y); }
+    ctx.stroke();
+  }
+  return finalizeTex(cv, 2, 30);
+}
+// 草地：细草叶噪声（V1：512px）
+function makeGrassTexture() {
+  const S = 512;
+  const { cv, ctx } = cv2d(S);
+  ctx.fillStyle = '#cfe6bf'; ctx.fillRect(0, 0, S, S);
+  const img = ctx.getImageData(0, 0, S, S);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (vnoise(i, i >> 1, 9.3) - 0.5) * 34;
+    img.data[i] += n * 0.6; img.data[i + 1] += n; img.data[i + 2] += n * 0.4;
+  }
+  ctx.putImageData(img, 0, 0);
+  return finalizeTex(cv, 8, 4);
+}
+// 皮肤（角色头部）：细微肤色颗粒 + 淡淡雀斑/毛孔（V1：512px）
+function makeSkinTexture() {
+  const S = 512;
+  const { cv, ctx } = cv2d(S);
+  ctx.fillStyle = '#f2f2f2'; ctx.fillRect(0, 0, S, S);
+  const img = ctx.getImageData(0, 0, S, S);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (vnoise(i, i >> 2, 7.7) - 0.5) * 16;
+    img.data[i] += n; img.data[i + 1] += n * 0.8; img.data[i + 2] += n * 0.6;
+  }
+  ctx.putImageData(img, 0, 0);
+  ctx.fillStyle = 'rgba(120,80,60,0.10)';
+  for (let i = 0; i < 120; i++) {
+    const x = Math.random() * S, y = Math.random() * S, r = 1 + Math.random() * 2.5;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  return finalizeTex(cv, 1, 1);
+}
+// 皮革（踢球）：斑驳颗粒 + 细裂纹（V1：512px）
+function makeLeatherTexture() {
+  const S = 512;
+  const { cv, ctx } = cv2d(S);
+  ctx.fillStyle = '#eaeaea'; ctx.fillRect(0, 0, S, S);
+  const img = ctx.getImageData(0, 0, S, S);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (vnoise(i, i >> 1, 4.4) - 0.5) * 26;
+    img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+  ctx.strokeStyle = 'rgba(90,50,30,0.35)'; ctx.lineWidth = 1.5;
+  for (let i = 0; i < 48; i++) {
+    let x = Math.random() * S, y = Math.random() * S;
+    ctx.beginPath(); ctx.moveTo(x, y);
+    for (let k = 0; k < 5; k++) { x += (Math.random() - 0.5) * 64; y += (Math.random() - 0.5) * 64; ctx.lineTo(x, y); }
+    ctx.stroke();
+  }
+  for (let i = 0; i < 80; i++) {
+    ctx.fillStyle = `rgba(70,40,25,${0.05 + Math.random() * 0.08})`;
+    const x = Math.random() * S, y = Math.random() * S, r = 8 + Math.random() * 18;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  return finalizeTex(cv, 2, 2);
+}
+const TEX = {
+  plaster: makePlasterTexture(),
+  wood: makeWoodTexture(),
+  roof: makeRoofTexture(),
+  asphalt: makeAsphaltTexture(),
+  grass: makeGrassTexture(),
+  skin: makeSkinTexture(),
+  leather: makeLeatherTexture()
+};
+
+// 轻量雾效：增强画面纵深与空间层次（自定义天空 Shader 不含 fog，不受影响）
+// 暖调暮霭（A3：0x6b4a5c 偏紫，与天空更协调）：与地面草绿、地平线橙融合，减弱星球轮廓处的色带
+scene.fog = new THREE.FogExp2(0x6b4a5c, CONFIG.render.fogDensity); // P5/A5：雾浓度可配置
+
+/* ============================================================
+ * 2. 灯光（黄昏故事感氛围：半球光 + 暖色平行光 + 环境补光 + 冷色背光）
+ *    平行光开启阴影投射，路灯 PointLight 仅照明不参与阴影（保性能）。
+ * ============================================================ */
+scene.add(new THREE.HemisphereLight(0x9ab8d8, 0x4a3855, 0.5));
+scene.add(new THREE.AmbientLight(0x404a66, 0.25));
+
+const sun = new THREE.DirectionalLight(0xffd9a0, 1.2);  // 暖色夕阳，低角度 → 长投影
+sun.position.set(48, 30, 22); // 初始位（每帧由 update 跟随角色）
+sun.castShadow = true;
+sun.shadow.mapSize.set(CONFIG.render.shadowSize, CONFIG.render.shadowSize);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 100;
+sun.shadow.camera.left = -CONFIG.render.shadowHalf;
+sun.shadow.camera.right = CONFIG.render.shadowHalf;
+sun.shadow.camera.top = CONFIG.render.shadowHalf;
+sun.shadow.camera.bottom = -CONFIG.render.shadowHalf;
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.03;
+// P2：阴影相机跟随角色（局部视锥），提高有效分辨率、降低整球阴影开销；光照方向用固定 SUN_DIR 保持
+const SUN_DIR = new THREE.Vector3(48, 30, 22).normalize();
+const SUN_DIST = 70;
+scene.add(sun);
+
+// 冷色轮廓光（Rim Light）：从太阳反方向补一盏弱冷光，勾出建筑/角色边缘，增强立体感与电影感
+// 开销极小（仅 DirectionalLight，不投影），但视觉层次跃升明显
+const rimLight = new THREE.DirectionalLight(0x7aa8d8, 0.35);
+rimLight.position.copy(SUN_DIR).multiplyScalar(-1).setY(0.2).normalize().multiplyScalar(SUN_DIST);
+scene.add(rimLight);
+scene.add(sun.target);  // target 每帧跟随角色位置更新
+
+/* ============================================================
+ * 3. 天空穹顶（魔幻晚霞渐变 ShaderMaterial，BackSide）
+ *    地平线暖橙 → 天顶深靛蓝，营造故事感氛围。
+ * ============================================================ */
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  depthWrite: false,
+  uniforms: {
+    horizon: { value: new THREE.Color('#ff8c5a') },
+    midSky:  { value: new THREE.Color('#6b4a7a') },
+    zenith:  { value: new THREE.Color('#0d0a26') },
+    sunDir:  { value: new THREE.Vector3(0.7, 0.35, 0.3).normalize() },
+    uConvert: { value: 1.0 }
+  },
+  vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `varying vec3 vP; uniform vec3 horizon; uniform vec3 midSky; uniform vec3 zenith; uniform vec3 sunDir; uniform float uConvert;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float hash3(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
+    float fbm(vec3 p){
+      float v = 0.0; float a = 0.5;
+      for(int i=0;i<4;i++){ v += a * hash3(floor(p*1.0)); p *= 2.0; a *= 0.5; }
+      return v;
+    }
+    void main(){
+      vec3 dir = normalize(vP);
+      float h = dir.y * 0.5 + 0.5;
+      vec3 col;
+      if(h < 0.5){
+        col = mix(horizon, midSky, smoothstep(0.25, 0.5, h));
+      } else {
+        col = mix(midSky, zenith, smoothstep(0.5, 0.95, h));
+      }
+      float sunDot = dot(dir, sunDir);
+      float mie = pow(max(0.0, sunDot), 8.0) * 0.35
+                 + pow(max(0.0, sunDot), 32.0) * 0.5;
+      col += vec3(1.0, 0.65, 0.35) * mie * smoothstep(-0.1, 0.3, dir.y);
+      col += horizon * (1.0 - smoothstep(0.30, 0.52, h)) * 0.25;
+      col += vec3(1.0, 0.5, 0.25) * (1.0 - smoothstep(0.40, 0.48, h)) * 0.15;
+      if(dir.y > -0.1 && dir.y < 0.6){
+        vec3 cloudP = dir * 3.0;
+        cloudP.y *= 0.5;
+        float cloudMask = smoothstep(0.0, 0.2, dir.y) * (1.0 - smoothstep(0.3, 0.6, dir.y));
+        float cloud = fbm(cloudP);
+        cloud = smoothstep(0.45, 0.65, cloud);
+        col = mix(col, vec3(1.0, 0.92, 0.88), cloud * cloudMask * 0.5);
+      }
+      if(dir.y > 0.3){
+        vec2 starUV = vec2(atan(dir.z, dir.x) * 25.0, dir.y * 50.0);
+        vec2 sid = floor(starUV);
+        float star = hash(sid);
+        if(star > 0.985){
+          float twinkle = 0.6 + 0.4 * sin(starUV.x * 4.0 + starUV.y * 3.0);
+          float starVal = (star - 0.985) / 0.015 * twinkle;
+          col += vec3(starVal) * smoothstep(0.3, 0.8, dir.y);
+        }
+      }
+      col = clamp(col, 0.0, 1.0);
+      col = mix(col, pow(col, vec3(1.0 / 2.2)), uConvert);
+      gl_FragColor = vec4(col, 1.0);
+    }`
+});
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(400, 32, 24), skyMat));
+applyColorMode(); // 依据 bloom 是否启用设置天空色彩空间转换方式
+
+// #1 环境贴图 — 用 PMREMGenerator 从天空 ShaderMaterial 烘焙 envMap，赋给 scene.environment。
+// 金属材质(金顶 metalness 0.6 / 池塘 0.9 / 小球)有了环境反射，不再发暗发平；池塘至少能反射天空。
+// BUG修复：skyMat 用 BackSide（从球内看），PMREM 从外部渲染会看不到任何东西。
+//         烘焙时临时切到 FrontSide，完成后恢复 BackSide。
+try {
+  const _pmrem = new THREE.PMREMGenerator(renderer);
+  const _origSide = skyMat.side;
+  skyMat.side = THREE.FrontSide;
+  const _skyScene = new THREE.Scene();
+  _skyScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 32, 24), skyMat));
+  const _envRT = _pmrem.fromScene(_skyScene, 0, 0.1, 1000);
+  skyMat.side = _origSide; // 恢复原 side
+  scene.environment = _envRT.texture;
+  _pmrem.dispose();
+} catch (e) { /* envMap 不可用时静默降级，材质仍可渲染（仅无反射） */ }
+
+// 星球半径常量（提前定义，供下方月亮/萤火虫/落叶等粒子代码引用；原定义在物理世界模块内，导致 TDZ 错误）
+const R = CONFIG.planetRadius;
+
+// V4：月亮球体 — 贴在穹顶内侧，柔和 emissive 参与 Bloom
+const moon = new THREE.Mesh(
+  new THREE.SphereGeometry(3, 24, 16),
+  new THREE.MeshBasicMaterial({ color: 0xfff4d6 })
+);
+moon.position.set(60, 80, -120);
+scene.add(moon);
+// 月亮光晕（半透明大球）
+const moonGlow = new THREE.Mesh(
+  new THREE.SphereGeometry(4.5, 24, 16),
+  new THREE.MeshBasicMaterial({ color: 0xfff4d6, transparent: true, opacity: 0.15, depthWrite: false })
+);
+moonGlow.position.copy(moon.position);
+scene.add(moonGlow);
+
+// V4：萤火虫粒子系统（桌面端，围绕街道低空飘动 + 闪烁）
+let fireflyPoints = null;
+if (!IS_COARSE) {
+  const ffCount = 40;
+  const ffGeo = new THREE.BufferGeometry();
+  const ffPos = new Float32Array(ffCount * 3);
+  const ffPhase = new Float32Array(ffCount);
+  for (let i = 0; i < ffCount; i++) {
+    const lon = Math.random() * Math.PI * 2;
+    const lat = (Math.random() - 0.5) * 0.3;
+    const r = R + 1 + Math.random() * 2;
+    ffPos[i * 3] = Math.cos(lat) * Math.cos(lon) * r;
+    ffPos[i * 3 + 1] = Math.sin(lat) * r + R;
+    ffPos[i * 3 + 2] = Math.cos(lat) * Math.sin(lon) * r;
+    ffPhase[i] = Math.random() * Math.PI * 2;
+  }
+  ffGeo.setAttribute('position', new THREE.BufferAttribute(ffPos, 3));
+  ffGeo.setAttribute('aPhase', new THREE.BufferAttribute(ffPhase, 1));
+  const ffMat = new THREE.PointsMaterial({
+    color: 0xffe066, size: 0.3, transparent: true, opacity: 0.8,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+  });
+  fireflyPoints = new THREE.Points(ffGeo, ffMat);
+  fireflyPoints.userData.base = new Float32Array(ffPos); // A1：存储基准位置供每帧漂移动画
+  scene.add(fireflyPoints);
+}
+
+// V4：落叶粒子系统（桌面端，从树附近飘落 + 旋转）
+let leafPoints = null;
+if (!IS_COARSE) {
+  const lfCount = 15;
+  const lfGeo = new THREE.BufferGeometry();
+  const lfPos = new Float32Array(lfCount * 3);
+  const lfVel = new Float32Array(lfCount * 3);
+  for (let i = 0; i < lfCount; i++) {
+    const lon = Math.random() * Math.PI * 2;
+    const lat = (Math.random() - 0.5) * 0.4;
+    const r = R + 3 + Math.random() * 4;
+    lfPos[i * 3] = Math.cos(lat) * Math.cos(lon) * r;
+    lfPos[i * 3 + 1] = Math.sin(lat) * r;
+    lfPos[i * 3 + 2] = Math.cos(lat) * Math.sin(lon) * r;
+    lfVel[i * 3] = (Math.random() - 0.5) * 0.5;
+    lfVel[i * 3 + 1] = -0.3 - Math.random() * 0.3;
+    lfVel[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
+  }
+  lfGeo.setAttribute('position', new THREE.BufferAttribute(lfPos, 3));
+  const lfMat = new THREE.PointsMaterial({
+    color: 0xd4a04a, size: 0.25, transparent: true, opacity: 0.7, depthWrite: false
+  });
+  leafPoints = new THREE.Points(lfGeo, lfMat);
+  leafPoints.userData.vel = lfVel;
+  scene.add(leafPoints);
+}
+
+/* ============================================================
+ * 4. 物理世界（Cannon.js） —— 【核心逻辑，禁止改动】
+ *    - 全局重力置 0，改为对每个刚体施加“指向球心”的径向重力
+ * ============================================================ */
+const world = new CANNON.World();
+world.gravity.set(0, 0, 0);
+world.broadphase = new CANNON.SAPBroadphase(world); // P8：宽相用扫掠剪枝，免费收益
+world.solver.iterations = 8;
+
+const G = CONFIG.physics.G; // 径向重力加速度（集中在 CONFIG）
+const SPAWN_LAT = CONFIG.streetHalfWidth / R; // F9：出生纬度 = 街道带（而非赤道草地）
+
+// 星球静态球体
+const planetBody = new CANNON.Body({ mass: 0 });
+planetBody.addShape(new CANNON.Sphere(R));
+world.addBody(planetBody);
+
+/* ============================================================
+ * 5. 高细节星球本体（高密度 SphereGeometry + 顶点色草地渐变）
+ *    移除 flatShading，启用平滑法线；南北极偏深、赤道偏亮绿。
+ * ============================================================ */
+const planetGeo = new THREE.SphereGeometry(R, CONFIG.render.planetSeg[0], CONFIG.render.planetSeg[1]); // P5
+{
+  const pos = planetGeo.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const cEq = new THREE.Color('#7fc56b');   // 赤道草绿
+  const cPole = new THREE.Color('#3f7a44'); // 极地深绿
+  const tmp = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const lat = Math.asin(THREE.MathUtils.clamp(pos.getY(i) / R, -1, 1)); // -π/2..π/2
+    const f = Math.abs(lat) / (Math.PI / 2);   // 0 赤道 → 1 极地
+    tmp.copy(cEq).lerp(cPole, f);
+    // 轻微随机扰动，避免大片纯色（C2：用 fract 替代 %1，避免负数）
+    const n = fract(Math.sin(i * 12.9898) * 43758.5453);
+    const j = 0.94 + 0.06 * n;
+    colors[i * 3] = tmp.r * j;
+    colors[i * 3 + 1] = tmp.g * j;
+    colors[i * 3 + 2] = tmp.b * j;
+  }
+  planetGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+const planet = new THREE.Mesh(
+  planetGeo,
+  new THREE.MeshStandardMaterial({ map: TEX.grass, vertexColors: true, roughness: 0.92, metalness: 0 })
+);
+planet.receiveShadow = true;
+scene.add(planet);
+
+/* ============================================================
+ * 6. 立体环形街道（厚度 + 人行道 + 路沿石，单一合并 BufferGeometry = 1 DrawCall）
+ * ============================================================ */
+function buildStreet() {
+  const S = 140;
+  const roadH = CONFIG.streetHalfWidth, sw = 1.6; // 人行道宽
+  const totalW = 2 * (roadH + sw);
+  // 横截面轮廓（u：南北向偏移米；w：径向抬升；c：颜色）
+  const prof = [
+    { u: -(roadH + sw), w: 0.02, c: '#9a948c' }, // 外侧人行道
+    { u: -(roadH + sw), w: 0.14, c: '#9a948c' },
+    { u: -roadH,       w: 0.14, c: '#6f665d' }, // 路沿石（北）
+    { u: -roadH,       w: 0.05, c: '#6b6b73' }, // 路面
+    { u:  roadH,       w: 0.05, c: '#6b6b73' },
+    { u:  roadH,       w: 0.14, c: '#6f665d' }, // 路沿石（南）
+    { u:  (roadH + sw), w: 0.14, c: '#9a948c' },
+    { u:  (roadH + sw), w: 0.02, c: '#9a948c' }
+  ];
+  const pos = [], col = [], uv = [], idx = [];
+  const colOf = c => { const x = new THREE.Color(c); return [x.r, x.g, x.b]; };
+  const P = (u, w, lon) => {
+    const lat = u / R;
+    const n = new THREE.Vector3(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon));
+    return n.multiplyScalar(R + w);
+  };
+  let base = 0;
+  for (let i = 0; i < S; i++) {
+    const lon0 = (i / S) * Math.PI * 2, lon1 = ((i + 1) / S) * Math.PI * 2;
+    for (let k = 0; k < prof.length - 1; k++) {
+      const a = prof[k], b = prof[k + 1];
+      const pa0 = P(a.u, a.w, lon0), pa1 = P(a.u, a.w, lon1);
+      const pb0 = P(b.u, b.w, lon0), pb1 = P(b.u, b.w, lon1);
+      const ca = colOf(a.c), cb = colOf(b.c);
+      const s = base;
+      pos.push(pa0.x, pa0.y, pa0.z, pa1.x, pa1.y, pa1.z, pb0.x, pb0.y, pb0.z, pb1.x, pb1.y, pb1.z);
+      col.push(...ca, ...ca, ...cb, ...cb);
+      // UV：u 横跨路宽 0..1，v 沿环向 0..1（纹理自身 repeat 平铺）
+      const ua = (a.u + (roadH + sw)) / totalW, ub = (b.u + (roadH + sw)) / totalW;
+      const va = lon0 / (Math.PI * 2), vb = lon1 / (Math.PI * 2);
+      uv.push(ua, va, ua, vb, ub, va, ub, vb);
+      idx.push(s, s + 1, s + 2, s + 1, s + 3, s + 2);
+      base += 4;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+const street = new THREE.Mesh(
+  buildStreet(),
+  new THREE.MeshStandardMaterial({ map: TEX.asphalt, vertexColors: true, roughness: 0.92, metalness: 0 })
+);
+street.receiveShadow = true;
+scene.add(street);
+
+/* ============================================================
+ * 7. 多层立体积云（每个云由多球合并为 1 个网格，半透明 + 呼吸感）
+ * ============================================================ */
+const cloudGroup = new THREE.Group();
+scene.add(cloudGroup);
+const cloudMat = new THREE.MeshStandardMaterial({
+  color: 0xffffff, transparent: true, opacity: 0.62, roughness: 1, depthWrite: false,
+  emissive: 0xffd9b0, emissiveIntensity: 0.15
+});
+const clouds = [];
+for (let i = 0; i < CONFIG.clouds; i++) {
+  const parts = [];
+  const n = 5 + Math.floor(Math.random() * 4);
+  for (let j = 0; j < n; j++) {
+    const r = 5 + Math.random() * 5;
+    const g = new THREE.SphereGeometry(r, 14, 12);
+    const m = new THREE.Matrix4().makeTranslation(
+      (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 10
+    );
+    g.applyMatrix4(m);
+    parts.push(g);
+  }
+  const cloud = new THREE.Mesh(mergeGeometries(parts, false), cloudMat);
+  const a = (i / CONFIG.clouds) * Math.PI * 2; // BUG-16 修复：除数用 CONFIG.clouds 而非硬编码 4
+  const rad = R + 38 + Math.random() * 22;
+  cloud.position.set(Math.cos(a) * rad, 30 + Math.random() * 28, Math.sin(a) * rad);
+  cloud.userData.base = 0.8 + Math.random() * 0.5;
+  cloud.userData.baseY = cloud.position.y;   // 记录基准高度，飘动时围绕它振荡（避免随机游走漂移）
+  cloud.scale.setScalar(cloud.userData.base);
+  cloudGroup.add(cloud);
+  clouds.push(cloud);
+}
+
+/* ============================================================
+ * 8. 公共几何工具：把几何体转“硬边”（toNonIndexed）并刷顶点色，
+ *    以便合并为单一网格（1 DrawCall），同时保留清晰建筑轮廓（不使用 flatShading）。
+ * ============================================================ */
+// BUG修复：computeVertexNormals() 在 r160 返回 undefined（非 this），不能链式调用。
+//         原写法 g.toNonIndexed().computeVertexNormals() 返回 undefined，
+//         导致 paint(undefined) 访问 .attributes 抛 TypeError，模块崩溃触发超时兜底。
+function crisp(g) { const ng = g.toNonIndexed(); ng.computeVertexNormals(); return ng; }
+function paint(g, hex) {
+  const c = new THREE.Color(hex);
+  const n = g.attributes.position.count;
+  const a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(a, 3));
+  return g;
+}
+function part(list, geo, hex, mat) {
+  const g = paint(crisp(geo), hex);
+  g.applyMatrix4(mat);
+  list.push(g);
+}
+const T = (x, y, z) => new THREE.Matrix4().makeTranslation(x, y, z);
+const RY = (a) => new THREE.Matrix4().makeRotationY(a);
+// C5：复用临时矩阵，避免在 reduce 中每步 clone 新建 Matrix4（仅构建期，非热路径）
+const _mReduce = new THREE.Matrix4();
+const M = (...ms) => { _mReduce.identity(); for (const m of ms) _mReduce.multiply(m); return _mReduce.clone(); };
+
+/* 球面局部坐标系：给定纬度 lat、经度 lon，返回 法线n / 东向east / 指向街道内侧 innerDir */
+function surfFrame(lat, lon) {
+  const n = new THREE.Vector3(
+    Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)
+  ).normalize();
+  const east = new THREE.Vector3(-Math.sin(lon), 0, Math.cos(lon)).normalize();
+  const innerDir = new THREE.Vector3(
+    Math.sin(lat) * Math.cos(lon), -Math.cos(lat), Math.sin(lat) * Math.sin(lon)
+  ).normalize();
+  return { n, east, innerDir };
+}
+/* 由 法线 + 指向街道方向 构造右手正交基（与原始 hut 朝向一致：local +Y=up, +Z=innerDir） */
+function basisMatrix(n, innerDir) {
+  const y = n.clone(), z = innerDir.clone();
+  const x = new THREE.Vector3().crossVectors(y, z).normalize();
+  z.crossVectors(x, y).normalize();
+  return new THREE.Matrix4().makeBasis(x, y, z);
+}
+
+/* ============================================================
+ * 9. 小屋工厂：多部件组合（屋檐 / 多层折叠屋顶 / 立体窗框 / 店面台阶 /
+ *    侧面灯箱招牌 / 门框门把手），全部合并为 1 个网格（顶点色）。
+ *    门为独立网格，保留靠近时的霓虹呼吸发光。
+ * ============================================================ */
+function makeLabelSprite(text, color) {
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 80;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = 'rgba(255,255,255,0.94)';
+  const r = 18;
+  ctx.beginPath();
+  ctx.moveTo(r, 4); ctx.arcTo(252, 4, 252, 76, r); ctx.arcTo(252, 76, 4, 76, r);
+  ctx.arcTo(4, 76, 4, 4, r); ctx.arcTo(4, 4, 252, 4, r); ctx.fill();
+  ctx.fillStyle = color;
+  ctx.font = 'bold 40px "PingFang SC", sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 42);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, fog: false }));
+  sp.scale.set(4, 1.25, 1);
+  return sp;
+}
+
+const huts = []; // 运行时数据
+const { w: HW, d: HD, h: HH, roof: HR } = CONFIG.hut;
+let _decoSeed = 0; // V2：装饰构件 seeded random 计数器
+
+// V2：门牌号 Canvas 纹理（生成 1-10 数字贴花）
+function makeDoorNumberTexture(n, accentColor) {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 180;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillRect(0, 0, 256, 180);
+  ctx.strokeStyle = accentColor; ctx.lineWidth = 6; ctx.strokeRect(4, 4, 248, 172);
+  ctx.fillStyle = '#3a2a1a'; ctx.font = 'bold 100px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(n), 128, 95);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+CONFIG.huts.forEach((cfg, i) => {
+  const colorHex = cfg.color || CONFIG.palette[i % CONFIG.palette.length];
+  const baseColor = new THREE.Color(colorHex);
+  const wallColor = '#' + baseColor.getHexString();
+  const roofColor = '#' + baseColor.clone().multiplyScalar(0.82).getHexString();
+  const roofColor2 = '#' + baseColor.clone().multiplyScalar(0.68).getHexString();
+  const trim = '#F3ECDD';       // 窗框 / 门框浅色
+  const glass = '#FFE6A8';       // 暖色“亮灯”窗
+  const stone = '#b9b2a6';      // 台阶 / 路沿
+  const gold = '#E8C36B';       // 金顶 / 门把手
+  const signGlow = '#FFC36B';   // 侧面灯箱
+
+  // 球面坐标 → 世界方向
+  const lat = cfg.side * (CONFIG.streetHalfWidth / R);
+  const lon = cfg.lon;
+  const { n: up, innerDir } = surfFrame(lat, lon);
+
+  const group = new THREE.Group();
+  group.position.copy(up.clone().multiplyScalar(R));
+
+  const basis = basisMatrix(up, innerDir);
+  group.quaternion.setFromRotationMatrix(basis);
+
+  // —— V1：合并主体（墙身 / 门框 / 台阶 → 石膏砖墙纹理）；屋顶 / 玻璃 / 金顶各自独立网格 ——
+  const parts = [];
+  const roofParts = [];
+  const glassParts = [];   // V1：玻璃独立网格，半透明 + emissive 暖光
+  const goldParts = [];    // V1：金顶独立网格，metalness 0.6
+  // 屋身
+  part(parts, new THREE.BoxGeometry(HW, HH, HD), wallColor, T(0, HH / 2, 0));
+  // C2：碎石地基围边 — 比屋身略宽的矮石台，消除屋底直接坐草地的突兀感
+  part(parts, new THREE.BoxGeometry(HW + 0.4, 0.25, HD + 0.4), '#a39a8c', T(0, 0.12, 0));
+  // 突出屋檐（四面悬挑）
+  part(roofParts, new THREE.BoxGeometry(HW + 0.7, 0.3, HD + 0.7), roofColor2, T(0, HH + 0.16, 0));
+  // V2：多层次折叠屋顶 — 3 种屋顶变体按 index 轮换
+  const roofType = i % 3;
+  if (roofType === 0) {
+    // 变体 A：尖塔（原设计）
+    part(roofParts, new THREE.ConeGeometry(HW * 0.98, HR, 4), roofColor, M(T(0, HH + 0.31 + HR / 2, 0), RY(Math.PI / 4)));
+    part(roofParts, new THREE.ConeGeometry(HW * 0.6, HR * 0.55, 4), roofColor2, M(T(0, HH + 0.31 + HR + HR * 0.55 / 2, 0), RY(Math.PI / 4)));
+    part(goldParts, new THREE.SphereGeometry(0.18, 12, 8), gold, T(0, HH + 0.31 + HR + HR * 0.55 + 0.12, 0));
+  } else if (roofType === 1) {
+    // 变体 B：圆顶（半球 + 金尖）
+    part(roofParts, new THREE.SphereGeometry(HW * 0.85, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), roofColor, T(0, HH + 0.31, 0));
+    part(goldParts, new THREE.ConeGeometry(0.12, 0.6, 8), gold, T(0, HH + 0.31 + HW * 0.85 + 0.3, 0));
+  } else {
+    // 变体 C：平顶露台（矮围栏 + 平顶 + 金球）
+    part(roofParts, new THREE.BoxGeometry(HW + 0.4, 0.2, HD + 0.4), roofColor, T(0, HH + 0.31, 0));
+    part(roofParts, new THREE.BoxGeometry(HW + 0.4, 0.5, 0.12), roofColor2, T(0, HH + 0.66, HD / 2 + 0.08));
+    part(roofParts, new THREE.BoxGeometry(HW + 0.4, 0.5, 0.12), roofColor2, T(0, HH + 0.66, -(HD / 2 + 0.08)));
+    part(roofParts, new THREE.BoxGeometry(0.12, 0.5, HD + 0.4), roofColor2, T(HW / 2 + 0.08, HH + 0.66, 0));
+    part(roofParts, new THREE.BoxGeometry(0.12, 0.5, HD + 0.4), roofColor2, T(-(HW / 2 + 0.08), HH + 0.66, 0));
+    part(goldParts, new THREE.SphereGeometry(0.22, 12, 8), gold, T(0, HH + 0.55, 0));
+  }
+  // 正面两扇窗（框 + V1 暖色玻璃独立网格）
+  [-1, 1].forEach(s => {
+    const x = s * HW * 0.27;
+    part(parts, new THREE.BoxGeometry(0.95, 1.05, 0.14), trim, T(x, HH * 0.62, HD / 2 + 0.02));
+    part(glassParts, new THREE.BoxGeometry(0.7, 0.8, 0.06), glass, T(x, HH * 0.62, HD / 2 + 0.07));
+    // V2：十字窗棂
+    part(parts, new THREE.BoxGeometry(0.72, 0.04, 0.08), trim, T(x, HH * 0.62, HD / 2 + 0.08));
+    part(parts, new THREE.BoxGeometry(0.04, 0.82, 0.08), trim, T(x, HH * 0.62, HD / 2 + 0.08));
+  });
+  // 侧面窗（左右山墙）— V1 玻璃独立
+  [-1, 1].forEach(s => {
+    const x = s * (HW / 2 + 0.02);
+    part(parts, new THREE.BoxGeometry(0.14, 1.05, 0.95), trim, T(x, HH * 0.62, 0));
+    part(glassParts, new THREE.BoxGeometry(0.06, 0.8, 0.7), glass, T(s * (HW / 2 + 0.06), HH * 0.62, 0));
+  });
+  // 门框（左 / 右 / 上 / 门槛）
+  part(parts, new THREE.BoxGeometry(0.16, 2.4, 0.2), trim, T(-0.78, 1.2, HD / 2 + 0.02));
+  part(parts, new THREE.BoxGeometry(0.16, 2.4, 0.2), trim, T(0.78, 1.2, HD / 2 + 0.02));
+  part(parts, new THREE.BoxGeometry(1.72, 0.18, 0.2), trim, T(0, 2.32, HD / 2 + 0.02));
+  part(parts, new THREE.BoxGeometry(1.72, 0.2, 0.24), stone, T(0, 0.1, HD / 2 + 0.02));
+  // 门把手（金）— V1 移入 goldParts
+  part(goldParts, new THREE.SphereGeometry(0.09, 10, 8), gold, T(0.46, 1.05, HD / 2 + 0.13));
+  // 店面台阶（三级，向街道降下）
+  for (let s = 0; s < 3; s++) {
+    part(parts, new THREE.BoxGeometry(HW * 0.85, 0.16, 0.45), stone, T(0, (2 - s) * 0.16, HD / 2 + 0.25 + s * 0.45));
+  }
+  // 侧面精致灯箱招牌（挂墙悬挑 + 支撑杆）— V1 移入 glassParts（发光）
+  part(glassParts, new THREE.BoxGeometry(0.14, 0.72, 1.5), signGlow, T(HW / 2 + 0.08, HH * 0.72, 0));
+  part(parts, new THREE.BoxGeometry(0.3, 0.1, 0.1), trim, T(HW / 2 + 0.02, HH * 0.72, 0));
+
+  // V2：随机装饰构件（seeded random，每小屋 2-3 种）
+  const seed = i * 9301 + 49297;
+  const rng = () => fract(Math.sin(seed + ++_decoSeed) * 43758.5453);
+  // 门廊雨檐
+  if (rng() > 0.4) {
+    part(parts, new THREE.BoxGeometry(1.8, 0.1, 0.6), roofColor, T(0, 2.5, HD / 2 + 0.3));
+    part(parts, new THREE.BoxGeometry(0.1, 0.6, 0.1), trim, T(-0.8, 2.2, HD / 2 + 0.5));
+    part(parts, new THREE.BoxGeometry(0.1, 0.6, 0.1), trim, T(0.8, 2.2, HD / 2 + 0.5));
+  }
+  // 烟囱
+  if (rng() > 0.5) {
+    const cx = (rng() - 0.5) * HW * 0.6;
+    part(parts, new THREE.BoxGeometry(0.4, 1.0, 0.4), stone, T(cx, HH + 0.5, 0));
+    part(parts, new THREE.BoxGeometry(0.5, 0.15, 0.5), roofColor2, T(cx, HH + 1.05, 0));
+  }
+  // 窗台花箱
+  if (rng() > 0.5) {
+    [-1, 1].forEach(s => {
+      const x = s * HW * 0.27;
+      part(parts, new THREE.BoxGeometry(0.8, 0.2, 0.2), '#8B4513', T(x, HH * 0.62 - 0.55, HD / 2 + 0.1));
+      part(parts, new THREE.BoxGeometry(0.7, 0.15, 0.15), '#FF6B9D', T(x, HH * 0.62 - 0.48, HD / 2 + 0.1));
+    });
+  }
+
+  // V2：门牌号贴花
+  const numTex = makeDoorNumberTexture(i + 1, colorHex);
+  const numMat = new THREE.MeshStandardMaterial({ map: numTex, transparent: true, roughness: 0.6 });
+  const numPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.35), numMat);
+  numPlate.position.set(0, 2.45, HD / 2 + 0.11);
+  group.add(numPlate);
+
+  const hutMesh = new THREE.Mesh(
+    mergeGeometries(parts, false),
+    new THREE.MeshStandardMaterial({ map: TEX.plaster, vertexColors: true, roughness: 0.85, metalness: 0.0 })
+  );
+  hutMesh.castShadow = true;
+  hutMesh.receiveShadow = true;
+  group.add(hutMesh);
+
+  const roofMesh = new THREE.Mesh(
+    mergeGeometries(roofParts, false),
+    new THREE.MeshStandardMaterial({ map: TEX.roof, vertexColors: true, roughness: 0.8, metalness: 0.0 })
+  );
+  roofMesh.castShadow = true;
+  roofMesh.receiveShadow = true;
+  group.add(roofMesh);
+
+  // V1：玻璃独立网格 — 半透明 + emissive 暖光（屋内亮灯效果）
+  let glassMesh = null;
+  if (glassParts.length) {
+    glassMesh = new THREE.Mesh(
+      mergeGeometries(glassParts, false),
+      new THREE.MeshStandardMaterial({ color: glass, vertexColors: true, transparent: true, opacity: 0.85, emissive: new THREE.Color(glass), emissiveIntensity: 0.6, roughness: 0.2, metalness: 0.0 })
+    );
+    glassMesh.castShadow = false;
+    group.add(glassMesh);
+  }
+  // V1：金顶/金件独立网格 — metalness 0.6 增强金属质感
+  if (goldParts.length) {
+    const goldMesh = new THREE.Mesh(
+      mergeGeometries(goldParts, false),
+      new THREE.MeshStandardMaterial({ color: gold, vertexColors: true, roughness: 0.3, metalness: 0.6 })
+    );
+    goldMesh.castShadow = false;
+    group.add(goldMesh);
+  }
+
+  // 门（独立网格，靠近时霓虹呼吸发光；木纹贴图 + 顶点棕色）— V1 roughness 0.6
+  const doorMat = new THREE.MeshStandardMaterial({
+    color: '#5a3d2b', map: TEX.wood, emissive: new THREE.Color(colorHex), emissiveIntensity: 0.0,
+    roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide
+  });
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.1, 0.12), doorMat);
+  door.position.set(0, 1.05, HD / 2 + 0.09);
+  group.add(door);
+
+  // 名称标牌
+  const label = makeLabelSprite(cfg.name, colorHex);
+  label.position.set(0, HH + HR + 1.8, 0);
+  group.add(label);
+
+  scene.add(group);
+  group.updateMatrixWorld(true);
+
+  // F5（修正）：碰撞体改为与小屋盒体等大的 Box，并继承小屋朝向。
+  // 原 Sphere(HW*0.42=1.68) 小于屋身半宽(2.0)，导致角色可斜插进屋角。
+  // 现 Box 正面在中心沿 innerDir 2.0m 处，角色半径 0.6 → 被挡在 2.6m，距门 0.51m < 2.0 仍可触发 Enter，
+  // 且四角不再可穿越。
+  {
+    const cb = new CANNON.Body({ mass: 0 });
+    cb.addShape(new CANNON.Box(new CANNON.Vec3(HW / 2, HH / 2, HD / 2)));
+    const cc = up.clone().multiplyScalar(R + HH * 0.5);
+    cb.position.set(cc.x, cc.y, cc.z);
+    const q = group.quaternion;          // 继承小屋朝向（local +Y=up, +Z=innerDir）
+    cb.quaternion.set(q.x, q.y, q.z, q.w);
+    world.addBody(cb);
+  }
+
+  // 门“世界坐标”（用于距离判定，须在矩阵更新后计算）
+  const doorWorld = new THREE.Vector3(0, 1.05, HD / 2 + 0.09).applyMatrix4(group.matrixWorld);
+
+  huts.push({ cfg, group, door, doorMat, glassMat: glassMesh ? glassMesh.material : null, colorHex, up, innerDir, doorWorld });
+});
+
+/* ============================================================
+ * 10. 程序化街道公共设施：复古路灯（带 PointLight 实际点光源）/
+ *     长椅 / 邮箱（后两者用 InstancedMesh，各 1 DrawCall）
+ * ============================================================ */
+const lampPositions = []; // 路灯位（用于放置长椅/邮箱）
+for (let g = 0; g < CONFIG.huts.length; g++) {
+  const a = CONFIG.huts[g], b = CONFIG.huts[(g + 1) % CONFIG.huts.length];
+  // 两屋中点经度（处理环绕）
+  let mid = (a.lon + b.lon) / 2;
+  if (b.lon < a.lon) mid += Math.PI;
+  mid = ((mid % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  const side = (g % 2 === 0) ? 1 : -1;
+  const lat = side * ((CONFIG.streetHalfWidth + 1.0) / R);
+  lampPositions.push({ lat, lon: mid, lit: (g % 2 === 0) }); // 隔盏亮灯，控制点光源数量
+}
+// 建路灯（合并几何 → InstancedMesh，仅 1 DrawCall，替代原先 10 个独立网格）
+const lampParts = [];
+const LP_H = 3.0;
+part(lampParts, new THREE.CylinderGeometry(0.1, 0.13, LP_H, 8), '#3a3a44', T(0, LP_H / 2, 0));
+part(lampParts, new THREE.BoxGeometry(0.12, 0.12, 0.95), '#3a3a44', T(0, LP_H, 0.38));
+part(lampParts, new THREE.BoxGeometry(0.5, 0.3, 0.55), '#ffdca0', T(0, LP_H, 0.85)); // 灯头（暖亮）
+const lampGeo = mergeGeometries(lampParts, false);
+const lampMesh = new THREE.InstancedMesh(
+  lampGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.2 }), lampPositions.length
+);
+lampMesh.castShadow = false; lampMesh.receiveShadow = true;
+{
+  const dummy = new THREE.Object3D();
+  lampPositions.forEach((lp, i) => {
+    const { n, innerDir } = surfFrame(lp.lat, lp.lon);
+    dummy.position.copy(n.clone().multiplyScalar(R + 0.14));
+    dummy.quaternion.setFromRotationMatrix(basisMatrix(n, innerDir));
+    dummy.updateMatrix();
+    lampMesh.setMatrixAt(i, dummy.matrix);
+  });
+  lampMesh.instanceMatrix.needsUpdate = true;
+}
+scene.add(lampMesh);
+// 真实点光源（隔盏亮灯）：仅照明，不参与阴影（保性能）
+lampPositions.forEach(lp => {
+  if (!lp.lit) return;
+  const { n, innerDir } = surfFrame(lp.lat, lp.lon);
+  const p0 = n.clone().multiplyScalar(R + 0.14);
+  const pl = new THREE.PointLight(0xffcf8a, 1.5, 18, 2.0); // 夜间路面光斑
+  pl.position.copy(p0).addScaledVector(n, LP_H).addScaledVector(innerDir, 0.85);
+  scene.add(pl);
+});
+// B2：路灯灯罩自发光球 — 暖色 emissive 参与 Bloom，形成可见发光点
+{
+  const lampGlowGeo = new THREE.SphereGeometry(0.18, 12, 8);
+  const lampGlowMesh = new THREE.InstancedMesh(
+    lampGlowGeo,
+    new THREE.MeshStandardMaterial({ color: 0xffdca0, emissive: 0xffcf8a, emissiveIntensity: 1.5, roughness: 0.3 }),
+    lampPositions.length
+  );
+  lampGlowMesh.castShadow = false;
+  const dummy3 = new THREE.Object3D();
+  lampPositions.forEach((lp, i) => {
+    const { n, innerDir } = surfFrame(lp.lat, lp.lon);
+    const p0 = n.clone().multiplyScalar(R + 0.14);
+    dummy3.position.copy(p0).addScaledVector(n, LP_H).addScaledVector(innerDir, 0.85);
+    dummy3.updateMatrix();
+    lampGlowMesh.setMatrixAt(i, dummy3.matrix);
+  });
+  lampGlowMesh.instanceMatrix.needsUpdate = true;
+  scene.add(lampGlowMesh);
+}
+
+// —— 长椅（InstancedMesh）——
+const benchParts = [];
+part(benchParts, new THREE.BoxGeometry(1.4, 0.12, 0.5), '#7a5a3a', T(0, 0.45, 0));
+part(benchParts, new THREE.BoxGeometry(1.4, 0.5, 0.12), '#7a5a3a', T(0, 0.7, -0.19));
+[[-0.6, -0.2], [0.6, -0.2], [-0.6, 0.2], [0.6, 0.2]].forEach(([x, z]) =>
+  part(benchParts, new THREE.BoxGeometry(0.12, 0.45, 0.12), '#5a4030', T(x, 0.22, z)));
+const benchGeo = mergeGeometries(benchParts, false);
+
+// —— 邮箱（InstancedMesh）——
+const mbParts = [];
+part(mbParts, new THREE.BoxGeometry(0.1, 0.8, 0.1), '#555', T(0, 0.4, 0));
+part(mbParts, new THREE.BoxGeometry(0.42, 0.32, 0.32), '#c0392b', T(0, 0.85, 0));
+const mailboxGeo = mergeGeometries(mbParts, false);
+
+// 在部分路灯旁放置长椅 / 邮箱
+const benchSpots = lampPositions.filter((_, i) => i % 3 === 0);
+const mailSpots = lampPositions.filter((_, i) => i % 4 === 0);
+function placeInstanced(geo, spots, cast = true) {
+  const mesh = new THREE.InstancedMesh(
+    geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 }), spots.length
+  );
+  mesh.castShadow = cast; mesh.receiveShadow = true;
+  const dummy = new THREE.Object3D();
+  spots.forEach((s, i) => {
+    const { n, innerDir } = surfFrame(s.lat, s.lon);
+    dummy.position.copy(n.clone().multiplyScalar(R + 0.14));
+    dummy.quaternion.setFromRotationMatrix(basisMatrix(n, innerDir));
+    dummy.scale.setScalar(1); dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  scene.add(mesh);
+}
+if (benchSpots.length) placeInstanced(benchGeo, benchSpots);
+if (mailSpots.length) placeInstanced(mailboxGeo, mailSpots, false);
+
+/* ============================================================
+ * 11. 星球自然景观（InstancedMesh 散落：行道树 / 草丛 / 碎石）
+ *     仅在非街道区域（两极与背面）随机生成，打破光秃球体感。
+ * ============================================================ */
+function angDiff(a, b) {
+  let d = Math.abs(a - b) % (Math.PI * 2);
+  return d > Math.PI ? Math.PI * 2 - d : d;
+}
+// —— 树（树干 + 两层锥冠）——
+const treeParts = [];
+part(treeParts, new THREE.CylinderGeometry(0.12, 0.18, 1.2, 7), '#6b4a2b', T(0, 0.6, 0));
+part(treeParts, new THREE.ConeGeometry(0.95, 1.7, 8), '#3f7d3a', T(0, 2.05, 0));
+part(treeParts, new THREE.ConeGeometry(0.7, 1.2, 8), '#4a8f43', T(0, 2.9, 0));
+// A4：第3层小顶锥，3层错落增强树冠层次
+part(treeParts, new THREE.ConeGeometry(0.45, 0.8, 8), '#5aa853', T(0, 3.55, 0));
+const treeGeo = mergeGeometries(treeParts, false);
+// A4：草丛改为 3-5 簇聚团（替代单锥，增强草丛体积感）
+const grassClusterParts = [];
+for (let g = 0; g < 4; g++) {
+  const ang = (g / 4) * Math.PI * 2;
+  const r = 0.06 + 0.05 * (g % 2);
+  part(grassClusterParts, new THREE.ConeGeometry(0.1, 0.4, 4), '#5aa84a', T(Math.cos(ang) * r, 0.2, Math.sin(ang) * r));
+}
+const grassGeo = mergeGeometries(grassClusterParts, false);
+// —— 碎石（低面数多面体，硬边）——
+const rockGeo = paint(crisp(new THREE.IcosahedronGeometry(0.28, 0)), '#8a857c');
+
+const bandLat = CONFIG.streetHalfWidth / R + 0.12; // 街道带纬度范围（需避开）
+const dummy = new THREE.Object3D();
+const _yAxis = new THREE.Vector3(0, 1, 0);   // 散落物绕“表面法线”随机偏航用
+const _qYaw = new THREE.Quaternion();
+function scatter(geo, count, opt) {
+  const mesh = new THREE.InstancedMesh(
+    geo,
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: opt.rough, metalness: 0 }),
+    count
+  );
+  mesh.castShadow = opt.cast; mesh.receiveShadow = opt.recv;
+  let placed = 0, tries = 0;
+  while (placed < count && tries < count * 60) {
+    tries++;
+    const u = (Math.random() * 2 - 1);
+    const lat = u * (Math.PI / 2 - 0.15);
+    const lon = Math.random() * Math.PI * 2;
+    if (Math.abs(lat) < bandLat) continue;          // 避开街道带
+    let near = false;
+    for (const h of CONFIG.huts) if (angDiff(lon, h.lon) < 0.18) { near = true; break; }
+    if (near) continue;                              // 避开门前
+    const { n, east } = surfFrame(lat, lon);
+    dummy.position.copy(n.clone().multiplyScalar(R + (opt.yOff || 0)));
+    dummy.quaternion.setFromRotationMatrix(basisMatrix(n, east));
+    // 绕“表面法线(局部Y)”做随机偏航，语义明确（原 dummy.rotation.y += 在已设四元数后改写欧拉，含糊）
+    dummy.quaternion.multiply(_qYaw.setFromAxisAngle(_yAxis, Math.random() * Math.PI * 2));
+    const sc = opt.scale ? (opt.scale[0] + Math.random() * (opt.scale[1] - opt.scale[0])) : 1;
+    dummy.scale.set(sc, sc * (opt.yStr || 1), sc);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(placed++, dummy.matrix);
+  }
+  mesh.count = placed;
+  mesh.instanceMatrix.needsUpdate = true;
+  scene.add(mesh);
+  return mesh; // A4：返回引用供风摆动使用
+}
+// 移动端（IS_COARSE）按比例减量散落物，降低中低端机几何/绘制压力
+const _sf = IS_COARSE ? 0.45 : 1;
+// A4：存储树/草引用供风摆动使用
+const treeMesh = scatter(treeGeo, Math.round(CONFIG.scatter.trees * _sf), { cast: true, recv: true, rough: 0.9, yOff: 0, scale: [0.8, 1.3], yStr: 1 });
+const grassMesh = scatter(grassGeo, Math.round(CONFIG.scatter.grass * _sf), { cast: false, recv: false, rough: 1, yOff: 0.0, scale: [0.7, 1.5] });
+scatter(rockGeo, Math.round(CONFIG.scatter.rocks * _sf), { cast: false, recv: true, rough: 1, yOff: 0.05, scale: [0.6, 1.6] });
+
+// A4：地面散落小花（桌面端，彩色小四边形 InstancedMesh，per-instance 颜色）
+if (!IS_COARSE) {
+  const flowerColors = [0xFF6B9D, 0xFFD700, 0xFF8C42, 0xE066FF, 0xFF4757];
+  const flowerGeo = new THREE.PlaneGeometry(0.12, 0.12);
+  const flowerCount = 80;
+  const flowerMesh2 = new THREE.InstancedMesh(
+    flowerGeo,
+    new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, side: THREE.DoubleSide, roughness: 0.8 }),
+    flowerCount
+  );
+  flowerMesh2.castShadow = false; flowerMesh2.receiveShadow = false;
+  const dummy4 = new THREE.Object3D();
+  let placed4 = 0, tries4 = 0;
+  while (placed4 < flowerCount && tries4 < flowerCount * 60) {
+    tries4++;
+    const u = (Math.random() * 2 - 1);
+    const lat = u * (Math.PI / 2 - 0.15);
+    const lon = Math.random() * Math.PI * 2;
+    if (Math.abs(lat) < bandLat) continue;
+    let near = false;
+    for (const h of CONFIG.huts) if (angDiff(lon, h.lon) < 0.18) { near = true; break; }
+    if (near) continue;
+    const { n, east } = surfFrame(lat, lon);
+    dummy4.position.copy(n.clone().multiplyScalar(R + 0.06));
+    dummy4.quaternion.setFromRotationMatrix(basisMatrix(n, east));
+    dummy4.scale.setScalar(0.7 + Math.random() * 0.6);
+    dummy4.updateMatrix();
+    flowerMesh2.setMatrixAt(placed4, dummy4.matrix);
+    flowerMesh2.setColorAt(placed4, new THREE.Color(flowerColors[placed4 % flowerColors.length]));
+    placed4++;
+  }
+  flowerMesh2.count = placed4;
+  flowerMesh2.instanceMatrix.needsUpdate = true;
+  if (flowerMesh2.instanceColor) flowerMesh2.instanceColor.needsUpdate = true;
+  scene.add(flowerMesh2);
+}
+
+// C1：池塘水面 — 2 个小型反射水面，高 metalness 低 roughness 模拟镜面反射
+// 放置在中高纬度（远离街道带），避开小屋门前
+const pondPositions = [
+  { lat: 0.55, lon: Math.PI * 0.15 },
+  { lat: -0.50, lon: Math.PI * 0.85 }
+];
+const pondMeshes = [];
+pondPositions.forEach(pp => {
+  const { n, east } = surfFrame(pp.lat, pp.lon);
+  const pondGeo = new THREE.CircleGeometry(2.2, 32);
+  const pondMat = new THREE.MeshStandardMaterial({
+    color: 0x2a4a6a, transparent: true, opacity: 0.78,
+    roughness: 0.08, metalness: 0.9,
+    emissive: 0x1a2a3a, emissiveIntensity: 0.15
+  });
+  const pond = new THREE.Mesh(pondGeo, pondMat);
+  pond.position.copy(n.clone().multiplyScalar(R + 0.02));
+  pond.quaternion.setFromRotationMatrix(basisMatrix(n, east));
+  pond.receiveShadow = true;
+  scene.add(pond);
+  pondMeshes.push(pond);
+  // 池塘边缘石（一圈矮石台）
+  const rimGeo = new THREE.RingGeometry(2.2, 2.5, 32);
+  const rim = new THREE.Mesh(rimGeo, new THREE.MeshStandardMaterial({ color: 0x9a948c, roughness: 0.9 }));
+  rim.position.copy(n.clone().multiplyScalar(R + 0.025));
+  rim.quaternion.setFromRotationMatrix(basisMatrix(n, east));
+  rim.receiveShadow = true;
+  scene.add(rim);
+});
+
+/* ============================================================
+ * 12. 小球（可被踢的 Cannon 刚体）
+ * ============================================================ */
+const ballR = CONFIG.physics.ballR;
+const ballBody = new CANNON.Body({ mass: 1, shape: new CANNON.Sphere(ballR) });
+// 出生在起点附近的街道上（便于立即踢球），非星球对侧
+{ const bn = surfFrame(SPAWN_LAT, 0.08).n; ballBody.position.set(bn.x * (R + ballR), bn.y * (R + ballR), bn.z * (R + ballR)); } // F9：街道带、靠近角色
+ballBody.linearDamping = 0.4;
+ballBody.angularDamping = 0.4; // BUG-06：角阻尼，使球被踢后旋转自然衰减
+world.addBody(ballBody);
+
+// F9：小球归位到起点附近街道（离角色过远或长时间远离时调用）
+function recallBall() {
+  const bn = surfFrame(SPAWN_LAT, 0.08).n;
+  ballBody.position.set(bn.x * (R + ballR), bn.y * (R + ballR), bn.z * (R + ballR));
+  ballBody.velocity.set(0, 0, 0);
+  ballBody.angularVelocity.set(0, 0, 0); // BUG-07：归位时重置角速度，避免球原地持续旋转
+}
+let ballFarSince = 0; // F9：小球“持续远离”计时
+
+const ball = new THREE.Mesh(
+  new THREE.SphereGeometry(ballR, 24, 18),
+  new THREE.MeshStandardMaterial({ color: '#FF8A5B', map: TEX.leather, roughness: 0.55, metalness: 0.05 })
+);
+ball.castShadow = true;
+scene.add(ball);
+
+/* ============================================================
+ * 13. 小男孩角色（白T恤蓝短裤，Cannon 刚体 + 几何体拼装，合并为 1 网格）
+ * ============================================================ */
+const charR = CONFIG.physics.charR;
+const charBody = new CANNON.Body({ mass: 5, shape: new CANNON.Sphere(charR) });
+charBody.fixedRotation = true;           // 禁止翻滚，朝向由我们手动控制
+charBody.updateMassProperties();
+{ const sn = surfFrame(SPAWN_LAT, 0).n; charBody.position.set(sn.x * (R + charR), sn.y * (R + charR), sn.z * (R + charR)); } // F9：出生在街道带、经度 0
+charBody.linearDamping = 0.0;
+world.addBody(charBody);
+
+const SKIN = '#F2C9A0', SHIRT = '#FFFFFF', SHORTS = '#4A90D9';
+const SHOE = '#2C2C3A', BELT = '#3a2a1a';
+const char = new THREE.Group();
+// V3：躯干 + 头部合并为主体网格（不含四肢，四肢独立以便行走动画）
+const charParts = [];
+// 腰带
+part(charParts, new THREE.BoxGeometry(0.72, 0.12, 0.52), BELT, T(0, 0.35, 0));
+// 短裤
+part(charParts, new THREE.BoxGeometry(0.7, 0.4, 0.5), SHORTS, T(0, 0.08, 0));
+// 上身（衬衫）
+part(charParts, new THREE.BoxGeometry(0.8, 0.7, 0.5), SHIRT, T(0, 0.6, 0));
+// 衣领
+part(charParts, new THREE.BoxGeometry(0.3, 0.08, 0.52), SHIRT, T(0, 0.97, 0));
+// 纽扣 x3
+part(charParts, new THREE.SphereGeometry(0.03, 8, 6), BELT, T(0, 0.75, 0.26));
+part(charParts, new THREE.SphereGeometry(0.03, 8, 6), BELT, T(0, 0.6, 0.26));
+part(charParts, new THREE.SphereGeometry(0.03, 8, 6), BELT, T(0, 0.45, 0.26));
+const charMesh = new THREE.Mesh(
+  mergeGeometries(charParts, false),
+  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })
+);
+charMesh.castShadow = true;
+char.add(charMesh);
+// V3：四肢独立 Mesh（行走动画用）
+const limbMat = new THREE.MeshStandardMaterial({ color: SKIN, vertexColors: true, roughness: 0.8 });
+const armMat = new THREE.MeshStandardMaterial({ color: SHIRT, vertexColors: true, roughness: 0.85 });
+const legMat = new THREE.MeshStandardMaterial({ color: SKIN, vertexColors: true, roughness: 0.8 });
+const shoeMat = new THREE.MeshStandardMaterial({ color: SHOE, roughness: 0.7 });
+// 左臂（pivot 在肩部）
+const leftArm = new THREE.Group();
+leftArm.position.set(-0.5, 0.95, 0);
+const leftArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.6, 0.18), armMat);
+leftArmMesh.position.y = -0.3; leftArmMesh.castShadow = true;
+leftArm.add(leftArmMesh);
+char.add(leftArm);
+// 右臂
+const rightArm = new THREE.Group();
+rightArm.position.set(0.5, 0.95, 0);
+const rightArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.6, 0.18), armMat);
+rightArmMesh.position.y = -0.3; rightArmMesh.castShadow = true;
+rightArm.add(rightArmMesh);
+char.add(rightArm);
+// 左腿（pivot 在髋部）
+const leftLeg = new THREE.Group();
+leftLeg.position.set(-0.2, 0.0, 0);
+const leftLegMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.5, 0.22), legMat);
+leftLegMesh.position.y = -0.25; leftLegMesh.castShadow = true;
+leftLeg.add(leftLegMesh);
+const leftShoe = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.32), shoeMat);
+leftShoe.position.set(0, -0.55, 0.05); leftShoe.castShadow = true;
+leftLeg.add(leftShoe);
+char.add(leftLeg);
+// 右腿
+const rightLeg = new THREE.Group();
+rightLeg.position.set(0.2, 0.0, 0);
+const rightLegMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.5, 0.22), legMat);
+rightLegMesh.position.y = -0.25; rightLegMesh.castShadow = true;
+rightLeg.add(rightLegMesh);
+const rightShoe = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.32), shoeMat);
+rightShoe.position.set(0, -0.55, 0.05); rightShoe.castShadow = true;
+rightLeg.add(rightShoe);
+char.add(rightLeg);
+// V3：头部 — 平滑球 + 皮肤纹理
+const head = new THREE.Mesh(
+  new THREE.SphereGeometry(0.34, 24, 18),
+  new THREE.MeshStandardMaterial({ color: SKIN, map: TEX.skin, roughness: 0.8 })
+);
+head.position.y = 1.15; head.castShadow = true;
+char.add(head);
+// V3：面部特征 — 眼睛 + 刘海
+const eyeMat = new THREE.MeshStandardMaterial({ color: '#1a1a2e', roughness: 0.3 });
+const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), eyeMat);
+leftEye.position.set(-0.1, 1.18, 0.3);
+char.add(leftEye);
+const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), eyeMat);
+rightEye.position.set(0.1, 1.18, 0.3);
+char.add(rightEye);
+// 刘海（半球覆盖头顶前部）
+const bangs = new THREE.Mesh(
+  new THREE.SphereGeometry(0.35, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2.5),
+  new THREE.MeshStandardMaterial({ color: '#3a2818', roughness: 0.9 })
+);
+bangs.position.set(0, 1.2, 0.05); bangs.rotation.x = -0.3;
+char.add(bangs);
+// A5：嘴 — 眼睛下方小弧条
+const mouth = new THREE.Mesh(
+  new THREE.BoxGeometry(0.1, 0.025, 0.02),
+  new THREE.MeshStandardMaterial({ color: '#9B6A4A', roughness: 0.7 })
+);
+mouth.position.set(0, 1.05, 0.32);
+char.add(mouth);
+scene.add(char);
+
+/* ============================================================
+ * 14. 输入与状态 —— 【核心逻辑，保留】
+ * ============================================================ */
+const keys = {};
+let running = false;       // Shift 奔跑
+let firstPerson = false;
+let inGame = false;        // 是否正在游戏（iframe 中）
+let nearHut = null;        // 当前靠近的小屋
+let returnHut = null;      // 返回后要归位的小屋
+const forward = new THREE.Vector3(0, 0, 1); // 角色当前前进切向（每帧重正交化）
+
+const TURN = CONFIG.physics.turn;          // 转向角速度 (rad/s)
+const SPEED = CONFIG.physics.speed, RUN_SPEED = CONFIG.physics.runSpeed;
+
+const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight']; // C7：模块级常量，避免每次按键重建数组
+addEventListener('keydown', e => {
+  if (inGame) return;
+  keys[e.code] = true;
+  if (MOVE_KEYS.includes(e.code)) e.preventDefault();
+  if (e.code === 'KeyC') firstPerson = !firstPerson;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') running = true;
+  if (e.code === 'Space') kickBall();
+  if (e.code === 'Enter' && nearHut) enterGame(nearHut);
+});
+addEventListener('keyup', e => {
+  keys[e.code] = false;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') running = false;
+});
+
+// F6：窗口失焦（如 Alt-Tab）时清空按键与奔跑状态，避免卡在奔跑
+addEventListener('blur', () => {
+  for (const k in keys) keys[k] = false;
+  running = false;
+  joyVec = { x: 0, y: 0 }; if (joyKnob) joyKnob.style.transform = 'translate(-50%,-50%)'; // BUG-11：失焦时也清空摇杆
+});
+
+// 移动端摇杆
+let joyVec = { x: 0, y: 0 };
+const joy = document.getElementById('joystick');
+const joyKnob = document.getElementById('joy-knob');
+let joyId = null;
+joy.addEventListener('touchstart', e => { joyId = e.changedTouches[0].identifier; moveJoy(e); }, { passive: false });
+joy.addEventListener('touchmove', e => { e.preventDefault(); moveJoy(e); }, { passive: false });
+joy.addEventListener('touchend', e => {
+  // F7：仅当抬起的手指是本摇杆跟踪的手指时才重置（多指触摸不误触）
+  for (const t of e.changedTouches) if (t.identifier === joyId) {
+    joyVec = { x: 0, y: 0 }; joyKnob.style.transform = 'translate(-50%,-50%)'; joyId = null;
+  }
+});
+joy.addEventListener('touchcancel', e => {  // F5：系统手势/来电打断时同样重置，避免摇杆卡住
+  for (const t of e.changedTouches) if (t.identifier === joyId) {
+    joyVec = { x: 0, y: 0 }; joyKnob.style.transform = 'translate(-50%,-50%)'; joyId = null;
+  }
+});
+function moveJoy(e) {
+  for (const t of e.changedTouches) if (t.identifier === joyId) {
+    const r = joy.getBoundingClientRect();
+    let dx = t.clientX - (r.left + r.width / 2);
+    let dy = t.clientY - (r.top + r.height / 2);
+    const max = r.width / 2;
+    const len = Math.hypot(dx, dy);
+    if (len > max) { dx *= max / len; dy *= max / len; }
+    joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    joyVec = { x: dx / max, y: dy / max };
+  }
+}
+document.getElementById('mb-run').addEventListener('touchstart', () => running = true);
+document.getElementById('mb-run').addEventListener('touchend', () => running = false);
+document.getElementById('mb-run').addEventListener('touchcancel', () => running = false); // F5：避免奔跑卡死
+document.getElementById('mb-cam').addEventListener('click', () => firstPerson = !firstPerson);
+document.getElementById('mb-kick').addEventListener('click', kickBall);
+document.getElementById('mb-enter').addEventListener('click', () => { if (nearHut) enterGame(nearHut); });
+
+/* ============================================================
+ * 15. 踢球 —— 【核心逻辑，保留】
+ * ============================================================ */
+// U4：踢球音效（Web Audio 轻量蜂鸣；首次需用户手势激活，踢球本身即手势）
+let _audioCtx = null;
+function playKick() {
+  try {
+    _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    const o = _audioCtx.createOscillator(), g = _audioCtx.createGain();
+    o.type = 'triangle'; o.frequency.value = 320;
+    g.gain.setValueAtTime(0.18, _audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.18);
+    o.connect(g); g.connect(_audioCtx.destination);
+    o.start(); o.stop(_audioCtx.currentTime + 0.2);
+    startAmbient(); // #10：首次踢球（用户手势）后启动环境氛围音
+  } catch (e) { /* 音频不可用时静默忽略 */ }
+}
+// #10：环境氛围音 — 低频 pad 持续音 + 行走脚步声
+// 注意自动播放策略：浏览器禁止页面加载即播放音频，需用户首次手势激活。
+// _audioCtx 在 playKick 首次调用时创建并 resume，此时才启动 ambient。
+let _ambientStarted = false;
+let _lastStepTime = 0;
+function startAmbient() {
+  if (_ambientStarted || !_audioCtx) return;
+  _ambientStarted = true;
+  try {
+    // 低频持续 pad：两个低音振荡器 + 低通滤波，营造黄昏静谧氛围
+    const o1 = _audioCtx.createOscillator(), o2 = _audioCtx.createOscillator();
+    const g = _audioCtx.createGain(), f = _audioCtx.createBiquadFilter();
+    o1.type = 'sine'; o1.frequency.value = 55;   // A1 低音
+    o2.type = 'sine'; o2.frequency.value = 82.4; // E2 五度音
+    f.type = 'lowpass'; f.frequency.value = 200;
+    g.gain.setValueAtTime(0, _audioCtx.currentTime);
+    g.gain.linearRampToValueAtTime(0.04, _audioCtx.currentTime + 3); // 3 秒淡入
+    o1.connect(f); o2.connect(f); f.connect(g); g.connect(_audioCtx.destination);
+    o1.start(); o2.start();
+  } catch (e) { /* 环境音不可用静默 */ }
+}
+// #10：脚步声 — 行走时按 swingFreq 节奏触发短促低频脉冲
+function playStep() {
+  if (!_audioCtx || REDUCE) return;
+  try {
+    const o = _audioCtx.createOscillator(), g = _audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = 120;
+    g.gain.setValueAtTime(0.06, _audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.08);
+    o.connect(g); g.connect(_audioCtx.destination);
+    o.start(); o.stop(_audioCtx.currentTime + 0.1);
+  } catch (e) { /* 静默 */ }
+}
+// #11：踢球冷却 + 瞄准反馈
+let _kickLastTime = 0; // 上次踢球时间戳（秒）
+const _kickRing = new THREE.Mesh(
+  new THREE.RingGeometry(0.4, 0.55, 24),
+  new THREE.MeshBasicMaterial({ color: 0xffd066, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false })
+);
+_kickRing.visible = false;
+scene.add(_kickRing);
+
+function kickBall() {
+  if (inGame) return;
+  // #11：冷却防连踢
+  const nowT = performance.now() / 1000;
+  if (nowT - _kickLastTime < CONFIG.physics.kick.cooldown) return;
+  const kc = CONFIG.physics.kick;
+  const d = charBody.position.distanceTo(ballBody.position);
+  if (d < kc.range && d > 1e-3) {
+    _kickLastTime = nowT;
+    const dir = ballBody.position.vsub(charBody.position); // 角色 → 小球
+    const up = new CANNON.Vec3(charBody.position.x, charBody.position.y, charBody.position.z);
+    up.normalize(); // F1：球面局部“上”= 指向球心的径向，而非世界 Y
+    // 去掉沿地心方向的向下分量，使球沿地表切线被踢出；再沿局部 up 轻微抬升，避免踢进地面
+    const along = dir.dot(up);
+    dir.set(dir.x - up.x * along, dir.y - up.y * along, dir.z - up.z * along);
+    if (dir.length() < 1e-4) dir.set(forward.x, forward.y, forward.z); // 退化守卫：球恰在脚正上方时沿前进方向踢
+    dir.normalize();
+    const imp = dir.scale(kc.impulse).vadd(up.scale(kc.liftRatio * kc.impulse)); // 切向冲量 + 局部 up 抬升
+    ballBody.applyImpulse(imp, ballBody.position);
+    playKick(); // U4
+  }
+}
+
+/* ============================================================
+ * 16. 进入 / 返回游戏 —— 【核心逻辑，保留完整状态机】
+ * ============================================================ */
+const fade = document.getElementById('fade');
+const gameLayer = document.getElementById('game-layer');
+const gameFrame = document.getElementById('game-frame');
+const returnBtn = document.getElementById('return-btn');
+const enterPrompt = document.getElementById('enter-prompt');
+const gameError = document.getElementById('game-error'); // F4/A-6：小游戏加载失败时的提示覆盖层
+let pendingEnter = null;   // F2：进入中待通知的小屋（load 完成后才 postMessage）
+let loadTimer = null;      // A-6/F-4：小游戏加载超时计时器
+
+// U3/F-7：iframe 加载完成后（跨域也会触发 load）才揭开渐黑层，避免长时间白屏；
+// F2：导航完成后再通知游戏页已进入（contentWindow 此时才是真实游戏页，而非 about:blank）。
+gameFrame.addEventListener('load', () => {
+  clearTimeout(loadTimer);
+  fade.classList.remove('on');
+  if (pendingEnter) {
+    try { gameFrame.contentWindow.postMessage({ action: 'planetEnter' }, '*'); } catch (e) {}
+    pendingEnter = null;
+  }
+});
+
+const FADE_MS = 500; // C6：与 CSS 过渡时长（.5s）一致，避免硬编码 520 与 UI 不同步
+function fadeTo(on, cb) {
+  fade.classList.toggle('on', on);
+  setTimeout(cb, FADE_MS);
+}
+
+// 进入小屋动画：镜头推向门 + 门发光扩散 + 渐黑，分三步完成更有仪式感
+// 总时长 ≈ 700ms（推近 200ms + 发光扩散 300ms + 渐黑 500ms，部分重叠）
+function enterAnim(hut, cb) {
+  if (!hut || !hut.doorMesh || !camera) { fadeTo(true, cb); return; }
+  const startPos = camera.position.clone();
+  const startFov = camera.fov;
+  const doorPos = hut.doorMesh.getWorldPosition(new THREE.Vector3());
+  const doorNormal = hut.doorMesh.getWorldDirection(new THREE.Vector3()).negate();
+  const targetPos = doorPos.clone().addScaledVector(doorNormal, 1.5);
+  const targetFov = 35;
+  const pushStart = performance.now();
+  const pushDur = 280;
+  const origEmissive = hut.doorMat.emissiveIntensity;
+  hut.doorMat.emissiveIntensity = 1.5; // 瞬间点亮门
+  function _pushStep() {
+    const t = Math.min(1, (performance.now() - pushStart) / pushDur);
+    const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
+    camera.position.lerpVectors(startPos, targetPos, e);
+    camera.fov = startFov + (targetFov - startFov) * e;
+    camera.updateProjectionMatrix();
+    hut.doorMat.emissiveIntensity = 1.5 + e * 2.0; // 发光扩散到 3.5
+    if (t < 1) {
+      requestAnimationFrame(_pushStep);
+    } else {
+      fadeTo(true, () => {
+        hut.doorMat.emissiveIntensity = origEmissive;
+        camera.fov = startFov; camera.updateProjectionMatrix();
+        cb();
+      });
+    }
+  }
+  _pushStep();
+}
+
+function showGameError() {           // A-6/F-4：小游戏加载失败（超时/error）时显示提示覆盖层
+  clearTimeout(loadTimer);
+  fade.classList.remove('on');
+  gameError.style.display = 'flex';
+}
+function enterGame(hut) {
+  if (inGame) return; // BUG-01：防止双击/重复触发产生孤儿计时器和假错误弹窗
+  inGame = true;
+  for (const k in keys) keys[k] = false; running = false; // 进入前清空按键态，避免返回后误触发移动
+  joyVec = { x: 0, y: 0 }; if (joyKnob) joyKnob.style.transform = 'translate(-50%,-50%)'; // BUG-11：清空摇杆，避免 iframe 截获 touchend 后角色自动移动
+  returnHut = hut;
+  pendingEnter = hut;
+  // 用进入动画（镜头推近 + 门发光 + 渐黑）替代硬切 fadeTo
+  enterAnim(hut, () => {
+    cancelAnimationFrame(rafId); // 动画完成后再暂停主循环
+    gameError.style.display = 'none';
+    gameFrame.src = hut.cfg.url;     // 全屏 iframe 加载对应游戏页
+    gameLayer.style.display = 'block';
+    returnBtn.style.display = 'block';
+    enterPrompt.classList.remove('show');
+    loadTimer = setTimeout(showGameError, 12000); // A-6/F-4：12s 未加载完成则提示失败
+  });
+}
+
+let isLeaving = false; // F10：防止重复触发返回（连点"返回星球"会叠加多次 leaveGame）
+function leaveGame() {
+  if (isLeaving) return;
+  isLeaving = true;
+  fadeTo(true, () => {
+    clearTimeout(loadTimer); gameError.style.display = 'none'; pendingEnter = null; // A-6/F-4：清理进入态
+    gameFrame.src = 'about:blank';   // 停止游戏运行
+    gameLayer.style.display = 'none';
+    returnBtn.style.display = 'none';
+    // 角色归位到小屋门口"街道侧"（BUG-02 修复：doorWorld 含门中心 Y 偏移 1.05m，需减去改为角色高度）
+    let spawnPos = null;
+    if (returnHut) {
+      const p = returnHut.doorWorld.clone()
+        .add(returnHut.up.clone().multiplyScalar(charR + 0.1 - 1.05))
+        .add(returnHut.innerDir.clone().multiplyScalar(CONFIG.spawnOffset));
+      charBody.position.set(p.x, p.y, p.z);
+      charBody.velocity.set(0, 0, 0);
+      forward.copy(returnHut.innerDir); // 面向街道
+      spawnPos = p.clone();
+    }
+    inGame = false;
+    isLeaving = false;
+    // 先放一帧确保物理/角色位置正确
+    rafId = requestAnimationFrame(loop);
+    window.focus(); // F2：返回后夺回父窗口键盘焦点
+    // 弹出动画：从门出发，镜头拉远 + 角色轻微弹跳
+    if (returnHut && spawnPos) _exitAnim(returnHut, spawnPos);
+    else fadeTo(false, () => {});
+  });
+}
+
+function _exitAnim(hut, spawnPos) {
+  const startFov = 35;
+  const endFov = camera.fov;
+  // 起点：靠近门的近距离视角
+  const doorPos = hut.doorMesh.getWorldPosition(new THREE.Vector3());
+  const doorNormal = hut.doorMesh.getWorldDirection(new THREE.Vector3()).negate();
+  const startCam = doorPos.clone().addScaledVector(doorNormal, 1.5);
+  // 终点：当前相机位置（loop 已开始更新）
+  const origEmissive = hut.doorMat.emissiveIntensity;
+  hut.doorMat.emissiveIntensity = 3.0;
+  const animStart = performance.now();
+  const dur = 450;
+  function _step() {
+    const t = Math.min(1, (performance.now() - animStart) / dur);
+    const e = 1 - Math.pow(1 - t, 2.5); // easeOutQuart
+    // 相机从近拉远
+    const currentTarget = charBody.position.clone().addScaledVector(tmpUp, 1.5);
+    const camTarget = startCam.clone().lerp(currentTarget, e);
+    camera.position.lerp(camTarget, 0.3);
+    camera.fov = startFov + (endFov - startFov) * e;
+    camera.updateProjectionMatrix();
+    // 发光衰减
+    hut.doorMat.emissiveIntensity = 3.0 * (1 - e) + origEmissive * e;
+    // 渐黑揭开
+    fade.style.opacity = String(1 - e);
+    if (t < 1) {
+      requestAnimationFrame(_step);
+    } else {
+      fade.classList.remove('on');
+      fade.style.opacity = '';
+      hut.doorMat.emissiveIntensity = origEmissive;
+      camera.fov = endFov; camera.updateProjectionMatrix();
+    }
+  }
+  _step();
+}
+returnBtn.addEventListener('click', leaveGame);
+document.getElementById('game-error-btn').addEventListener('click', leaveGame); // A-6/F-4
+
+// 监听游戏页发来的返回消息（游戏页内可加：parent.postMessage({action:'returnToPlanet'},'*')）
+addEventListener('message', e => {
+  if (e.data && e.data.action === 'returnToPlanet') leaveGame();
+});
+
+// U7：设置面板（阴影 / 泛光 / 重置角色）
+const setBtn = document.getElementById('settings-btn');
+const setPanel = document.getElementById('settings-panel');
+setBtn.addEventListener('click', () => {
+  const show = setPanel.style.display !== 'block';
+  setPanel.style.display = show ? 'block' : 'none';
+  if (show) { const f = setPanel.querySelector('input,button'); if (f) f.focus(); } // U4：打开时聚焦首个控件
+});
+// U4：Esc 关闭设置面板并归还焦点
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && setPanel.style.display === 'block') { setPanel.style.display = 'none'; setBtn.focus(); }
+});
+// #4：设置持久化 — 读写 localStorage，跨会话保留偏好
+const SETTINGS_KEY = 'planet.settings';
+// 性能复位：版本号变更时，丢弃旧的高开销设置（bloom/ssao/dof），强制走保守默认。
+// 之前测试时手动开启的 SSAO/景深会持久化导致刷新后仍卡，此处一次性清除。
+const SETTINGS_VERSION = 2;
+function loadSettings() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+    if (raw._v !== SETTINGS_VERSION) {
+      // 版本不匹配：清除高开销项，仅保留无害的 shadow 偏好
+      delete raw.bloom; delete raw.ssao; delete raw.dof;
+      raw._v = SETTINGS_VERSION;
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(raw)); } catch (e) {}
+    }
+    return raw;
+  } catch (e) { return {}; }
+}
+function saveSettings(s) {
+  s._v = SETTINGS_VERSION;
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch (e) { /* 隐私模式无 localStorage 静默 */ }
+}
+const savedSettings = loadSettings();
+// 性能治理：SSAO/景深默认关闭（CONFIG.render.ssao/dof = false），仅当用户曾手动开启才保持
+let ssaoEnabled = savedSettings.ssao !== undefined ? savedSettings.ssao : CONFIG.render.ssao;
+let dofEnabled = savedSettings.dof !== undefined ? savedSettings.dof : CONFIG.render.dof;
+if (savedSettings.shadow !== undefined) {
+  document.getElementById('set-shadow').checked = savedSettings.shadow;
+  sun.castShadow = savedSettings.shadow; // BUG修复：同步实际阴影状态，否则刷新后 checkbox 与 sun.castShadow 不一致
+}
+if (savedSettings.bloom !== undefined) bloomEnabled = savedSettings.bloom;
+
+document.getElementById('set-shadow').addEventListener('change', e => {
+  sun.castShadow = e.target.checked;
+  renderer.shadowMap.needsUpdate = true;
+  saveSettings(Object.assign(loadSettings(), { shadow: e.target.checked }));
+});
+const setBloom = document.getElementById('set-bloom');
+setBloom.checked = bloomEnabled;
+setBloom.addEventListener('change', e => {
+  bloomEnabled = e.target.checked;
+  if (bloomEnabled && !composer) buildComposer();
+  if (composer && composer._ssaoPass) composer._ssaoPass.enabled = ssaoEnabled; // 重建后同步 SSAO 状态
+  if (composer && composer._bokehPass) composer._bokehPass.enabled = dofEnabled; // 重建后同步景深状态
+  applyColorMode();
+  saveSettings(Object.assign(loadSettings(), { bloom: bloomEnabled }));
+});
+// #3：SSAO 运行时开关 — pass.enabled=false 跳过该 Pass，无需重建管线
+const setSsao = document.getElementById('set-ssao');
+setSsao.checked = ssaoEnabled;
+setSsao.addEventListener('change', e => {
+  ssaoEnabled = e.target.checked;
+  if (composer && composer._ssaoPass) composer._ssaoPass.enabled = ssaoEnabled;
+  saveSettings(Object.assign(loadSettings(), { ssao: ssaoEnabled }));
+});
+// #3：景深运行时开关
+const setDof = document.getElementById('set-dof');
+setDof.checked = dofEnabled;
+setDof.addEventListener('change', e => {
+  dofEnabled = e.target.checked;
+  if (composer && composer._bokehPass) composer._bokehPass.enabled = dofEnabled;
+  saveSettings(Object.assign(loadSettings(), { dof: dofEnabled }));
+});
+// 初始化时同步 Pass 开关状态（buildComposer 在此之前已执行）
+if (composer && composer._ssaoPass) composer._ssaoPass.enabled = ssaoEnabled;
+if (composer && composer._bokehPass) composer._bokehPass.enabled = dofEnabled;
+document.getElementById('set-reset').addEventListener('click', () => {
+  const sn = surfFrame(SPAWN_LAT, 0).n;
+  charBody.position.set(sn.x * (R + charR), sn.y * (R + charR), sn.z * (R + charR));
+  charBody.velocity.set(0, 0, 0);
+  forward.set(0, 0, 1);
+  recallBall(); // BUG-15：重置时同时召回小球，避免球卡远处无法恢复
+});
+
+/* ============================================================
+ * 17. 每帧更新：物理步进 + 球面行走 + 朝向 + 相机 + 交互判定
+ *     —— 物理/控制/相机逻辑保留；仅“门发光”改为霓虹呼吸。
+ * ============================================================ */
+const tmpUp = new THREE.Vector3();
+const tmpFwd = new THREE.Vector3();
+const tmpRight = new THREE.Vector3();
+const camTarget = new THREE.Vector3();
+// 复用的临时对象（避免每帧 GC 分配，保障 120fps 目标）
+const _q = new THREE.Quaternion();
+const _m = new THREE.Matrix4();
+const _ballUp = new THREE.Vector3();
+const _look = new THREE.Vector3();
+const _camPos = new THREE.Vector3(); // #7：相机目标位置临时向量（lerp 过渡用）
+const _ringZ = new THREE.Vector3(0, 0, 1); // #11：Ring 默认法线常量（避免每帧 new）
+const _gf = new CANNON.Vec3(0, 0, 0);
+const _bg = new CANNON.Vec3(0, 0, 0);
+const _zeroVec = new CANNON.Vec3(0, 0, 0); // #2：复用施力相对点，避免每帧 new 分配
+// 性能复位：emissive 条件写入追踪变量（避免每帧全量写 10+ 个 uniform）
+let _lastWinBreath = -1;       // 上次玻璃呼吸量化值
+let _lastLitDoor = null;       // 上次高亮的门
+let _lastDoorBreathQ = -1;     // 上次门呼吸量化值
+
+function update(dt) {
+  const pos = charBody.position;
+  tmpUp.set(pos.x, pos.y, pos.z).normalize();          // 星球法线 = 角色“上”
+  // 重正交化前进向量，使其严格切于球面
+  forward.addScaledVector(tmpUp, -forward.dot(tmpUp)).normalize();
+
+  // 输入：A/D 转向，W/S 前后（摇杆 y 为前后、x 为转向）
+  let turn = 0, move = 0;
+  if (keys['KeyA']) turn += 1;
+  if (keys['KeyD']) turn -= 1;
+  if (keys['KeyW']) move += 1;
+  if (keys['KeyS']) move -= 1;
+  turn -= joyVec.x;          // 摇杆左右 = 转向
+  move -= joyVec.y;          // 摇杆上下 = 前后
+  if (turn !== 0) {
+    _q.setFromAxisAngle(tmpUp, turn * TURN * dt);
+    forward.applyQuaternion(_q);
+  }
+
+  // 设定切向速度（保留径向分量，使物理重力维持贴地）
+  const speed = (running ? RUN_SPEED : SPEED) * Math.max(-1, Math.min(1, move));
+  tmpFwd.copy(forward).multiplyScalar(speed);
+  tmpRight.crossVectors(tmpUp, forward);
+  if (tmpRight.lengthSq() < 1e-8) tmpRight.set(1, 0, 0); else tmpRight.normalize();
+  const radial = charBody.velocity.dot(tmpUp);
+  const vx = tmpFwd.x + tmpUp.x * radial;
+  const vy = tmpFwd.y + tmpUp.y * radial;
+  const vz = tmpFwd.z + tmpUp.z * radial;
+  charBody.velocity.set(vx, vy, vz);
+
+  // 对角色施加径向重力（指向球心）
+  _gf.set(-pos.x, -pos.y, -pos.z);
+  _gf.normalize(); _gf.scale(G * charBody.mass, _gf);
+  charBody.applyForce(_gf, _zeroVec); // BUG-09 修复：相对点应为(0,0,0)而非绝对位置；#2：复用 _zeroVec
+  // 对小球施加径向重力
+  _bg.set(-ballBody.position.x, -ballBody.position.y, -ballBody.position.z);
+  _bg.normalize(); _bg.scale(G * ballBody.mass, _bg);
+  ballBody.applyForce(_bg, _zeroVec); // BUG-09 修复：同上；#2：复用 _zeroVec
+
+  // 物理步进
+  world.step(1 / 60, dt, CONFIG.render.subSteps); // P6
+
+  // P2：阴影相机跟随角色（局部视锥），提高有效分辨率、降低整球阴影开销
+  sun.target.position.copy(charBody.interpolatedPosition);
+  sun.position.copy(charBody.interpolatedPosition).addScaledVector(SUN_DIR, SUN_DIST);
+  // Rim Light 同样跟随角色，从背面勾边
+  rimLight.target.position.copy(charBody.interpolatedPosition);
+  rimLight.position.copy(charBody.interpolatedPosition).addScaledVector(SUN_DIR, -SUN_DIST).setY(charBody.interpolatedPosition.y + 10);
+  sun.target.updateMatrixWorld();
+
+  // 同步角色网格（沿法线微抬，使脚底贴合抬高后的路面，消除陷入感）
+  // 用 interpolatedPosition 渲染：物理固定 60Hz 步进，但渲染可在 120Hz 插值，消除高刷屏下的阶梯微卡顿
+  char.position.copy(charBody.interpolatedPosition).addScaledVector(tmpUp, CONFIG.camera.charLift);
+  _m.makeBasis(tmpRight, tmpUp, forward);
+  char.quaternion.setFromRotationMatrix(_m);
+
+  // V3：行走动画 — 四肢按移动速度 sin 摆动，奔跑时身体前倾 + 幅度加倍
+  const moveSpeed = charBody.velocity.length();
+  const isMoving = moveSpeed > 0.5;
+  const swingFreq = running ? 12 : 8;
+  const swingAmp = (running ? 0.5 : 0.3) * Math.min(moveSpeed / SPEED, 1.5);
+  const t = performance.now() / 1000;
+  if (isMoving) {
+    const s = Math.sin(t * swingFreq) * swingAmp;
+    leftArm.rotation.x = s;
+    rightArm.rotation.x = -s;
+    leftLeg.rotation.x = -s * 0.7;
+    rightLeg.rotation.x = s * 0.7;
+    // 奔跑前倾
+    if (running) charMesh.rotation.x = 0.26;
+    else charMesh.rotation.x = 0;
+    // #10：脚步声 — 每半个摆动周期触发一次（脚落地时）
+    const stepInterval = Math.PI / swingFreq; // 半周期
+    if (t - _lastStepTime > stepInterval) {
+      _lastStepTime = t;
+      playStep();
+    }
+  } else {
+    // 静止归位
+    leftArm.rotation.x *= 0.8;
+    rightArm.rotation.x *= 0.8;
+    leftLeg.rotation.x *= 0.8;
+    rightLeg.rotation.x *= 0.8;
+    charMesh.rotation.x *= 0.8;
+  }
+
+  // A1：萤火虫粒子每帧更新 — sin 漂移 + 整体闪烁
+  // #12：REDUCE 时跳过装饰性动画
+  if (fireflyPoints && !REDUCE) {
+    const ffPosAttr = fireflyPoints.geometry.attributes.position;
+    const ffPhaseAttr = fireflyPoints.geometry.attributes.aPhase;
+    const ffBase = fireflyPoints.userData.base;
+    for (let i = 0; i < ffPosAttr.count; i++) {
+      const ph = ffPhaseAttr.array[i];
+      ffPosAttr.array[i * 3]     = ffBase[i * 3]     + Math.sin(t * 0.7 + ph) * 0.3;
+      ffPosAttr.array[i * 3 + 1] = ffBase[i * 3 + 1] + Math.cos(t * 0.5 + ph) * 0.2;
+      ffPosAttr.array[i * 3 + 2] = ffBase[i * 3 + 2] + Math.sin(t * 0.6 + ph * 1.3) * 0.3;
+    }
+    ffPosAttr.needsUpdate = true;
+    fireflyPoints.material.opacity = 0.6 + 0.4 * Math.abs(Math.sin(t * 2));
+  }
+
+  // A1：落叶粒子每帧更新 — 径向下落（指向球心） + 落地重置
+  // BUG修复：球形星球上"下落"应沿径向（指向球心），原实现用固定世界-y速度，
+  //         会导致赤道下方(lat<0)的粒子反而远离球心，永远不落地。
+  // #12：REDUCE 时跳过
+  if (leafPoints && !REDUCE) {
+    const lfPosAttr = leafPoints.geometry.attributes.position;
+    const lfVel = leafPoints.userData.vel; // [0]=下落速度(标量,>0表示落向球心), [1]=切向漂移x, [2]=切向漂移z
+    for (let i = 0; i < lfPosAttr.count; i++) {
+      const px = lfPosAttr.array[i * 3], py = lfPosAttr.array[i * 3 + 1], pz = lfPosAttr.array[i * 3 + 2];
+      const dist = Math.sqrt(px * px + py * py + pz * pz) || 1;
+      // 径向单位向量（指向远离球心），下落 = 沿 -径向 移动
+      const nx = px / dist, ny = py / dist, nz = pz / dist;
+      const fall = lfVel[i * 3 + 1]; // 下落速度（原存储在 y 分量，值为负数）
+      lfPosAttr.array[i * 3]     += (-nx * (-fall) + lfVel[i * 3])     * dt;
+      lfPosAttr.array[i * 3 + 1] += (-ny * (-fall))                     * dt;
+      lfPosAttr.array[i * 3 + 2] += (-nz * (-fall) + lfVel[i * 3 + 2]) * dt;
+      // 落地重置：距球心 < R+0.5 表示接近地面
+      const px2 = lfPosAttr.array[i * 3], py2 = lfPosAttr.array[i * 3 + 1], pz2 = lfPosAttr.array[i * 3 + 2];
+      if (Math.sqrt(px2 * px2 + py2 * py2 + pz2 * pz2) < R + 0.5) {
+        const lon = Math.random() * Math.PI * 2;
+        const lat = (Math.random() - 0.5) * 0.4;
+        const r = R + 3 + Math.random() * 4;
+        lfPosAttr.array[i * 3]     = Math.cos(lat) * Math.cos(lon) * r;
+        lfPosAttr.array[i * 3 + 1] = Math.sin(lat) * r;
+        lfPosAttr.array[i * 3 + 2] = Math.cos(lat) * Math.sin(lon) * r;
+      }
+    }
+    lfPosAttr.needsUpdate = true;
+    leafPoints.rotation.z += dt * 0.5; // 整体微旋转模拟翻转
+  }
+
+  // B3：窗户灯光呼吸 — emissiveIntensity 随时间微弱起伏（模拟屋内活动）
+  // 性能复位：量化到 1 位小数，值不变时跳过 10 个 uniform 写入（每秒仅约 6 次实际写入）
+  const winBreath = 0.5 + 0.15 * Math.sin(t * 1.5);
+  const winBreathQ = Math.round(winBreath * 10) / 10;
+  if (winBreathQ !== _lastWinBreath) {
+    _lastWinBreath = winBreathQ;
+    huts.forEach(h => { if (h.glassMat) h.glassMat.emissiveIntensity = winBreathQ; });
+  }
+
+  // A4：植被风感（桌面端）— 整体微小 scale 起伏模拟"风吹草动"
+  // 注：散布在球面的 InstancedMesh 不能用 rotation（会让实例绕世界原点摆动偏离地面），
+  //     改用 scale 微小起伏（1±0.01），视觉上如微风拂过，不改变实例位置。
+  // #12：REDUCE 时跳过
+  if (!IS_COARSE && !REDUCE && treeMesh) {
+    const s = 1 + 0.008 * Math.sin(t * 0.5);
+    treeMesh.scale.setScalar(s);
+  }
+  if (!IS_COARSE && !REDUCE && grassMesh) {
+    const s = 1 + 0.012 * Math.sin(t * 0.7 + 0.5);
+    grassMesh.scale.setScalar(s);
+  }
+
+  // D1：景深 focus 跟随相机到角色的距离，保持主角清晰、远处模糊
+  if (composer && composer._bokehPass) {
+    composer._bokehPass.uniforms.focus.value = camera.position.distanceTo(charBody.interpolatedPosition);
+  }
+
+  // #11：踢球瞄准环 — 在踢球范围内时显示在球下方，平贴球面
+  // 用 interpolatedPosition 与小球渲染位置一致，避免物理步进抖动
+  const _ballDist = charBody.position.distanceTo(ballBody.interpolatedPosition);
+  if (_ballDist < CONFIG.physics.kick.range && _ballDist > 1e-3) {
+    const bn = _ballUp.copy(ballBody.interpolatedPosition).normalize(); // 球位置的法线
+    _kickRing.position.copy(ballBody.interpolatedPosition).addScaledVector(bn, -0.45); // 略低于球，贴地
+    _kickRing.quaternion.setFromUnitVectors(_ringZ, bn); // Ring 默认朝 Z，旋转到法线方向
+    _kickRing.visible = true;
+  } else {
+    _kickRing.visible = false;
+  }
+
+  // 同步小球（同理微抬，使其停在路面上）
+  _ballUp.copy(ballBody.interpolatedPosition).normalize();
+  ball.position.copy(ballBody.interpolatedPosition).addScaledVector(_ballUp, CONFIG.camera.ballLift);
+
+  // F9：小球离角色过远（>ballRecallDist）或长时间远离（>25m 持续 10s）时自动归位，避免失联/卡屋后
+  const ballDist = ballBody.position.distanceTo(charBody.position);
+  if (ballDist > CONFIG.ballRecallDist) {
+    recallBall(); ballFarSince = 0;
+  } else if (ballDist > 25) {
+    if (!ballFarSince) ballFarSince = performance.now();
+    else if (performance.now() - ballFarSince > 10000) { recallBall(); ballFarSince = 0; }
+  } else ballFarSince = 0;
+
+  // 相机（第三人称：角色身后上方；第一人称：角色眼位）
+  // #7：切换时位置 lerp 过渡（系数 0.15，约 0.2s 完成），避免视角突变眩晕
+  // #9：参数从 CONFIG.camera 读取
+  const cam = CONFIG.camera;
+  if (firstPerson) {
+    char.visible = false; // F8：第一人称隐藏自身模型，避免看到身体/头部内部穿模
+    camTarget.copy(charBody.interpolatedPosition).addScaledVector(tmpUp, cam.eyeUp).addScaledVector(forward, cam.eyeFwd);
+    camera.position.lerp(camTarget, cam.lerp);
+    camera.up.copy(tmpUp);
+    _look.copy(camTarget).add(forward);
+    camera.lookAt(_look);
+  } else {
+    char.visible = true;
+    camTarget.copy(charBody.interpolatedPosition).addScaledVector(tmpUp, cam.eyeUp);
+    _camPos.copy(charBody.interpolatedPosition).addScaledVector(tmpUp, cam.thirdUp).addScaledVector(forward, -cam.thirdBack);
+    camera.position.lerp(_camPos, cam.lerp);
+    camera.up.copy(tmpUp);
+    camera.lookAt(camTarget);
+  }
+
+  // 交互判定：距门 < enterDist → 霓虹呼吸发光 + 提示
+  let best = null, bestD = CONFIG.enterDist;
+  huts.forEach(h => {
+    const d = charBody.interpolatedPosition.distanceTo(h.doorWorld);
+    if (d < bestD) { bestD = d; best = h; }
+  });
+  // 性能复位：仅在门切换或呼吸值变化时写 uniform，避免每帧全量清零 10 个门
+  if (best !== _lastLitDoor) {
+    if (_lastLitDoor) _lastLitDoor.doorMat.emissiveIntensity = 0;
+    _lastLitDoor = best;
+    _lastDoorBreathQ = -1; // 强制下次重写
+  }
+  if (best !== nearHut) {
+    nearHut = best;
+    if (best) enterPrompt.innerHTML = IS_COARSE
+      ? `点“进入”进入《${best.cfg.name}》`
+      : `按 <b>Enter</b> 键进入《${best.cfg.name}》`;
+  }
+  enterPrompt.classList.toggle('show', !!best); // 返回后若仍在门口，提示自动恢复
+  if (best) {
+    const breath = 0.5 + 0.5 * Math.abs(Math.sin(performance.now() * 0.0032)); // 呼吸节律
+    const breathQ = Math.round(breath * 10) / 10;
+    if (breathQ !== _lastDoorBreathQ) {
+      _lastDoorBreathQ = breathQ;
+      best.doorMat.emissiveIntensity = breathQ; // 门霓虹呼吸
+    }
+  }
+}
+
+/* ============================================================
+ * 17.5 小地图（U2）：环形 10 屋 + 玩家位置/朝向箭头，解决球面迷路
+ * ============================================================ */
+const mini = document.getElementById('minimap');
+const mctx = mini.getContext('2d');
+const MM = mini.width;
+function drawMinimap() {
+  const S = MM, c = mctx, cx = S / 2, cy = S / 2, Rr = S / 2 - 14;
+  c.clearRect(0, 0, S, S);
+
+  const innerR = Rr * 0.6;
+  c.strokeStyle = 'rgba(212, 171, 106, 0.15)';
+  c.lineWidth = 1;
+  c.setLineDash([2, 3]);
+  c.beginPath(); c.arc(cx, cy, innerR, 0, Math.PI * 2); c.stroke();
+  c.setLineDash([]);
+
+  c.strokeStyle = 'rgba(212, 171, 106, 0.25)';
+  c.lineWidth = 1.5;
+  c.beginPath(); c.arc(cx, cy, Rr, 0, Math.PI * 2); c.stroke();
+
+  huts.forEach(h => {
+    const a = h.cfg.lon, x = cx + Math.cos(a) * Rr, y = cy + Math.sin(a) * Rr;
+    c.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    c.beginPath(); c.arc(x + 1, y + 1, 4.5, 0, Math.PI * 2); c.fill();
+
+    c.fillStyle = h.colorHex;
+    c.beginPath(); c.arc(x, y, 4.5, 0, Math.PI * 2); c.fill();
+
+    c.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    c.beginPath(); c.arc(x - 1.5, y - 1.5, 1.5, 0, Math.PI * 2); c.fill();
+
+    if (h === nearHut) {
+      const t = performance.now() / 300;
+      const pulse = 0.5 + 0.5 * Math.sin(t);
+      c.strokeStyle = `rgba(212, 171, 106, ${0.4 + 0.6 * pulse})`;
+      c.lineWidth = 2;
+      c.beginPath(); c.arc(x, y, 9 + pulse * 2, 0, Math.PI * 2); c.stroke();
+
+      c.strokeStyle = 'rgba(212, 171, 106, 0.8)';
+      c.lineWidth = 1.5;
+      c.beginPath(); c.arc(x, y, 7, 0, Math.PI * 2); c.stroke();
+    }
+  });
+  const p = charBody.interpolatedPosition;
+  const plon = Math.atan2(p.z, p.x);
+  const px = cx + Math.cos(plon) * Rr, py = cy + Math.sin(plon) * Rr;
+  const fa = Math.atan2(forward.z, forward.x);
+  c.save(); c.translate(px, py); c.rotate(fa);
+
+  c.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  c.beginPath(); c.moveTo(8, 1); c.lineTo(-4, -3); c.lineTo(-4, 5); c.closePath(); c.fill();
+
+  const grad = c.createLinearGradient(-5, 0, 8, 0);
+  grad.addColorStop(0, '#D4AB6A');
+  grad.addColorStop(1, '#E8D4A8');
+  c.fillStyle = grad;
+  c.beginPath(); c.moveTo(8, 0); c.lineTo(-5, -4); c.lineTo(-5, 4); c.closePath(); c.fill();
+
+  c.fillStyle = 'rgba(255, 255, 255, 0.4)';
+  c.beginPath(); c.moveTo(6, -1); c.lineTo(-2, -3); c.lineTo(-2, -1); c.closePath(); c.fill();
+
+  c.restore();
+}
+
+/* ============================================================
+ * 18. 主循环（含 FPS 统计 + 云朵飘动/呼吸）
+ * ============================================================ */
+let last = performance.now();
+let rafId = 0;
+let fpsAcc = 0, fpsCnt = 0;
+let _frameCount = 0; // 性能复位：帧计数器，用于小地图节流
+let _firstFrame = true; // 屏闪修复：首帧渲染后再渐隐 loading
+const fpsEl = document.getElementById('fps');
+
+function loop(now) {
+  rafId = requestAnimationFrame(loop); // 续帧；进游戏时会被取消，返回时重启（真正暂停渲染/物理/RAF）
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+  // P1/F3：游戏态（iframe 覆盖全屏）下完全暂停物理/动画/渲染，避免后台空耗 GPU 与电量。
+  // 注：进游戏时主循环已被 cancelAnimationFrame 取消，本守卫为防御性双保险（C5）。
+  if (inGame) return;
+
+  // #5：update 异常保护 — 任一帧抛错则提示并停 RAF，避免静默卡死
+  try {
+    update(dt);
+  } catch (err) {
+    console.error('[planet] update 异常，已停止渲染:', err);
+    cancelAnimationFrame(rafId);
+    const el = document.getElementById('loading');
+    if (el) {
+      el.style.display = 'flex';
+      el.querySelector('.spin').style.display = 'none';
+      el.querySelector('div:last-child').textContent = '渲染异常，请刷新页面重试。错误：' + (err.message || err);
+      el.classList.remove('hide');
+    }
+    return;
+  }
+  // 性能复位：小地图节流 — 每 4 帧重绘一次（玩家两帧间位移极小，肉眼无感知）
+  if ((_frameCount++ & 3) === 0) drawMinimap(); // U2
+
+  // 云朵缓慢飘动 + 呼吸缩放
+  // #12：REDUCE 时关闭呼吸缩放（保留缓慢飘动，因移动幅度小不影响前庭觉）
+  cloudGroup.rotation.y += dt * 0.015;
+  clouds.forEach((c, i) => {
+    if (!REDUCE) c.position.y = c.userData.baseY + Math.sin(now * 0.0004 + i) * 0.6; // 围绕基准高度振荡，不累积漂移
+    c.scale.setScalar(REDUCE ? c.userData.base : c.userData.base * (1 + 0.04 * Math.sin(now * 0.0006 + i)));
+  });
+
+  // U6：泛光开启且管线可用时走后处理，否则普通渲染
+  if (composer && bloomEnabled) composer.render(); else renderer.render(scene, camera);
+
+  // 屏闪修复：首帧渲染完成（canvas 已有场景内容）后再渐隐 loading，
+  // 避免渐隐期间露出空 canvas（黑/紫）造成闪烁
+  if (_firstFrame) {
+    _firstFrame = false;
+    const _el = document.getElementById('loading');
+    if (_el) { _el.classList.add('hide'); setTimeout(() => _el.remove(), 700); }
+  }
+
+  // FPS
+  fpsAcc += dt; fpsCnt++;
+  if (fpsAcc >= 0.5) {
+    fpsEl.textContent = Math.round(fpsCnt / fpsAcc) + ' FPS';
+    fpsAcc = 0; fpsCnt = 0;
+  }
+}
+
+/* ============================================================
+ * 19. 自适应窗口
+ * ============================================================ */
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(devicePixelRatio, CONFIG.render.pixelRatioMax)); // P6/F-10：跨屏 DPR 变化时同步
+  renderer.setSize(innerWidth, innerHeight);
+  if (composer) composer.setSize(innerWidth, innerHeight);
+});
+
+/* ============================================================
+ * 20. 启动
+ * ============================================================ */
+// BUG-13 修复：Cannon.js 检测已移至模块顶部，此处直接启动
+// 屏闪根因修复：不在 RAF 前 hide loading。原代码在首帧渲染前就渐隐 #loading，
+// 此时 canvas 还是默认 clearColor（黑/紫），露出空 canvas = 闪。
+// 现改为：__planetReady 关兜底 → RAF 启动 → 首帧渲染完（canvas 已有场景）后再渐隐 loading。
+window.__planetReady = true; // F4：标记初始化成功，关闭兜底错误提示
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

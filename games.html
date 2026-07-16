@@ -702,9 +702,17 @@
       <div class="sub-header-center">
         <span class="sub-header-title">游戏小屋</span>
       </div>
-      <button class="theme-toggle" id="themeToggle" aria-label="切换主题" title="切换深色/浅色模式">
-        <!-- 图标由 JS 注入 -->
-      </button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <a href="planet.html" class="theme-toggle" id="planetToggle" aria-label="星球街道视图" title="进入球形星球街道">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"></path></svg>
+        </a>
+        <a href="cottage.html" class="theme-toggle" id="viewToggle" aria-label="3D小屋视图" title="进入3D小屋">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </a>
+        <button class="theme-toggle" id="themeToggle" aria-label="切换主题" title="切换深色/浅色模式">
+          <!-- 图标由 JS 注入 -->
+        </button>
+      </div>
     </div>
   </header>
 

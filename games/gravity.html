@@ -953,6 +953,7 @@ function playSound(type) {
   const gain = audioCtx.createGain();
   osc.connect(gain);
   gain.connect(audioCtx.destination);
+  osc.onended = function () { try { osc.disconnect(); gain.disconnect(); } catch (e) {} };
   switch (type) {
     case 'launch':
       osc.type = 'sine';
@@ -2584,6 +2585,12 @@ if (window.GameUtils) {
     return NOTE_FREQS[name] || 220;
   }
 
+  // 振荡器停止后自动断开连接，避免节点堆积引发 GC 卡顿（音频咔哒/断续）
+  function _track(node) {
+    node.onended = function () { try { node.disconnect(); } catch (e) {} };
+    return node;
+  }
+
   // 和弦进行：Dm - Bbmaj7 - Am - Gm · 宇宙神秘色彩
   var CHORDS = [
     // === A段：深邃宇宙 (1-4)
@@ -2659,8 +2666,8 @@ if (window.GameUtils) {
   // 音色：星空铃铛（正弦波 + 高频泛音）
   function playBellNote(freq, startTime, duration, gain) {
     if (!audioCtx || !masterGain) return;
-    var osc1 = audioCtx.createOscillator();
-    var osc2 = audioCtx.createOscillator();
+    var osc1 = _track(audioCtx.createOscillator());
+    var osc2 = _track(audioCtx.createOscillator());
     var noteGain = audioCtx.createGain();
 
     osc1.type = 'sine';
@@ -2689,9 +2696,9 @@ if (window.GameUtils) {
   // 音色：宇宙Pad（多个失谐正弦波 + 低通滤波）
   function playPadNote(freq, startTime, duration, gain) {
     if (!audioCtx || !masterGain) return;
-    var osc1 = audioCtx.createOscillator();
-    var osc2 = audioCtx.createOscillator();
-    var osc3 = audioCtx.createOscillator();
+    var osc1 = _track(audioCtx.createOscillator());
+    var osc2 = _track(audioCtx.createOscillator());
+    var osc3 = _track(audioCtx.createOscillator());
     var noteGain = audioCtx.createGain();
     var filter = audioCtx.createBiquadFilter();
 
@@ -2702,7 +2709,7 @@ if (window.GameUtils) {
     osc3.type = 'sine';
     osc3.frequency.value = freq * 0.997;
 
-    var lfo = audioCtx.createOscillator();
+    var lfo = _track(audioCtx.createOscillator());
     var lfoGain = audioCtx.createGain();
     lfo.type = 'sine';
     lfo.frequency.value = 0.06;
@@ -2745,8 +2752,8 @@ if (window.GameUtils) {
   // 音色：深空低音（正弦波 + 缓慢调制）
   function playBassNote(freq, startTime, duration, gain) {
     if (!audioCtx || !masterGain) return;
-    var osc1 = audioCtx.createOscillator();
-    var osc2 = audioCtx.createOscillator();
+    var osc1 = _track(audioCtx.createOscillator());
+    var osc2 = _track(audioCtx.createOscillator());
     var noteGain = audioCtx.createGain();
 
     osc1.type = 'sine';
@@ -2777,7 +2784,7 @@ if (window.GameUtils) {
   // 音色：星星闪烁（高频短音，随机触发）
   function playStarTwinkle(startTime, gain) {
     if (!audioCtx || !masterGain) return;
-    var osc = audioCtx.createOscillator();
+    var osc = _track(audioCtx.createOscillator());
     var noteGain = audioCtx.createGain();
     osc.type = 'sine';
     var baseFreq = 2000 + Math.random() * 2500;
@@ -2971,7 +2978,7 @@ if (window.GameUtils) {
     if (!initAudio()) return;
     if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
     var t = audioCtx.currentTime;
-    var osc = audioCtx.createOscillator();
+    var osc = _track(audioCtx.createOscillator());
     var noteGain = audioCtx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(200, t);
@@ -3009,7 +3016,7 @@ if (window.GameUtils) {
     if (!initAudio()) return;
     if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
     var t = audioCtx.currentTime;
-    var osc = audioCtx.createOscillator();
+    var osc = _track(audioCtx.createOscillator());
     var noteGain = audioCtx.createGain();
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(250, t);

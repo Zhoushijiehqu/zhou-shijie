@@ -198,6 +198,34 @@
     background: rgba(0, 255, 255, 0.25);
     box-shadow: 0 0 16px rgba(0, 255, 255, 0.4);
   }
+
+  /* ========== D1: 虚拟摇杆 ========== */
+  .joystick-zone {
+    position: absolute; bottom: 0; left: 0; width: 50%; height: 50%;
+    z-index: 14; pointer-events: auto; display: none;
+  }
+  .joystick-base {
+    position: absolute; width: 120px; height: 120px; border-radius: 50%;
+    border: 2px solid rgba(0,255,255,0.3); background: rgba(0,255,255,0.05);
+    pointer-events: none; display: none;
+  }
+  .joystick-thumb {
+    position: absolute; width: 50px; height: 50px; border-radius: 50%;
+    background: rgba(0,255,255,0.4); border: 2px solid var(--cyan);
+    box-shadow: 0 0 12px rgba(0,255,255,0.5); pointer-events: none;
+    display: none;
+  }
+  @media (pointer: coarse) {
+    .joystick-zone { display: block; }
+    .dpad { display: none !important; }
+  }
+
+  /* ========== D2: 色盲友好高对比模式 ========== */
+  body.colorblind-mode #game-canvas { filter: contrast(1.3) brightness(1.1); }
+
+  /* ========== D4: 减少动效模式 ========== */
+  body.reduce-motion .level-transition { animation-duration: 0.3s !important; }
+  body.reduce-motion .goal-flash { animation-duration: 0.3s !important; }
   .dpad-up    { grid-area: up; }
   .dpad-down  { grid-area: down; }
   .dpad-left  { grid-area: left; }
@@ -292,6 +320,69 @@
   .lb-item .score { font-family: var(--font-family-display); font-weight: 700; color: var(--color-text-primary); }
   .lb-item .meta { font-size: 10px; color: var(--color-text-tertiary); }
   .lb-empty { text-align: center; color: var(--color-text-tertiary); font-size: 12px; padding: 16px 0; }
+
+  /* ========== 难度选择 ========== */
+  .difficulty-row { display: flex; gap: 8px; width: 100%; }
+  .difficulty-btn {
+    flex: 1; padding: 10px 4px; border: 1px solid var(--border); border-radius: 8px;
+    background: rgba(0,255,255,0.04); color: rgba(224,247,250,0.6);
+    font-size: 13px; cursor: pointer; transition: all 0.2s; font-family: inherit; text-align: center;
+  }
+  .difficulty-btn.active {
+    background: rgba(0,255,255,0.15); border-color: var(--cyan); color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0,255,255,0.3);
+  }
+  .difficulty-btn:hover { background: rgba(0,255,255,0.1); }
+  .difficulty-btn .d-label { font-weight: 700; display: block; }
+  .difficulty-btn .d-desc { font-size: 10px; opacity: 0.6; display: block; margin-top: 2px; }
+
+  /* ========== 暂停遮罩 ========== */
+  .pause-overlay {
+    display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.85);
+    align-items: center; justify-content: center; z-index: 18;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .pause-overlay.visible { display: flex; }
+  .pause-panel { text-align: center; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+  .pause-panel h2 { color: var(--cyan); font-size: 28px; margin: 0; text-shadow: var(--glow-cyan); letter-spacing: 0.1em; }
+
+  /* ========== HUD 统计扩展 ========== */
+  .hud-stat {
+    padding: 6px 12px; background: rgba(10,10,20,0.75);
+    border: 1px solid rgba(0,255,255,0.2); border-radius: 16px;
+    font-size: 12px; color: rgba(224,247,250,0.7);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .hud-stat .val { color: var(--cyan); font-weight: 700; }
+
+  /* ========== 关卡转场 ========== */
+  .level-transition {
+    position: absolute; inset: 0; z-index: 25; pointer-events: none; opacity: 0;
+    background: radial-gradient(circle at center, rgba(0,255,255,0.25) 0%, rgba(0,0,0,0.95) 70%);
+  }
+  .level-transition.active { animation: levelTransition 1.0s ease-out forwards; }
+  @keyframes levelTransition {
+    0%   { opacity: 0; transform: scale(0.3); }
+    35%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(2.2); }
+  }
+
+  /* ========== 回放轨迹预览 ========== */
+  .replay-canvas { border: 1px solid var(--border); border-radius: 8px; background: #000; margin: 12px auto; display: block; max-width: 100%; }
+
+  /* ========== 关卡选择 ========== */
+  .level-select-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; max-height: 220px; overflow-y: auto; }
+  .level-card {
+    padding: 10px 4px; border: 1px solid var(--border); border-radius: 8px;
+    background: rgba(0,255,255,0.04); color: rgba(224,247,250,0.6);
+    font-size: 12px; cursor: pointer; transition: all 0.2s; text-align: center;
+    font-family: inherit; position: relative;
+  }
+  .level-card.unlocked { color: var(--cyan); border-color: rgba(0,255,255,0.3); }
+  .level-card.unlocked:hover { background: rgba(0,255,255,0.12); box-shadow: var(--glow-cyan); }
+  .level-card.locked { opacity: 0.35; cursor: not-allowed; }
+  .level-card .lv-stars { font-size: 10px; color: var(--gold); margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -304,7 +395,14 @@
   <div class="ui-overlay active" id="menu-overlay">
     <div class="menu-panel visible" id="menu-panel">
       <div class="game-title">声波盲境探路<span class="sub">SONIC BLIND MAZE</span></div>
+      <div class="difficulty-row" id="difficulty-row">
+        <button class="difficulty-btn" data-diff="novice"><span class="d-label">新手</span><span class="d-desc">视野大·终点可见</span></button>
+        <button class="difficulty-btn active" data-diff="normal"><span class="d-label">标准</span><span class="d-desc">微光·终点隐藏</span></button>
+        <button class="difficulty-btn" data-diff="hardcore"><span class="d-label">硬核</span><span class="d-desc">全黑·回声更少</span></button>
+      </div>
       <button class="menu-btn" id="btn-start">开始游戏</button>
+      <button class="menu-btn" id="btn-level-select">关卡选择</button>
+      <button class="menu-btn" id="btn-daily">📅 每日挑战</button>
       <button class="menu-btn accent" id="btn-tutorial">教学模式</button>
       <button class="menu-btn" id="btn-settings">游戏设置</button>
     </div>
@@ -338,8 +436,21 @@
         <span>震动反馈</span>
         <div class="toggle-switch" id="toggle-vibration"></div>
       </div>
+      <div class="setting-row">
+        <span>色盲友好高对比</span>
+        <div class="toggle-switch" id="toggle-colorblind"></div>
+      </div>
+      <div class="setting-row">
+        <span>减少动效</span>
+        <div class="toggle-switch" id="toggle-reduce-motion"></div>
+      </div>
+      <div class="setting-row">
+        <span>长按自动声波</span>
+        <div class="toggle-switch on" id="toggle-autoping"></div>
+      </div>
       <p style="font-size:12px;color:rgba(224,247,250,0.4);margin-top:8px;">
-        音效与震动功能将在后续版本中实装，当前仅保留 UI 占位。
+        震动反馈支持移动端设备；回声音频随声波发射自动播放，受音效开关控制。
+        色盲友好模式用亮度差异替代色相；减少动效降低闪烁频率。
       </p>
       <button class="modal-close-btn" id="btn-settings-close">关闭</button>
     </div>
@@ -360,8 +471,11 @@
   <!-- HUD 关卡进度 -->
   <div class="hud" id="hud" style="display:none;">
     <div class="hud-level">第 <span class="num" id="hud-level-num">1</span> / <span id="hud-total">10</span> 关</div>
+    <div class="hud-stat">声波 <span class="val" id="hud-sonic-count">0</span></div>
+    <div class="hud-stat">碎片 <span class="val" id="hud-shard-count">0</span>/<span id="hud-shard-total">0</span></div>
     <div style="display:flex;gap:8px;pointer-events:auto;">
       <button class="menu-btn" id="btn-hint-daily" style="padding:6px 14px;font-size:12px;width:auto;min-width:auto;" title="每日 3 次免费提示">💡 提示(<span id="hint-count">3</span>)</button>
+      <button class="menu-btn" id="btn-pause" style="padding:6px 14px;font-size:12px;width:auto;min-width:auto;" title="暂停 (P)">⏸ 暂停</button>
       <button class="menu-btn" id="btn-screenshot" style="padding:6px 14px;font-size:12px;width:auto;min-width:auto;" title="截图分享">📷 截图</button>
       <button class="menu-btn" id="btn-fullscreen" style="padding:6px 14px;font-size:12px;width:auto;min-width:auto;" title="全屏">⛶ 全屏</button>
     </div>
@@ -377,8 +491,35 @@
     </div>
   </div>
 
+  <!-- D1: 虚拟摇杆（触屏设备） -->
+  <div class="joystick-zone" id="joystick-zone"></div>
+  <div class="joystick-base" id="joystick-base"></div>
+  <div class="joystick-thumb" id="joystick-thumb"></div>
+
   <!-- 移动端声波发射按钮 -->
   <button class="sonic-btn" id="sonic-btn" title="发射声波" aria-label="发射声波">🎵</button>
+
+  <!-- 暂停遮罩 -->
+  <div class="pause-overlay" id="pause-overlay">
+    <div class="pause-panel">
+      <h2>⏸ 已暂停</h2>
+      <button class="menu-btn" id="btn-resume" style="min-width:200px">继续游戏</button>
+      <button class="menu-btn" id="btn-pause-restart" style="min-width:200px">重置本关</button>
+      <button class="menu-btn" id="btn-pause-menu" style="min-width:200px">返回菜单</button>
+    </div>
+  </div>
+
+  <!-- 关卡转场 -->
+  <div class="level-transition" id="level-transition"></div>
+
+  <!-- 关卡选择面板 -->
+  <div class="modal-overlay" id="level-select-overlay">
+    <div class="modal-panel">
+      <h2>🗺️ 关卡选择</h2>
+      <div class="level-select-grid" id="level-select-grid"></div>
+      <button class="modal-close-btn" id="btn-level-select-close">关闭</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -410,6 +551,24 @@ const BOUNCE_COLORS = [
   { r: 180, g: 60,  b: 255 },  // 第 1 次反弹：粉紫
   { r: 255, g: 30,  b: 180 }   // 第 2 次反弹：品红
 ];
+
+// ============ 难度配置 / 视野 / 回声 / 收集品 / 回放 ============
+const DIFFICULTIES = {
+  novice:   { name: '新手', visionRadius: 80, goalVisible: true,  rayDecay: 0.7,  echoCount: 8 },
+  normal:   { name: '标准', visionRadius: 45, goalVisible: false, rayDecay: 0.7,  echoCount: 5 },
+  hardcore: { name: '硬核', visionRadius: 0,  goalVisible: false, rayDecay: 0.5,  echoCount: 3 }
+};
+let currentDifficulty = 'normal';
+let VISION_RADIUS = DIFFICULTIES.normal.visionRadius;
+const GOAL_BEACON_INTERVAL = 4;   // A3: 终点信标自动 ping 间隔（秒）
+const ECHO_SOUND_SPEED = 450;      // A1: 回声传播速度（与波纹一致）
+const SHARD_BONUS = 1;             // B3: 每个碎片减少的声波计数
+const PATH_SAMPLE_INTERVAL = 0.1;  // B6: 回放路径采样间隔（秒）
+
+// A5: 声波次数星级阈值
+function sonicStarThresholds(levelId) {
+  return { good: 5 + levelId, fair: 10 + levelId * 2 };
+}
 
 // =============================================================================
 //  关卡数据 — 完整 10 关（保持不变）
@@ -447,6 +606,10 @@ const LEVELS = [
       { x1: 380, y1: 220, x2: 380, y2: 500 },
       { x1: 520, y1: 100, x2: 520, y2: 350 },
       { x1: 520, y1: 350, x2: 680, y2: 350 }
+    ],
+    shards: [
+      { x: 300, y: 250 },
+      { x: 450, y: 420 }
     ]
   },
   // ===== 第 4 关：死胡同迷宫 — 10 堵墙 =====
@@ -483,6 +646,14 @@ const LEVELS = [
       { x1: 640, y1: 200, x2: 640, y2: 440 },
       { x1: 520, y1: 440, x2: 720, y2: 440 },
       { x1: 200, y1: 520, x2: 520, y2: 520 }
+    ],
+    shards: [
+      { x: 250, y: 320 },
+      { x: 560, y: 180 },
+      { x: 680, y: 380 }
+    ],
+    movingWalls: [
+      { wallIndex: 5, x1: 480, y1: 80, x2: 480, y2: 280, axis: 'y', range: 60, speed: 0.6, phase: 0 }
     ]
   },
   // ===== 第 6 关：狭长通道 — 16 堵墙 =====
@@ -533,6 +704,11 @@ const LEVELS = [
       { x1: 600, y1: 400, x2: 700, y2: 400 },
       { x1: 600, y1: 300, x2: 600, y2: 400 },
       { x1: 600, y1: 300, x2: 700, y2: 300 }
+    ],
+    shards: [
+      { x: 250, y: 450 },
+      { x: 550, y: 200 },
+      { x: 400, y: 350 }
     ]
   },
   // ===== 第 8 关：密集障碍 — 18 堵墙 =====
@@ -881,10 +1057,15 @@ class Player {
    * @param {Array} walls 墙壁数组 [{x1,y1,x2,y2}]
    */
   move(dx, dy, dt, walls) {
+    // C4: 每帧重置撞墙标记（即使不移动也重置）
+    this._bumpedWall = false;
     if (dx === 0 && dy === 0) return;
 
     const moveX = dx * this.speed * dt;
     const moveY = dy * this.speed * dt;
+
+    // C4: 撞墙检测标记
+    var bumped = false;
 
     // === 第 1 步：X 轴移动（二分法精确贴墙）===
     if (moveX !== 0) {
@@ -892,6 +1073,7 @@ class Player {
       this.x += moveX;
       this.x = Math.max(this.radius, Math.min(CANVAS_W - this.radius, this.x));
       if (this._collidesWithAny(walls)) {
+        bumped = true;
         let lo = 0, hi = 1;
         for (let i = 0; i < 8; i++) {
           const mid = (lo + hi) / 2;
@@ -914,6 +1096,7 @@ class Player {
       this.y += moveY;
       this.y = Math.max(this.radius, Math.min(CANVAS_H - this.radius, this.y));
       if (this._collidesWithAny(walls)) {
+        bumped = true;
         let lo = 0, hi = 1;
         for (let i = 0; i < 8; i++) {
           const mid = (lo + hi) / 2;
@@ -929,6 +1112,9 @@ class Player {
         this.y = Math.max(this.radius, Math.min(CANVAS_H - this.radius, this.y));
       }
     }
+
+    // C4: 撞墙状态暴露给 Game
+    this._bumpedWall = bumped;
   }
 
   /**
@@ -976,34 +1162,94 @@ class Player {
 //  在交点处反射，记录所有碰撞点用于墙壁照亮渲染。
 // =============================================================================
 class RayCaster {
+  // E1: 射线数量自适应（根据帧率动态调整）
+  static _adaptiveRayCount = RAY_COUNT;
+  static _fpsHistory = [];
+  static updateAdaptiveRayCount(dt) {
+    if (dt <= 0) return;
+    var fps = 1 / dt;
+    RayCaster._fpsHistory.push(fps);
+    if (RayCaster._fpsHistory.length > 30) RayCaster._fpsHistory.shift();
+    if (RayCaster._fpsHistory.length < 10) return;
+    var avg = 0;
+    for (var i = 0; i < RayCaster._fpsHistory.length; i++) avg += RayCaster._fpsHistory[i];
+    avg /= RayCaster._fpsHistory.length;
+    if (avg < 30 && RayCaster._adaptiveRayCount > 120) {
+      RayCaster._adaptiveRayCount = Math.max(120, RayCaster._adaptiveRayCount - 60);
+    } else if (avg > 55 && RayCaster._adaptiveRayCount < RAY_COUNT) {
+      RayCaster._adaptiveRayCount = Math.min(RAY_COUNT, RayCaster._adaptiveRayCount + 30);
+    }
+  }
+  static getRayCount() { return RayCaster._adaptiveRayCount; }
+
+  // E2: 空间分区（Grid Spatial Hash）— 只检测声源附近的墙
+  static _grid = null;
+  static _gridCellSize = 100;
+  static buildGrid(walls, canvasW, canvasH) {
+    var cs = RayCaster._gridCellSize;
+    var cols = Math.ceil(canvasW / cs) + 1;
+    var rows = Math.ceil(canvasH / cs) + 1;
+    var grid = [];
+    for (var i = 0; i < cols * rows; i++) grid.push([]);
+    for (var wi = 0; wi < walls.length; wi++) {
+      var w = walls[wi];
+      var minCx = Math.floor(Math.min(w.x1, w.x2) / cs);
+      var maxCx = Math.floor(Math.max(w.x1, w.x2) / cs);
+      var minCy = Math.floor(Math.min(w.y1, w.y2) / cs);
+      var maxCy = Math.floor(Math.max(w.y1, w.y2) / cs);
+      for (var cx = minCx; cx <= maxCx; cx++) {
+        for (var cy = minCy; cy <= maxCy; cy++) {
+          if (cx >= 0 && cx < cols && cy >= 0 && cy < rows) {
+            grid[cy * cols + cx].push(wi);
+          }
+        }
+      }
+    }
+    RayCaster._grid = { grid: grid, cols: cols, rows: rows, cellSize: cs };
+  }
+  static getNearbyWalls(originX, originY, maxDist) {
+    if (!RayCaster._grid) return null;
+    var g = RayCaster._grid;
+    var cs = g.cellSize;
+    var minCx = Math.max(0, Math.floor((originX - maxDist) / cs));
+    var maxCx = Math.min(g.cols - 1, Math.floor((originX + maxDist) / cs));
+    var minCy = Math.max(0, Math.floor((originY - maxDist) / cs));
+    var maxCy = Math.min(g.rows - 1, Math.floor((originY + maxDist) / cs));
+    var seen = {};
+    var result = [];
+    for (var cx = minCx; cx <= maxCx; cx++) {
+      for (var cy = minCy; cy <= maxCy; cy++) {
+        var cell = g.grid[cy * g.cols + cx];
+        for (var k = 0; k < cell.length; k++) {
+          var wi = cell[k];
+          if (!seen[wi]) { seen[wi] = true; result.push(wi); }
+        }
+      }
+    }
+    return result;
+  }
+
   /**
    * 从指定位置发射声波射线，返回所有墙壁碰撞点
-   *
-   * @param {number} originX 声源 X
-   * @param {number} originY 声源 Y
-   * @param {Array} walls 墙壁数组 [{x1,y1,x2,y2}]
-   * @param {number} rayCount 射线数量（默认 RAY_COUNT）
-   * @param {number} maxDist 最大传播距离
-   * @param {number} maxBounces 最大反射次数
-   * @returns {Array<{wallIndex:number, u:number, x:number, y:number, intensity:number, bounce:number}>}
    */
   static cast(originX, originY, walls, rayCount, maxDist, maxBounces) {
-    /** @type {Array} 所有碰撞点 */
     const allHits = [];
 
-    // 生成均匀分布的射线方向
+    // E2: 使用空间分区获取附近墙壁
+    var nearbyIndices = RayCaster.getNearbyWalls(originX, originY, maxDist);
+    var nearbyWalls = nearbyIndices ? nearbyIndices.map(function (wi) {
+      return { wall: walls[wi], index: wi };
+    }) : walls.map(function (w, i) { return { wall: w, index: i }; });
+
     for (let i = 0; i < rayCount; i++) {
       const angle = (Math.PI * 2 * i) / rayCount;
       const dx = Math.cos(angle);
       const dy = Math.sin(angle);
 
-      // 追踪单条射线（含反射）
       RayCaster._traceRay(
         originX, originY, dx, dy,
-        0,           // 当前已传播距离
-        1.0,         // 初始强度
-        0,           // 当前反弹次数
-        walls, maxDist, maxBounces,
+        0, 1.0, 0,
+        nearbyWalls, maxDist, maxBounces,
         allHits
       );
     }
@@ -1033,9 +1279,9 @@ class RayCaster {
     let nearestU = 0;
     let nearestX = 0, nearestY = 0;
 
-    // 遍历所有墙壁，找最近交点
+    // 遍历所有墙壁，找最近交点（E2: walls 是 {wall, index} 对象数组）
     for (let wi = 0; wi < walls.length; wi++) {
-      const w = walls[wi];
+      const w = walls[wi].wall;
       const hit = raySegmentIntersection(ox, oy, dx, dy, w.x1, w.y1, w.x2, w.y2);
       if (hit && hit.t < nearestT) {
         nearestT = hit.t;
@@ -1049,22 +1295,22 @@ class RayCaster {
     // 无交点或超出最大距离
     if (nearestWallIdx < 0 || traveled + nearestT > maxDist) return;
 
-    // 记录碰撞点（含累计总距离和本次射线起点，用于扩散动画和正确连线）
+    // 记录碰撞点（wallIndex 使用真实墙壁索引）
     outHits.push({
-      wallIndex: nearestWallIdx,
-      u: nearestU,                    // 在线段上的归一化位置 0~1
+      wallIndex: walls[nearestWallIdx].index,
+      u: nearestU,
       x: nearestX,
       y: nearestY,
       intensity: intensity,
       bounce: bounce,
-      totalDistance: traveled + nearestT,  // 从玩家出发的累计总像素长度（用于扩散动画）
-      fromX: ox,                            // 本次射线起点 X（用于正确画锯齿形反射路线）
-      fromY: oy                             // 本次射线起点 Y
+      totalDistance: traveled + nearestT,
+      fromX: ox,
+      fromY: oy
     });
 
     // 如果还能反弹，计算反射方向并继续追踪
     if (bounce < maxBounces) {
-      const w = walls[nearestWallIdx];
+      const w = walls[nearestWallIdx].wall;
       const ex = w.x2 - w.x1, ey = w.y2 - w.y1;
       const ref = reflectDirection(dx, dy, ex, ey);
 
@@ -1102,6 +1348,12 @@ class LevelManager {
   }
 
   reset() { this.currentIndex = 0; }
+
+  /** F2: 跳转到指定关卡（1-based） */
+  setLevel(levelId) {
+    var idx = Math.max(0, Math.min(this.levels.length - 1, levelId - 1));
+    this.currentIndex = idx;
+  }
 
   get currentLevelId() { return this.currentIndex + 1; }
   get totalLevels() { return this.levels.length; }
@@ -1166,21 +1418,47 @@ class Renderer {
   }
 
   /**
-   * 渲染终点（始终可见，脉冲发光）
+   * A2: 渲染玩家微光视野遮罩 — 以玩家为中心的径向渐变，遮罩远处
+   * @param {Player} player
+   */
+  renderVisionMask(player) {
+    if (VISION_RADIUS <= 0) return; // 硬核模式：完全无视野
+    const ctx = this.ctx;
+    ctx.save();
+    // 径向渐变：中心透明 → 边缘纯黑
+    const grd = ctx.createRadialGradient(
+      player.x, player.y, VISION_RADIUS * 0.3,
+      player.x, player.y, VISION_RADIUS
+    );
+    grd.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    grd.addColorStop(0.7, 'rgba(0, 0, 0, 0.4)');
+    grd.addColorStop(1, 'rgba(0, 0, 0, 0.92)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.restore();
+  }
+
+  /**
+   * A3: 渲染终点（条件可见 — 难度决定是否始终可见）
    * @param {{x:number, y:number, radius:number}} goal
    * @param {number} dt deltaTime（秒）
+   * @param {boolean} forceVisible 是否强制可见（声波击中时短暂闪烁）
    */
-  renderGoal(goal, dt) {
+  renderGoal(goal, dt, forceVisible) {
+    const diff = DIFFICULTIES[currentDifficulty];
+    const visible = forceVisible || diff.goalVisible;
+    if (!visible) return;
+
     const ctx = this.ctx;
     this.time += dt;
 
     const pulse = 1 + 0.25 * Math.sin(this.time * 3.0);
     const r = goal.radius * pulse;
-    const alpha = 0.7 + 0.3 * Math.sin(this.time * 3.0);
+    // D4: 减少动效模式下降低闪烁（S11: 用 window.__game 而非不可见的局部 game）
+    var alphaMul = (window.__game && window.__game._reduceMotion) ? 0.5 : 1;
+    const alpha = (0.7 + 0.3 * Math.sin(this.time * 3.0)) * alphaMul;
 
     ctx.save();
-
-    // 外层大光晕
     const grd = ctx.createRadialGradient(goal.x, goal.y, r * 0.2, goal.x, goal.y, r * 3);
     grd.addColorStop(0, `rgba(255, 215, 0, ${alpha * 0.9})`);
     grd.addColorStop(0.35, `rgba(255, 180, 0, ${alpha * 0.5})`);
@@ -1191,7 +1469,6 @@ class Renderer {
     ctx.arc(goal.x, goal.y, r * 3, 0, Math.PI * 2);
     ctx.fill();
 
-    // 核心发光圆
     ctx.shadowColor = `rgba(255, 215, 0, ${alpha})`;
     ctx.shadowBlur = 30;
     ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
@@ -1199,13 +1476,11 @@ class Renderer {
     ctx.arc(goal.x, goal.y, r, 0, Math.PI * 2);
     ctx.fill();
 
-    // 内核白点
     ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
     ctx.beginPath();
     ctx.arc(goal.x, goal.y, r * 0.3, 0, Math.PI * 2);
     ctx.fill();
-
     ctx.restore();
   }
 
@@ -1418,6 +1693,73 @@ class Renderer {
 
     ctx.restore();
   }
+
+  /**
+   * C3: 渲染墙端点高光 — 声波击中墙端点时额外画亮点，帮助辨认空间结构
+   * @param {Array} rayHits
+   * @param {number} now
+   */
+  renderWallEndpoints(rayHits, now) {
+    if (!rayHits || rayHits.length === 0) return;
+    const ctx = this.ctx;
+    const elapsed = (now - rayHits._time) / 1000;
+    if (elapsed > AFTERGLOW_S) return;
+    const fade = Math.max(0, 1 - elapsed / AFTERGLOW_S);
+
+    ctx.save();
+    for (const hit of rayHits) {
+      if (hit.u < 0.05 || hit.u > 0.95) {
+        // 靠近墙端点的碰撞点画额外高光
+        const col = BOUNCE_COLORS[Math.min(hit.bounce, BOUNCE_COLORS.length - 1)];
+        ctx.shadowColor = `rgba(${col.r}, ${col.g}, ${col.b}, ${fade})`;
+        ctx.shadowBlur = 12 * fade;
+        ctx.fillStyle = `rgba(255, 255, 255, ${fade * 0.8})`;
+        ctx.beginPath();
+        ctx.arc(hit.x, hit.y, 2.5 * fade, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  /**
+   * B3: 渲染声波碎片（可收集品）
+   * @param {Array} shards 碎片数组 [{x, y, collected, id}]
+   * @param {number} time 当前时间（秒）
+   */
+  renderShards(shards, time) {
+    if (!shards || shards.length === 0) return;
+    const ctx = this.ctx;
+    ctx.save();
+    for (const s of shards) {
+      if (s.collected) continue;
+      const pulse = 1 + 0.15 * Math.sin(time * 4 + s.id * 1.7);
+      const r = 6 * pulse;
+      // 外层光晕
+      ctx.shadowColor = 'rgba(0, 255, 200, 0.8)';
+      ctx.shadowBlur = 16 * pulse;
+      // 菱形（旋转八面体投影）
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(time * 2 + s.id);
+      ctx.fillStyle = 'rgba(100, 255, 220, 0.9)';
+      ctx.beginPath();
+      ctx.moveTo(0, -r);
+      ctx.lineTo(r * 0.7, 0);
+      ctx.lineTo(0, r);
+      ctx.lineTo(-r * 0.7, 0);
+      ctx.closePath();
+      ctx.fill();
+      // 内核
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(220, 255, 240, 0.95)';
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
 }
 
 // =============================================================================
@@ -1428,6 +1770,7 @@ class Game {
   static State = Object.freeze({
     MENU:           'MENU',
     PLAYING:        'PLAYING',
+    PAUSED:         'PAUSED',
     LEVEL_COMPLETE: 'LEVEL_COMPLETE',
     ALL_COMPLETE:   'ALL_COMPLETE',
     TUTORIAL:       'TUTORIAL',
@@ -1448,7 +1791,14 @@ class Game {
     this.hud                  = document.getElementById('hud');
     this.hudLevelNum          = document.getElementById('hud-level-num');
     this.hudTotal             = document.getElementById('hud-total');
+    this.hudSonicCount        = document.getElementById('hud-sonic-count');
+    this.hudShardCount        = document.getElementById('hud-shard-count');
+    this.hudShardTotal        = document.getElementById('hud-shard-total');
     this.sonicBtn             = document.getElementById('sonic-btn');
+    this.pauseOverlay         = document.getElementById('pause-overlay');
+    this.levelTransition      = document.getElementById('level-transition');
+    this.levelSelectOverlay   = document.getElementById('level-select-overlay');
+    this.levelSelectGrid      = document.getElementById('level-select-grid');
 
     // 核心模块
     this.input    = new InputManager(this.canvas);
@@ -1494,6 +1844,37 @@ class Game {
 
     // Web Audio 上下文（延迟初始化）
     this._audioCtx = null;
+    this._echoEnabled = true;       // A1: 回声系统开关
+    this._vibrationEnabled = false; // A4: 震动反馈开关
+    // D2: 色盲友好高对比模式
+    this._colorblindMode = false;
+    // D4: 减少动效
+    this._reduceMotion = false;
+    // D3: 长按自动声波
+    this._autoPingEnabled = true;
+    this._autoPingTimer = 0;
+    // D1: 虚拟摇杆状态
+    this._joystickActive = false;
+    this._joystickDx = 0;
+    this._joystickDy = 0;
+
+    // A5: 声波使用计数
+    this.sonicCount = 0;
+    // A3: 终点闪烁状态（声波击中终点时短暂可见）
+    this.goalFlashTime = 0;
+    this._goalBeaconTimer = 0;
+    // B3: 收集品
+    this.shards = [];
+    this.shardsCollected = 0;
+    // B2: 动态墙壁
+    this.movingWalls = [];
+    // B6: 回放路径记录
+    this._pathSamples = [];
+    this._pathSampleTimer = 0;
+    this._sonicLog = []; // 声波发射点记录
+    // B4: 无尽模式
+    this.endlessMode = false;
+    this.endlessDepth = 0;
 
     this._loop = this._loop.bind(this);
     this._initUI();
@@ -1516,6 +1897,93 @@ class Game {
     } catch (e) { /* 隐私模式忽略 */ }
   }
 
+  // ==================== F1: 关卡进度持久化 ====================
+
+  _saveLevelRecord(levelId, stars, timeSec, sonicCount) {
+    try {
+      var key = 'sonic_level_' + levelId;
+      var existing = {};
+      var raw = localStorage.getItem(key);
+      if (raw) existing = JSON.parse(raw);
+      // 保留最佳记录
+      var updated = {
+        stars: Math.max(existing.stars || 0, stars),
+        bestTime: existing.bestTime ? Math.min(existing.bestTime, timeSec) : timeSec,
+        bestSonic: existing.bestSonic ? Math.min(existing.bestSonic, sonicCount) : sonicCount,
+        plays: (existing.plays || 0) + 1
+      };
+      localStorage.setItem(key, JSON.stringify(updated));
+    } catch (e) {}
+  }
+
+  _loadLevelRecord(levelId) {
+    try {
+      var raw = localStorage.getItem('sonic_level_' + levelId);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  // ==================== F3: 每日挑战 ====================
+
+  _getDailySeed() {
+    var d = new Date();
+    return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  }
+
+  _generateDailyLevel() {
+    var seed = this._getDailySeed();
+    // 基于日期种子生成伪随机迷宫
+    var walls = [];
+    var rng = function () { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    var wallCount = 8 + Math.floor(rng() * 12);
+    for (var i = 0; i < wallCount; i++) {
+      var x1 = 80 + rng() * 640;
+      var y1 = 60 + rng() * 480;
+      var len = 60 + rng() * 120;
+      var angle = rng() * Math.PI * 2;
+      walls.push({
+        x1: Math.round(x1), y1: Math.round(y1),
+        x2: Math.round(x1 + Math.cos(angle) * len),
+        y2: Math.round(y1 + Math.sin(angle) * len)
+      });
+    }
+    return {
+      levelId: 999,
+      playerStart: { x: 80, y: 300 },
+      goal: { x: 720, y: 300, radius: GOAL_R },
+      walls: walls,
+      shards: [
+        { x: 300 + rng() * 200, y: 150 + rng() * 300 },
+        { x: 300 + rng() * 200, y: 150 + rng() * 300 }
+      ]
+    };
+  }
+
+  startDailyChallenge() {
+    this.endlessMode = false;
+    var dailyLevel = this._generateDailyLevel();
+    // 临时替换 levels 数组
+    this.levels.levels = [dailyLevel];
+    this.levels.currentIndex = 0;
+    this._dailyMode = true;
+    if (window.GameUtils) GameUtils.recordPlay('sonic', 0);
+    this._startLevel();
+  }
+
+  _isDailyCompleted() {
+    try {
+      var seed = this._getDailySeed();
+      return localStorage.getItem('sonic_daily_' + seed) === '1';
+    } catch (e) { return false; }
+  }
+
+  _markDailyCompleted() {
+    try {
+      var seed = this._getDailySeed();
+      localStorage.setItem('sonic_daily_' + seed, '1');
+    } catch (e) {}
+  }
+
   // ==================== 音频 ====================
 
   _playBeep(freq = 880, duration = 0.12, type = 'sine') {
@@ -1532,6 +2000,124 @@ class Game {
       osc.start(this._audioCtx.currentTime);
       osc.stop(this._audioCtx.currentTime + duration);
     } catch (e) { /* 静默 */ }
+  }
+
+  // ==================== A1: 回声音频系统 ====================
+
+  /**
+   * 播放回声音效 — 根据碰撞点距离/角度/反弹次数生成立体声回声
+   * @param {Array} hits 碰撞点数组（已按距离排序）
+   */
+  _playEchoes(hits) {
+    if (!this._echoEnabled || !hits || hits.length === 0) return;
+    try {
+      if (!this._audioCtx) this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = this._audioCtx;
+      if (ctx.state === 'suspended') ctx.resume().catch(function(){});
+      const diff = DIFFICULTIES[currentDifficulty];
+      const maxEchoes = Math.min(diff.echoCount, hits.length);
+      // 按角度均匀采样，避免回声全聚在一个方向
+      const step = Math.max(1, Math.floor(hits.length / maxEchoes));
+      let played = 0;
+      for (let i = 0; i < hits.length && played < maxEchoes; i += step) {
+        const hit = hits[i];
+        const dist = hit.totalDistance;
+        if (dist < 5) continue; // 太近的不播放
+        const delay = dist / ECHO_SOUND_SPEED; // 延迟（秒）
+        const vol = Math.max(0.02, 0.15 * hit.intensity * (1 - dist / RAY_MAX_DIST));
+        // 频率：近=高音亮、远=低音闷
+        const freq = Math.max(120, 800 - dist * 0.8);
+        // 反弹次数影响音色：0=sine, 1=triangle, 2=square
+        const oscType = hit.bounce === 0 ? 'sine' : hit.bounce === 1 ? 'triangle' : 'square';
+        // 声像：根据击中点相对玩家的角度
+        const angle = Math.atan2(hit.x - this.player.x, -(hit.y - this.player.y));
+        const pan = Math.max(-1, Math.min(1, Math.sin(angle)));
+        this._scheduleEcho(freq, delay, vol, oscType, pan);
+        played++;
+      }
+    } catch (e) { /* 静默 */ }
+  }
+
+  _scheduleEcho(freq, delay, vol, oscType, pan) {
+    const ctx = this._audioCtx;
+    const startTime = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    osc.type = oscType;
+    osc.frequency.setValueAtTime(freq, startTime);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.7, startTime + 0.15);
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.linearRampToValueAtTime(vol, startTime + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.2);
+    osc.connect(gain);
+    if (panner) { panner.pan.value = pan; gain.connect(panner); panner.connect(ctx.destination); }
+    else { gain.connect(ctx.destination); }
+    osc.start(startTime);
+    osc.stop(startTime + 0.25);
+  }
+
+  // ==================== A4: 震动反馈 ====================
+
+  _vibrate(pattern) {
+    if (!this._vibrationEnabled || !navigator.vibrate) return;
+    try { navigator.vibrate(pattern); } catch (e) {}
+  }
+
+  // ==================== C2: 环境氛围音 ====================
+
+  _initAmbientNoise() {
+    if (this._ambientSource) return;
+    try {
+      if (!this._audioCtx) this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = this._audioCtx;
+      // 生成低频白噪声
+      const bufferSize = ctx.sampleRate * 2;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 120;
+      filter.Q.value = 0.5;
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = 0.04;
+      source.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      source.start();
+      this._ambientSource = source;
+      this._ambientGain = gainNode;
+    } catch (e) {}
+  }
+
+  _setAmbientVolume(v) {
+    if (this._ambientGain && this._audioCtx) {
+      this._ambientGain.gain.setTargetAtTime(v, this._audioCtx.currentTime, 0.5);
+    }
+  }
+
+  // ==================== C4: 撞墙音效 ====================
+
+  _playBumpSound() {
+    try {
+      if (!this._audioCtx) this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = this._audioCtx;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(120, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.15);
+    } catch (e) {}
   }
 
   // ==================== 移动端检测 ====================
@@ -1615,6 +2201,9 @@ class Game {
 
     this._initToggle('toggle-sound');
     this._initToggle('toggle-vibration');
+    this._initToggle('toggle-colorblind');
+    this._initToggle('toggle-reduce-motion');
+    this._initToggle('toggle-autoping');
 
     // 设置项切换视为"换肤/换偏好"，触发 try_skin 成就（本游戏无主题切换，以此替代）
     var soundToggleEl = document.getElementById('toggle-sound');
@@ -1659,7 +2248,9 @@ class Game {
   }
 
   startGame() {
+    this.levels.levels = LEVELS;
     this.levels.reset();
+    this._dailyMode = false;
     if (window.GameUtils) GameUtils.recordPlay('sonic', 0);
     this._startLevel();
   }
@@ -1674,13 +2265,26 @@ class Game {
   _startLevel() {
     const level = this.levels.getCurrent();
 
-    // 补全屏幕四周边界墙，使游戏空间闭合，射线不再飞入虚空
+    // 补全屏幕四周边界墙
     this.currentWalls = level.walls.concat([
-      { x1: 0,            y1: 0,            x2: CANVAS_W, y2: 0            },  // 上边界
-      { x1: CANVAS_W,     y1: 0,            x2: CANVAS_W, y2: CANVAS_H     },  // 右边界
-      { x1: CANVAS_W,     y1: CANVAS_H,     x2: 0,        y2: CANVAS_H      },  // 下边界
-      { x1: 0,            y1: CANVAS_H,     x2: 0,        y2: 0             }   // 左边界
+      { x1: 0,            y1: 0,            x2: CANVAS_W, y2: 0            },
+      { x1: CANVAS_W,     y1: 0,            x2: CANVAS_W, y2: CANVAS_H     },
+      { x1: CANVAS_W,     y1: CANVAS_H,     x2: 0,        y2: CANVAS_H      },
+      { x1: 0,            y1: CANVAS_H,     x2: 0,        y2: 0             }
     ]);
+
+    // B2: 初始化动态墙壁（关卡数据中 movingWalls 字段，wallIndex 指向 level.walls 中的位置）
+    this.movingWalls = [];
+    if (level.movingWalls) {
+      this.movingWalls = level.movingWalls.map(function (mw, i) {
+        return {
+          wallIndex: mw.wallIndex !== undefined ? mw.wallIndex : (level.walls.length - level.movingWalls.length + i),
+          baseX1: mw.x1, baseY1: mw.y1, baseX2: mw.x2, baseY2: mw.y2,
+          axis: mw.axis || 'x', range: mw.range || 80, speed: mw.speed || 0.5,
+          phase: mw.phase || 0
+        };
+      });
+    }
 
     // 隐藏所有 UI
     this.menuOverlay.classList.remove('active');
@@ -1689,29 +2293,56 @@ class Game {
     this.settingsOverlay.classList.remove('visible');
     this.levelCompleteOverlay.classList.remove('active');
     this.levelCompleteToast.classList.remove('visible');
+    this.pauseOverlay.classList.remove('visible');
 
     // 初始化玩家
     this.player = new Player(level.playerStart.x, level.playerStart.y, PLAYER_R, PLAYER_SPD);
 
-    // 初始化墙壁光斑数组（每堵墙一个空数组，含边界墙）
+    // 初始化墙壁光斑数组
     this.wallSpots = this.currentWalls.map(() => []);
     this.lastRayHits = null;
-    this.activeWaves = [];  // 重置活跃声波
+    this.activeWaves = [];
+
+    // E2: 构建空间分区网格
+    RayCaster.buildGrid(this.currentWalls, CANVAS_W, CANVAS_H);
+
+    // A5: 重置声波计数
+    this.sonicCount = 0;
+    // A3: 终点闪烁状态重置
+    this.goalFlashTime = 0;
+    this._goalBeaconTimer = 0;
+    // S14: 重置自动声波计时器和撞墙节流时间戳，避免跨关残留
+    this._autoPingTimer = 0;
+    this._lastBumpTime = 0;
+    // B3: 初始化收集品
+    this.shards = [];
+    this.shardsCollected = 0;
+    if (level.shards) {
+      this.shards = level.shards.map(function (s, i) {
+        return { x: s.x, y: s.y, id: i, collected: false };
+      });
+    }
+    // B6: 重置路径记录
+    this._pathSamples = [];
+    this._pathSampleTimer = 0;
+    this._sonicLog = [];
 
     // 更新 HUD
     if (this.hud) {
       this.hud.style.display = 'flex';
-      this.hudLevelNum.textContent = this.levels.currentLevelId;
-      this.hudTotal.textContent = this.levels.totalLevels;
+      this.hudLevelNum.textContent = this.endlessMode ? ('∞-' + this.endlessDepth) : this.levels.currentLevelId;
+      this.hudTotal.textContent = this.endlessMode ? '∞' : this.levels.totalLevels;
+      this.hudSonicCount.textContent = '0';
+      this.hudShardCount.textContent = '0';
+      this.hudShardTotal.textContent = this.shards.length;
     }
 
-    // 切换到游戏状态，启用点击
+    // C2: 初始化环境音
+    this._initAmbientNoise();
+
     this.state = Game.State.PLAYING;
     this.input.clickEnabled = true;
-
-    // 重置时间戳（避免第一帧 deltaTime 跳变）
     this._lastTime = 0;
-    // 记录关卡开始时间，用于通关时星级评价
     this._levelStartTime = performance.now();
 
     this._detectMobile();
@@ -1723,9 +2354,12 @@ class Game {
     this.input.clickEnabled = false;
 
     const levelId = this.levels.currentLevelId;
-    this._saveBestLevel(levelId);
+    // S6: 每日挑战模式不写入正常关卡的进度/星级/记录，避免覆盖第1关
+    if (!this._dailyMode) {
+      this._saveBestLevel(levelId);
+    }
 
-    // 排行榜接入：记录最远通关数
+    // 排行榜接入
     if (window.GameUtils) {
       GameUtils.saveLeaderboard('sonic', this.bestLevel);
       GameUtils.recordScore('sonic', this.bestLevel);
@@ -1739,7 +2373,27 @@ class Game {
 
     this._triggerGoalFlash();
 
-    if (levelId >= this.levels.totalLevels) {
+    // A4: 通关震动
+    this._vibrate([100, 50, 100, 50, 200]);
+
+    // A5: 声波次数星级评价
+    const elapsed = this._levelStartTime ? (performance.now() - this._levelStartTime) / 1000 : 0;
+    // S12: 每日挑战 levelId=999 会导致阈值异常（good=1004声波），改用固定阈值
+    const evalLevelId = this._dailyMode ? 5 : levelId;
+    const threshold = 30 + evalLevelId * 5;
+    const sonicThresholds = sonicStarThresholds(evalLevelId);
+    let stars;
+    if (elapsed < threshold && this.sonicCount <= sonicThresholds.good) stars = 3;
+    else if (elapsed < threshold || this.sonicCount <= sonicThresholds.fair) stars = 2;
+    else stars = 1;
+
+    if (this._dailyMode) {
+      // S6: 每日挑战完成 — 不触发全部通关状态
+      this.state = Game.State.LEVEL_COMPLETE;
+      this.levelCompleteText.textContent = `🌙 每日挑战完成！ ★${stars} (声波${this.sonicCount}次)`;
+      this._playBeep(880, 0.12, 'sine');
+      setTimeout(() => this._playBeep(1100, 0.15, 'sine'), 120);
+    } else if (levelId >= this.levels.totalLevels) {
       this.state = Game.State.ALL_COMPLETE;
       this.levelCompleteText.textContent = '🎉 恭喜通关全部关卡！';
       this._playBeep(660, 0.15, 'sine');
@@ -1747,7 +2401,7 @@ class Game {
       setTimeout(() => this._playBeep(1100, 0.2, 'sine'), 300);
     } else {
       this.state = Game.State.LEVEL_COMPLETE;
-      this.levelCompleteText.textContent = `第 ${levelId} 关完成！`;
+      this.levelCompleteText.textContent = `第 ${levelId} 关完成！ ★${stars} (声波${this.sonicCount}次)`;
       this._playBeep(880, 0.12, 'sine');
       setTimeout(() => this._playBeep(1100, 0.15, 'sine'), 120);
     }
@@ -1756,29 +2410,57 @@ class Game {
       window.SonicBGM.playWin();
     }
 
-    // —— 关卡星级评价 + 渐进解锁（同步至 GameUtils 全局进度）——
+    // 星级保存（含声波次数维度）— S6: 每日挑战模式跳过
     try {
-      if (window.GameUtils) {
-        // 用时阈值（秒）：随关卡递增，未超时 = 3 星，超时但通关 = 2 星
-        const elapsed = this._levelStartTime ? (performance.now() - this._levelStartTime) / 1000 : 0;
-        const threshold = 30 + levelId * 5;
-        const stars = elapsed < threshold ? 3 : 2;
+      if (window.GameUtils && !this._dailyMode) {
         GameUtils.saveLevelStars('sonic', levelId, stars, levelId + 1);
       }
     } catch (e) { console.warn('星级保存失败', e); }
 
-    // —— 成就接入 ——
+    // F1: 保存关卡进度记录（最佳用时/最少声波）— S6: 每日挑战模式跳过
+    if (!this._dailyMode) {
+      this._saveLevelRecord(levelId, stars, elapsed, this.sonicCount);
+    }
+
+    // F3: 每日挑战完成标记
+    if (this._dailyMode) {
+      this._markDailyCompleted();
+    }
+
+    // 成就接入
     try {
       if (window.GameUtils) {
-        // bestLevel 已是当前通关数（_saveBestLevel 已更新）
         if (!GameUtils.isUnlocked('sonic_lv5') && this.bestLevel >= 5) {
           GameUtils.unlock('sonic_lv5', '回声定位', '声波探路通关 5 关');
         }
         if (!GameUtils.isUnlocked('sonic_all') && this.bestLevel >= this.levels.totalLevels) {
           GameUtils.unlock('sonic_all', '暗夜行者', '声波探路全 10 关通关');
         }
+        // A5: 声波大师成就
+        if (!GameUtils.isUnlocked('sonic_echo_master') && this.sonicCount <= sonicThresholds.good) {
+          GameUtils.unlock('sonic_echo_master', '回声大师', '用极少声波通关一关');
+        }
+        // F4: 扩展成就
+        if (!GameUtils.isUnlocked('sonic_shard_hunter') && this.shardsCollected >= 5) {
+          GameUtils.unlock('sonic_shard_hunter', '碎片猎人', '累计收集 5 个声波碎片');
+        }
+        if (!GameUtils.isUnlocked('sonic_daily') && this._dailyMode) {
+          GameUtils.unlock('sonic_daily', '每日探路者', '完成一次每日挑战');
+        }
+        if (!GameUtils.isUnlocked('sonic_3star') && stars === 3 && !this._dailyMode) {
+          // S13: 每日挑战模式 totalLevels=1 会误判，需用真实关卡数 LEVELS.length 检查
+          var all3 = true;
+          for (var li = 1; li <= LEVELS.length; li++) {
+            var rec = this._loadLevelRecord(li);
+            if (!rec || rec.stars < 3) { all3 = false; break; }
+          }
+          if (all3) GameUtils.unlock('sonic_3star', '完美探路者', '所有关卡获得3星评价');
+        }
       }
     } catch (e) { console.warn('成就解锁失败', e); }
+
+    // B6: 生成回放轨迹图
+    this._showReplayTrace(elapsed, stars);
 
     this._render(0);
   }
@@ -1795,13 +2477,106 @@ class Game {
     }, 1000);
   }
 
+  // ==================== B6: 回放轨迹图 ====================
+
+  _showReplayTrace(elapsed, stars) {
+    var old = document.getElementById('replay-trace-canvas');
+    if (old) old.parentElement.removeChild(old);
+    if (this._pathSamples.length < 2) return;
+
+    var canvas = document.createElement('canvas');
+    canvas.id = 'replay-trace-canvas';
+    canvas.className = 'replay-canvas';
+    canvas.width = 300; canvas.height = 225;
+    var ctx = canvas.getContext('2d');
+    // 缩放因子
+    var sx = canvas.width / CANVAS_W, sy = canvas.height / CANVAS_H;
+    // 背景
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // 墙壁
+    ctx.strokeStyle = 'rgba(100,100,120,0.5)';
+    ctx.lineWidth = 1;
+    for (var wi = 0; wi < this.currentWalls.length; wi++) {
+      var w = this.currentWalls[wi];
+      ctx.beginPath();
+      ctx.moveTo(w.x1 * sx, w.y1 * sy);
+      ctx.lineTo(w.x2 * sx, w.y2 * sy);
+      ctx.stroke();
+    }
+    // 路径
+    ctx.strokeStyle = 'rgba(0,255,255,0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (var i = 0; i < this._pathSamples.length; i++) {
+      var p = this._pathSamples[i];
+      if (i === 0) ctx.moveTo(p.x * sx, p.y * sy);
+      else ctx.lineTo(p.x * sx, p.y * sy);
+    }
+    ctx.stroke();
+    // 声波发射点
+    ctx.fillStyle = 'rgba(180,60,255,0.9)';
+    for (var j = 0; j < this._sonicLog.length; j++) {
+      var s = this._sonicLog[j];
+      ctx.beginPath();
+      ctx.arc(s.x * sx, s.y * sy, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // 信息文字
+    ctx.fillStyle = '#d4ab6a';
+    ctx.font = '600 11px Manrope, sans-serif';
+    ctx.fillText('★'.repeat(stars) + '  ' + elapsed.toFixed(1) + 's  声波' + this.sonicCount + '次', 8, canvas.height - 8);
+
+    // 插入到关卡完成弹窗中
+    var panel = this.levelCompleteOverlay.querySelector('.modal-panel') || this.levelCompleteOverlay;
+    panel.appendChild(canvas);
+  }
+
+  // ==================== B5: 暂停功能 ====================
+
+  _pause() {
+    if (this.state !== Game.State.PLAYING) return;
+    this.state = Game.State.PAUSED;
+    this._stopLoop();
+    this._pauseTime = performance.now();
+    this.pauseOverlay.classList.add('visible');
+    // S3: 暂停时降低环境音量
+    this._setAmbientVolume(0.01);
+  }
+
+  _resume() {
+    if (this.state !== Game.State.PAUSED) return;
+    this.pauseOverlay.classList.remove('visible');
+    if (this._pauseTime && this._levelStartTime) {
+      this._levelStartTime += performance.now() - this._pauseTime;
+    }
+    this.state = Game.State.PLAYING;
+    this._lastTime = 0;
+    this._setAmbientVolume(0.04);
+    this._startLoop();
+  }
+
+  // ==================== C5: 关卡转场动画 ====================
+
+  _playLevelTransition(callback) {
+    var el = this.levelTransition;
+    el.classList.remove('active');
+    void el.offsetWidth; // 强制 reflow
+    el.classList.add('active');
+    setTimeout(function () {
+      el.classList.remove('active');
+      if (callback) callback();
+    }, 1000);
+  }
+
   _continueFromLevelComplete() {
     if (this.state === Game.State.ALL_COMPLETE) {
       this.showMenu();
       return;
     }
     if (this.levels.nextLevel()) {
-      this._startLevel();
+      var self = this;
+      this._playLevelTransition(function () { self._startLevel(); });
     } else {
       this.showMenu();
     }
@@ -1861,6 +2636,9 @@ class Game {
     }
     this._lastTime = timestamp;
 
+    // E1: 射线数量自适应
+    RayCaster.updateAdaptiveRayCount(dt);
+
     this._update(dt);
     this._render(dt);
     this.rafId = requestAnimationFrame(this._loop);
@@ -1877,7 +2655,7 @@ class Game {
     const level = this.levels.getCurrent();
     const walls = this.currentWalls;
 
-    // 0. 处理一次性按键（R 重置、ESC 退出）
+    // 0. 处理一次性按键（R 重置、ESC 退出、P 暂停）
     const keyPresses = this.input.consumeKeyPresses();
     for (const key of keyPresses) {
       if (key === 'r' || key === 'R') {
@@ -1888,47 +2666,88 @@ class Game {
         this.showMenu();
         return;
       }
+      if (key === 'p' || key === 'P') {
+        this._pause();
+        return;
+      }
     }
 
-    // 1. 玩家移动（deltaTime 驱动）
+    // 1. 玩家移动（deltaTime 驱动）+ D1 虚拟摇杆
     const { dx, dy } = this.input.getMoveDir();
-    this.player.move(dx, dy, dt, walls);
+    var moveDx = dx, moveDy = dy;
+    if (this._joystickActive && (Math.abs(this._joystickDx) > 0.1 || Math.abs(this._joystickDy) > 0.1)) {
+      moveDx = this._joystickDx;
+      moveDy = this._joystickDy;
+    }
+    this.player.move(moveDx, moveDy, dt, walls);
+
+    // 声波发射/撞墙音效统一时间戳（S7: 必须在使用前声明，避免 TDZ）
+    const now = performance.now();
+
+    // C4: 撞墙音效（节流，避免连续播放）
+    if (this.player._bumpedWall) {
+      if (!this._lastBumpTime || now - this._lastBumpTime > 300) {
+        this._lastBumpTime = now;
+        this._playBumpSound();
+        this._vibrate(8);
+      }
+    }
 
     // 2. 声波发射：点击或空格键时创建 ActiveWave，不立即点亮墙壁
     const clicks = this.input.consumeClicks();
     const sonics = this.input.consumeSonic();
-    const now = performance.now();
 
     const fireSonic = () => {
-      // 执行光线追踪（hit 已含 totalDistance 和 fromX/fromY）
+      // 执行光线追踪（E1: 使用自适应射线数量）
       const hits = RayCaster.cast(
         this.player.x, this.player.y,
         walls,
-        RAY_COUNT, RAY_MAX_DIST, RAY_MAX_BOUNCES
+        RayCaster.getRayCount(), RAY_MAX_DIST, RAY_MAX_BOUNCES
       );
 
-      // 按 totalDistance 升序排序，使扩散动画由近及远依次激活
       hits.sort((a, b) => a.totalDistance - b.totalDistance);
 
-      // 创建活跃声波对象，记录发射信息，等待扩散激活
       const wave = {
         x: this.player.x,
         y: this.player.y,
         startTime: now,
-        speed: 450,        // 声波扩散速度 px/s
+        speed: 450,
         hits: hits,
-        activatedCount: 0   // 已激活的碰撞点数
+        activatedCount: 0
       };
       this.activeWaves.push(wave);
 
-      // 保存射线数据用于可视化
       hits._time = now;
       this.lastRayHits = hits;
 
+      // A5: 声波计数
+      this.sonicCount++;
+      if (this.hudSonicCount) this.hudSonicCount.textContent = this.sonicCount;
+      // B6: 记录声波发射点
+      this._sonicLog.push({ x: this.player.x, y: this.player.y });
+
       // 播放音效
       this._playBeep(660, 0.08, 'sine');
+      // A1: 播放回声
+      this._playEchoes(hits);
+      // A4: 发射声波轻震
+      this._vibrate(10);
+
       if (window.SonicBGM && typeof window.SonicBGM.playSonicPing === 'function') {
         window.SonicBGM.playSonicPing();
+      }
+
+      // A3: 检测声波是否击中终点附近
+      var goal = level.goal;
+      var goalDistSq = (this.player.x - goal.x) * (this.player.x - goal.x) + (this.player.y - goal.y) * (this.player.y - goal.y);
+      if (goalDistSq < RAY_MAX_DIST * RAY_MAX_DIST) {
+        for (var hi = 0; hi < hits.length; hi++) {
+          var hd = (hits[hi].x - goal.x) * (hits[hi].x - goal.x) + (hits[hi].y - goal.y) * (hits[hi].y - goal.y);
+          if (hd < 400) { // 击中终点附近 20px 范围
+            this.goalFlashTime = now;
+            break;
+          }
+        }
       }
     };
 
@@ -1937,6 +2756,19 @@ class Game {
     }
     for (const _ of sonics) {
       fireSonic();
+    }
+
+    // D3: 长按自动声波 — 按住空格/移动键时每0.5秒自动发射
+    if (this._autoPingEnabled) {
+      this._autoPingTimer += dt;
+      if (this._autoPingTimer >= 0.5) {
+        var hasMoveInput = (dx !== 0 || dy !== 0) || this._joystickActive;
+        var hasSpace = this.input.keys.has(' ');
+        if (hasMoveInput || hasSpace) {
+          this._autoPingTimer = 0;
+          fireSonic();
+        }
+      }
     }
 
     // 3. 处理活跃声波的扩散激活：声波随时间一圈圈荡漾出去
@@ -1970,7 +2802,7 @@ class Game {
     }
     this.activeWaves = stillActive;
 
-    // 4. 清理过期光斑（每 60 帧清理一次，减少 GC 压力）
+    // 4. 清理过期光斑（每 60 帧清理一次，减少 GC 压力）+ E4 光斑上限
     if (!this._cleanFrameCounter) this._cleanFrameCounter = 0;
     this._cleanFrameCounter++;
     if (this._cleanFrameCounter > 60) {
@@ -1978,12 +2810,90 @@ class Game {
       const expireTime = performance.now() - AFTERGLOW_S * 1000;
       for (let i = 0; i < this.wallSpots.length; i++) {
         this.wallSpots[i] = this.wallSpots[i].filter(s => s.time > expireTime);
+        // E4: 每堵墙最多保留 50 个光斑，超出淘汰最旧的
+        if (this.wallSpots[i].length > 50) {
+          this.wallSpots[i] = this.wallSpots[i].slice(-50);
+        }
       }
     }
 
     // 5. 检测终点
     if (this.player.hitGoal(level.goal)) {
       this._onLevelComplete();
+      return;
+    }
+
+    // 6. B3: 收集品拾取检测
+    for (var si = 0; si < this.shards.length; si++) {
+      var s = this.shards[si];
+      if (s.collected) continue;
+      var sdx = this.player.x - s.x, sdy = this.player.y - s.y;
+      if (sdx * sdx + sdy * sdy < 256) { // 16px 范围
+        s.collected = true;
+        this.shardsCollected++;
+        // B3: 拾取碎片减少声波计数
+        this.sonicCount = Math.max(0, this.sonicCount - SHARD_BONUS);
+        if (this.hudShardCount) this.hudShardCount.textContent = this.shardsCollected;
+        if (this.hudSonicCount) this.hudSonicCount.textContent = this.sonicCount;
+        this._playBeep(1200, 0.1, 'triangle');
+        this._vibrate(30);
+      }
+    }
+
+    // 7. B2: 动态墙壁更新
+    if (this.movingWalls.length > 0) {
+      var t = now / 1000;
+      for (var mi = 0; mi < this.movingWalls.length; mi++) {
+        var mw = this.movingWalls[mi];
+        var offset = Math.sin(t * mw.speed + mw.phase) * mw.range / 2;
+        var wallIdx = mw.wallIndex;
+        if (this.currentWalls[wallIdx]) {
+          if (mw.axis === 'x') {
+            this.currentWalls[wallIdx].x1 = mw.baseX1 + offset;
+            this.currentWalls[wallIdx].x2 = mw.baseX2 + offset;
+          } else {
+            this.currentWalls[wallIdx].y1 = mw.baseY1 + offset;
+            this.currentWalls[wallIdx].y2 = mw.baseY2 + offset;
+          }
+        }
+      }
+      // S8: 动态墙移动后空间分区网格坐标过期，需重建（墙数量少，开销可接受）
+      RayCaster.buildGrid(this.currentWalls, CANVAS_W, CANVAS_H);
+    }
+
+    // 8. A3: 终点信标 — 定时自动 ping
+    this._goalBeaconTimer += dt;
+    if (this._goalBeaconTimer >= GOAL_BEACON_INTERVAL) {
+      this._goalBeaconTimer = 0;
+      var goalDist = Math.sqrt(
+        (this.player.x - level.goal.x) * (this.player.x - level.goal.x) +
+        (this.player.y - level.goal.y) * (this.player.y - level.goal.y)
+      );
+      if (goalDist < RAY_MAX_DIST) {
+        var delay = goalDist / ECHO_SOUND_SPEED;
+        var vol = Math.max(0.03, 0.12 * (1 - goalDist / RAY_MAX_DIST));
+        var angle = Math.atan2(level.goal.x - this.player.x, -(level.goal.y - this.player.y));
+        var pan = Math.max(-1, Math.min(1, Math.sin(angle)));
+        this._scheduleEcho(1000, delay, vol, 'sine', pan);
+        this._vibrate(15);
+      }
+    }
+
+    // 9. B6: 路径记录
+    this._pathSampleTimer += dt;
+    if (this._pathSampleTimer >= PATH_SAMPLE_INTERVAL) {
+      this._pathSampleTimer = 0;
+      this._pathSamples.push({ x: this.player.x, y: this.player.y });
+    }
+
+    // 10. C1: BGM 动态联动 — 靠近终点时加快 BPM
+    if (window.SonicBGM && typeof window.SonicBGM.setIntensity === 'function') {
+      var goalDist2 = Math.sqrt(
+        (this.player.x - level.goal.x) * (this.player.x - level.goal.x) +
+        (this.player.y - level.goal.y) * (this.player.y - level.goal.y)
+      );
+      var intensity = Math.max(0, Math.min(1, 1 - goalDist2 / 400));
+      window.SonicBGM.setIntensity(intensity);
     }
   }
 
@@ -2003,19 +2913,28 @@ class Game {
     // 1. 声波扩散波纹（最底层）
     renderer.renderWaveRings(this.activeWaves, now);
 
-    // 2. 墙壁光斑（余晖系统）— 使用含边界墙的 currentWalls
+    // 2. 墙壁光斑（余晖系统）
     renderer.renderWallSpots(this.currentWalls, this.wallSpots, now);
 
-    // 3. 射线可视化（锯齿形反射路线，用 hit.fromX/fromY）
+    // 3. 射线可视化
     if (this.lastRayHits) {
       renderer.renderRayLines(this.lastRayHits, this.player.x, this.player.y, now);
+      // C3: 墙端点高光
+      renderer.renderWallEndpoints(this.lastRayHits, now);
     }
 
-    // 4. 终点（脉冲动画，deltaTime 驱动）
-    renderer.renderGoal(level.goal, dt);
+    // 4. B3: 收集品渲染
+    renderer.renderShards(this.shards, now / 1000);
 
-    // 5. 玩家
+    // 5. 终点（A3: 条件可见 — 声波击中时闪烁）
+    var goalFlash = this.goalFlashTime > 0 && (now - this.goalFlashTime) < 500;
+    renderer.renderGoal(level.goal, dt, goalFlash);
+
+    // 6. 玩家
     renderer.renderPlayer(this.player);
+
+    // 7. A2: 微光视野遮罩（最后画，遮罩远处）
+    renderer.renderVisionMask(this.player);
   }
 }
 
@@ -2114,6 +3033,196 @@ document.addEventListener('DOMContentLoaded', () => {
       if (window.GameUtils) GameUtils.toggleFullscreen(document.getElementById('game-container'));
     });
   }
+
+  // ============ B1: 难度选择 ============
+  var diffBtns = document.querySelectorAll('.difficulty-btn');
+  diffBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      diffBtns.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentDifficulty = btn.dataset.diff;
+      VISION_RADIUS = DIFFICULTIES[currentDifficulty].visionRadius;
+      if (window.GameUtils) GameUtils._toast('难度：' + DIFFICULTIES[currentDifficulty].name, 2000);
+    });
+  });
+
+  // ============ A4: 震动反馈开关 ============
+  var vibToggle = document.getElementById('toggle-vibration');
+  if (vibToggle) {
+    vibToggle.addEventListener('click', function () {
+      game._vibrationEnabled = vibToggle.classList.contains('on');
+    });
+    game._vibrationEnabled = vibToggle.classList.contains('on');
+  }
+
+  // ============ A1: 回声系统开关（复用音效开关） ============
+  var soundToggle = document.getElementById('toggle-sound');
+  if (soundToggle) {
+    soundToggle.addEventListener('click', function () {
+      game._echoEnabled = soundToggle.classList.contains('on');
+    });
+    game._echoEnabled = soundToggle.classList.contains('on');
+  }
+
+  // ============ D2: 色盲友好高对比模式 ============
+  var cbToggle = document.getElementById('toggle-colorblind');
+  if (cbToggle) {
+    cbToggle.addEventListener('click', function () {
+      game._colorblindMode = cbToggle.classList.contains('on');
+      document.body.classList.toggle('colorblind-mode', game._colorblindMode);
+    });
+    game._colorblindMode = cbToggle.classList.contains('on');
+  }
+
+  // ============ D4: 减少动效 ============
+  var rmToggle = document.getElementById('toggle-reduce-motion');
+  if (rmToggle) {
+    rmToggle.addEventListener('click', function () {
+      game._reduceMotion = rmToggle.classList.contains('on');
+      document.body.classList.toggle('reduce-motion', game._reduceMotion);
+    });
+    game._reduceMotion = rmToggle.classList.contains('on');
+  }
+
+  // ============ D3: 长按自动声波 ============
+  var apToggle = document.getElementById('toggle-autoping');
+  if (apToggle) {
+    apToggle.addEventListener('click', function () {
+      game._autoPingEnabled = apToggle.classList.contains('on');
+    });
+    game._autoPingEnabled = apToggle.classList.contains('on');
+  }
+
+  // ============ D1: 虚拟摇杆初始化 ============
+  (function initJoystick() {
+    var zone = document.getElementById('joystick-zone');
+    var base = document.getElementById('joystick-base');
+    var thumb = document.getElementById('joystick-thumb');
+    if (!zone || !base || !thumb) return;
+    var baseRadius = 60, thumbRadius = 25;
+    var touchId = null, centerX = 0, centerY = 0;
+
+    zone.addEventListener('touchstart', function (e) {
+      e.preventDefault();
+      if (touchId !== null) return;
+      if (game.state !== Game.State.PLAYING) return;
+      var t = e.changedTouches[0];
+      touchId = t.identifier;
+      centerX = t.clientX; centerY = t.clientY;
+      base.style.left = (centerX - baseRadius) + 'px';
+      base.style.top = (centerY - baseRadius) + 'px';
+      base.style.display = 'block';
+      thumb.style.left = (centerX - thumbRadius) + 'px';
+      thumb.style.top = (centerY - thumbRadius) + 'px';
+      thumb.style.display = 'block';
+      game._joystickActive = true;
+    }, { passive: false });
+
+    zone.addEventListener('touchmove', function (e) {
+      e.preventDefault();
+      if (touchId === null) return;
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        if (t.identifier !== touchId) continue;
+        var dx = t.clientX - centerX;
+        var dy = t.clientY - centerY;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var maxDist = baseRadius;
+        if (dist > maxDist) { dx = dx / dist * maxDist; dy = dy / dist * maxDist; }
+        game._joystickDx = dx / maxDist;
+        game._joystickDy = dy / maxDist;
+        thumb.style.left = (centerX + dx - thumbRadius) + 'px';
+        thumb.style.top = (centerY + dy - thumbRadius) + 'px';
+      }
+    }, { passive: false });
+
+    function endTouch(e) {
+      if (touchId === null) return;
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier !== touchId) continue;
+        touchId = null;
+        base.style.display = 'none';
+        thumb.style.display = 'none';
+        game._joystickActive = false;
+        game._joystickDx = 0; game._joystickDy = 0;
+      }
+    }
+    zone.addEventListener('touchend', endTouch);
+    zone.addEventListener('touchcancel', endTouch);
+  })();
+
+  // ============ B5: 暂停按钮 ============
+  var btnPause = document.getElementById('btn-pause');
+  if (btnPause) btnPause.addEventListener('click', function () { game._pause(); });
+  var btnResume = document.getElementById('btn-resume');
+  if (btnResume) btnResume.addEventListener('click', function () { game._resume(); });
+  var btnPauseRestart = document.getElementById('btn-pause-restart');
+  if (btnPauseRestart) btnPauseRestart.addEventListener('click', function () {
+    game.pauseOverlay.classList.remove('visible');
+    game.state = Game.State.PLAYING;
+    game._restartLevel();
+  });
+  var btnPauseMenu = document.getElementById('btn-pause-menu');
+  if (btnPauseMenu) btnPauseMenu.addEventListener('click', function () {
+    game.pauseOverlay.classList.remove('visible');
+    game.showMenu();
+  });
+
+  // ============ F2: 关卡选择（含 F1 最佳记录显示）============
+  var btnLevelSelect = document.getElementById('btn-level-select');
+  if (btnLevelSelect) btnLevelSelect.addEventListener('click', function () {
+    var grid = game.levelSelectGrid;
+    if (!grid) return;
+    // S9: 每日挑战后 levels 数组被替换为 [dailyLevel]，需先恢复才能正确显示全部关卡
+    if (game._dailyMode) {
+      game.levels.levels = LEVELS;
+      game._dailyMode = false;
+    }
+    grid.innerHTML = '';
+    for (var i = 1; i <= game.levels.totalLevels; i++) {
+      var card = document.createElement('div');
+      var unlocked = i <= (game.bestLevel + 1);
+      card.className = 'level-card ' + (unlocked ? 'unlocked' : 'locked');
+      var stars = '';
+      var rec = game._loadLevelRecord(i);
+      if (rec && rec.stars) stars = '★'.repeat(rec.stars);
+      else if (window.GameUtils && GameUtils.getLevelStars) {
+        var st = GameUtils.getLevelStars('sonic', i);
+        stars = st ? '★'.repeat(st) : '☆☆☆';
+      } else { stars = '☆☆☆'; }
+      var meta = rec ? (rec.bestTime ? rec.bestTime.toFixed(1) + 's' : '') : '';
+      card.innerHTML = '<div>第 ' + i + ' 关</div><div class="lv-stars">' + stars + '</div>' +
+        (meta ? '<div style="font-size:9px;color:rgba(224,247,250,0.4)">' + meta + '</div>' : '');
+      if (unlocked) {
+        (function (lv) {
+          card.addEventListener('click', function () {
+            game.levelSelectOverlay.classList.remove('active');
+            game._dailyMode = false;
+            game.levels.levels = LEVELS;
+            game.levels.setLevel(lv);
+            game._startLevel();
+          });
+        })(i);
+      }
+      grid.appendChild(card);
+    }
+    game.levelSelectOverlay.classList.add('active');
+  });
+  var btnLevelSelectClose = document.getElementById('btn-level-select-close');
+  if (btnLevelSelectClose) btnLevelSelectClose.addEventListener('click', function () {
+    game.levelSelectOverlay.classList.remove('active');
+  });
+
+  // ============ F3: 每日挑战按钮 ============
+  var btnDaily = document.getElementById('btn-daily');
+  if (btnDaily) btnDaily.addEventListener('click', function () {
+    var done = game._isDailyCompleted();
+    if (done && window.GameUtils) {
+      GameUtils._toast('今日挑战已完成，明天再来！', 3000);
+      return;
+    }
+    game.startDailyChallenge();
+  });
 
   // 反馈入口注入
   if (window.GameUtils) {
@@ -2426,7 +3535,7 @@ if (window.GameUtils) {
     osc.stop(startTime + 0.12);
   }
 
-  // ---------- 调度 ----------
+  // ---------- 调度（E5: 使用 audioCtx 时间防漂移）----------
   function scheduler() {
     if (!isPlaying || !audioCtx) return;
     var now = audioCtx.currentTime;
@@ -2434,7 +3543,11 @@ if (window.GameUtils) {
       scheduleTick(nextNoteTime);
       nextNoteTime += TICK;
     }
-    schedulerTimer = setTimeout(scheduler, 30);
+    // E5: 用 requestAnimationFrame 校准，避免 setTimeout 长时间累积漂移
+    if (window._sonicBgmRAF) cancelAnimationFrame(window._sonicBgmRAF);
+    window._sonicBgmRAF = requestAnimationFrame(function () {
+      schedulerTimer = setTimeout(scheduler, 25);
+    });
   }
 
   function scheduleTick(t) {
@@ -2779,6 +3892,20 @@ if (window.GameUtils) {
     });
   }
 
+  // ---------- C1: BGM 动态强度联动 ----------
+  var bgmIntensity = 0;
+  var baseBPM = BPM;
+  function setIntensity(v) {
+    bgmIntensity = Math.max(0, Math.min(1, v));
+    // 靠近终点时 BPM 加快 (100 → 130)
+    BPM = Math.round(baseBPM + bgmIntensity * 30);
+    // 靠近终点时音量略增
+    if (masterGain && audioCtx && isPlaying) {
+      var target = userVolume * (1 + bgmIntensity * 0.3);
+      masterGain.gain.setTargetAtTime(target, audioCtx.currentTime, 0.5);
+    }
+  }
+
   // ---------- 暴露给外部 ----------
   window.SonicBGM = {
     play: play,
@@ -2786,6 +3913,7 @@ if (window.GameUtils) {
     toggle: toggle,
     setVolume: setVolume,
     setEnabled: setEnabled,
+    setIntensity: setIntensity,
     playSonicPing: playSonicPing,
     playWin: playWin,
     playReset: playReset,

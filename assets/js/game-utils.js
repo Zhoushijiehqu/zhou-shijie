@@ -25,7 +25,7 @@
     HINT_DAILY_LIMIT: 3,                     // 每日提示上限
     STORAGE_PREFIXES: ['snake_', 'mine_', 'puzzle_', 'memory_', 'prism_',
                        'sonic_', 'gravity_', 'eco_', 'cube2048_', 'rhythm_',
-                       'global_', 'daily_'],
+                       'global_', 'daily_', 'cottage_'],
 
     /* ============================================================
      *  1. 截图分享
@@ -245,6 +245,9 @@
       stats.totalTime = (stats.totalTime || 0) + (durationSec || 0);
       stats.lastPlay[gameSlug] = Date.now();
       this._writeJSON(this.KEY_STATS, stats);
+      if (typeof this.updateTaskProgress === 'function') {
+        try { this.updateTaskProgress(gameSlug, 'play', 1); } catch(e) {}
+      }
     },
 
     getStats() {
@@ -559,6 +562,9 @@
       // 最多保留 100 条
       if (all[slug].length > 100) all[slug] = all[slug].slice(-100);
       this._writeJSON(this.KEY_HISTORY, all);
+      if (typeof this.updateTaskProgress === 'function') {
+        try { this.updateTaskProgress(slug, 'score', Number(score) || 0); } catch(e) {}
+      }
     },
 
     /**
@@ -667,6 +673,9 @@
         // 排序：lowerBetter 升序（用时越短越好），否则降序
         lb.sort((a, b) => o.lowerBetter ? a.score - b.score : b.score - a.score);
         this._writeJSON(this._lbKey(slug), lb.slice(0, this.LEADERBOARD_LIMIT));
+        if (typeof this.updateTaskProgress === 'function') {
+          try { this.updateTaskProgress(slug, 'clear', 1); } catch(e) {}
+        }
       } catch (e) {}
     },
 
@@ -1218,6 +1227,297 @@
     });
   };
 
+  // ============================================================
+  // 模块17：每日任务系统 + 星光货币 + 商城框架
+  // ============================================================
+
+  GU.KEY_DAILY = 'global_daily_tasks_v1';
+  GU.KEY_STARS = 'global_star_currency_v1';
+  GU.KEY_DECOR = 'global_cottage_decor_v1';
+
+  // 任务模板池：每天从中随机抽取 5 个
+  GU.TASK_TEMPLATES = [
+    // —— 贪吃蛇 ——
+    { id: 'snake_play_3',  game: 'snake',  type: 'play',  target: 3,  title: '玩 3 局贪吃蛇',       reward: 8 },
+    { id: 'snake_score_30', game: 'snake', type: 'score', target: 30, title: '贪吃蛇单局达 30 分',  reward: 12 },
+    { id: 'snake_score_50', game: 'snake', type: 'score', target: 50, title: '贪吃蛇单局达 50 分',  reward: 18 },
+    // —— 扫雷 ——
+    { id: 'mine_play_2',   game: 'mine',   type: 'play',  target: 2,  title: '玩 2 局扫雷',         reward: 8 },
+    { id: 'mine_clear_1',  game: 'mine',   type: 'clear', target: 1,  title: '完成 1 局扫雷',       reward: 15 },
+    // —— 解谜剧场 ——
+    { id: 'puzzle_play_1', game: 'puzzle', type: 'play',  target: 1,  title: '玩 1 局解谜剧场',     reward: 6 },
+    { id: 'puzzle_clear_2',game: 'puzzle', type: 'clear', target: 2,  title: '通过 2 关解谜剧场',   reward: 15 },
+    // —— 记忆拼图 ——
+    { id: 'memory_play_1', game: 'memory', type: 'play',  target: 1,  title: '玩 1 局记忆拼图',     reward: 6 },
+    { id: 'memory_clear_2',game: 'memory', type: 'clear', target: 2,  title: '通过 2 关记忆拼图',   reward: 15 },
+    // —— 光影棱镜 ——
+    { id: 'prism_play_1',  game: 'prism',  type: 'play',  target: 1,  title: '玩 1 局光影棱镜',     reward: 6 },
+    { id: 'prism_clear_2', game: 'prism',  type: 'clear', target: 2,  title: '通过 2 关光影棱镜',   reward: 15 },
+    // —— 声波盲境 ——
+    { id: 'sonic_play_1',  game: 'sonic',  type: 'play',  target: 1,  title: '玩 1 局声波盲境',     reward: 6 },
+    { id: 'sonic_clear_2', game: 'sonic',  type: 'clear', target: 2,  title: '通过 2 关声波盲境',   reward: 15 },
+    // —— 引力弹弓 ——
+    { id: 'gravity_play_1',game: 'gravity',type: 'play',  target: 1,  title: '玩 1 局引力弹弓',     reward: 6 },
+    { id: 'gravity_clear_2',game:'gravity',type: 'clear', target: 2,  title: '通过 2 关引力弹弓',   reward: 15 },
+    // —— 生态瓶 ——
+    { id: 'eco_play_1',    game: 'eco',    type: 'play',  target: 1,  title: '观察一次生态瓶',       reward: 6 },
+    { id: 'eco_balance_30',game: 'eco',    type: 'score', target: 30, title: '生态瓶维持平衡 30 秒', reward: 12 },
+    // —— 3D 魔方 ——
+    { id: 'cube_play_1',   game: 'cube2048',type: 'play', target: 1,  title: '玩 1 局 3D 魔方',      reward: 6 },
+    { id: 'cube_score_256',game: 'cube2048',type: 'score',target: 256,title: '3D 魔方合成 256',      reward: 18 },
+    // —— 节奏线条 ——
+    { id: 'rhythm_play_1', game: 'rhythm', type: 'play',  target: 1,  title: '玩 1 局节奏线条',     reward: 6 },
+    { id: 'rhythm_score_200',game:'rhythm',type: 'score', target: 200,title: '节奏线条单局 200 分', reward: 12 },
+    // —— 跨游戏探索类 ——
+    { id: 'explore_3_games', game: 'global', type: 'explore', target: 3, title: '今日体验 3 款不同游戏', reward: 20 },
+    { id: 'explore_5_games', game: 'global', type: 'explore', target: 5, title: '今日体验 5 款不同游戏', reward: 30 },
+    { id: 'play_5_rounds',   game: 'global', type: 'play_all',target: 5, title: '今日累计游玩 5 局',   reward: 15 }
+  ];
+
+  // 商城装饰商品（阶段3填充，目前为框架）
+  GU.SHOP_ITEMS = [
+    { id: 'rug_red',    name: '红色地毯',   price: 50,  icon: '🟥', category: 'floor', desc: '给小屋铺上温暖的红地毯' },
+    { id: 'plant_pot',  name: '窗边盆栽',   price: 40,  icon: '🪴', category: 'plant', desc: '窗台摆上一盆绿色植物' },
+    { id: 'lamp_glow',  name: '暖色台灯',   price: 60,  icon: '💡', category: 'light', desc: '书桌上的温暖灯光' },
+    { id: 'painting',   name: '装饰挂画',   price: 80,  icon: '🖼️', category: 'wall',  desc: '墙上挂一幅艺术画' },
+    { id: 'rug_blue',   name: '蓝色地毯',   price: 70,  icon: '🟦', category: 'floor', desc: '清爽的蓝色地毯' },
+    { id: 'bookshelf',  name: '小书架',     price: 100, icon: '📚', category: 'furniture', desc: '角落的迷你书架' },
+    { id: 'fish_bowl',  name: '鱼缸',       price: 120, icon: '🐠', category: 'furniture', desc: '桌上的小鱼缸' },
+    { id: 'star_light', name: '星空灯',     price: 150, icon: '⭐', category: 'light', desc: '天花板的星光投影' }
+  ];
+
+  GU._getTodayStr = function () {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
+
+  /**
+   * 随机抽取 n 个不重复元素
+   */
+  GU._pickRandom = function (arr, n) {
+    var pool = arr.slice();
+    var result = [];
+    for (var i = 0; i < n && pool.length > 0; i++) {
+      var idx = Math.floor(Math.random() * pool.length);
+      result.push(pool.splice(idx, 1)[0]);
+    }
+    return result;
+  };
+
+  /**
+   * 生成今日任务（5 个）
+   */
+  GU._generateDailyTasks = function () {
+    var templates = this.TASK_TEMPLATES;
+    // 策略：至少 2 个不同游戏 + 1 个跨游戏探索类
+    var gameTasks = templates.filter(function (t) { return t.game !== 'global'; });
+    var globalTasks = templates.filter(function (t) { return t.game === 'global'; });
+    var picked = this._pickRandom(gameTasks, 4);
+    var globalPicked = this._pickRandom(globalTasks, 1);
+    var all = picked.concat(globalPicked);
+    // 打乱顺序
+    for (var i = all.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = all[i]; all[i] = all[j]; all[j] = tmp;
+    }
+    return all.map(function (t) {
+      return {
+        id: t.id,
+        game: t.game,
+        type: t.type,
+        target: t.target,
+        title: t.title,
+        reward: t.reward,
+        progress: 0,
+        completed: false,
+        claimed: false
+      };
+    });
+  };
+
+  /**
+   * 获取今日任务（自动检查日期刷新）
+   * @returns {Array<{id,game,type,target,title,reward,progress,completed,claimed}>}
+   */
+  GU.getDailyTasks = function () {
+    try {
+      var today = this._getTodayStr();
+      var data = this._readJSON(this.KEY_DAILY, null);
+      if (!data || data.date !== today || !data.tasks || data.tasks.length !== 5) {
+        data = {
+          date: today,
+          tasks: this._generateDailyTasks(),
+          playedGames: []
+        };
+        this._writeJSON(this.KEY_DAILY, data);
+      }
+      return data.tasks.slice();
+    } catch (e) {
+      return [];
+    }
+  };
+
+  /**
+   * 上报游戏进度（各游戏在对应事件调用）
+   * @param {string} game - 游戏 slug
+   * @param {string} type - 事件类型：play/clear/score
+   * @param {number} value - 进度值（play 传 1，clear 传 1，score 传当前分数）
+   */
+  GU.updateTaskProgress = function (game, type, value) {
+    try {
+      var today = this._getTodayStr();
+      var data = this._readJSON(this.KEY_DAILY, null);
+      if (!data || data.date !== today || !data.tasks) return;
+      var changed = false;
+      var justCompleted = [];
+
+      // 记录今日已玩游戏（用于 explore 类任务）
+      if (type === 'play' && data.playedGames.indexOf(game) === -1) {
+        data.playedGames.push(game);
+        changed = true;
+      }
+
+      // 更新各任务进度
+      for (var i = 0; i < data.tasks.length; i++) {
+        var t = data.tasks[i];
+        if (t.claimed) continue;
+        var matches = false;
+
+        if (t.type === 'play' && t.game === game && type === 'play') {
+          t.progress += value || 1;
+          matches = true;
+        } else if (t.type === 'clear' && t.game === game && type === 'clear') {
+          t.progress += value || 1;
+          matches = true;
+        } else if (t.type === 'score' && t.game === game && type === 'score') {
+          if (value > t.progress) { t.progress = value; matches = true; }
+        } else if (t.type === 'explore' && t.game === 'global') {
+          var gameCount = data.playedGames.filter(function (g) { return g !== 'global'; }).length;
+          if (gameCount !== t.progress) { t.progress = gameCount; matches = true; }
+        } else if (t.type === 'play_all' && t.game === 'global' && type === 'play') {
+          t.progress += value || 1;
+          matches = true;
+        }
+
+        if (matches) {
+          changed = true;
+          if (!t.completed && t.progress >= t.target) {
+            t.completed = true;
+            justCompleted.push(t);
+          }
+        }
+      }
+
+      if (changed) this._writeJSON(this.KEY_DAILY, data);
+
+      // 已完成 toast 提示
+      for (var k = 0; k < justCompleted.length; k++) {
+        this._toast('🎉 任务完成：' + justCompleted[k].title + ' +' + justCompleted[k].reward + '星光', 3000);
+      }
+    } catch (e) {}
+  };
+
+  /**
+   * 领取任务奖励（星光）
+   */
+  GU.claimTaskReward = function (taskId) {
+    try {
+      var data = this._readJSON(this.KEY_DAILY, null);
+      if (!data || !data.tasks) return false;
+      var task = null;
+      for (var i = 0; i < data.tasks.length; i++) {
+        if (data.tasks[i].id === taskId) { task = data.tasks[i]; break; }
+      }
+      if (!task || !task.completed || task.claimed) return false;
+      task.claimed = true;
+      this._writeJSON(this.KEY_DAILY, data);
+      this.addStars(task.reward);
+      return task.reward;
+    } catch (e) { return false; }
+  };
+
+  /**
+   * 获取星光总数
+   */
+  GU.getStars = function () {
+    try {
+      return parseInt(localStorage.getItem(this.KEY_STARS) || '0', 10);
+    } catch (e) { return 0; }
+  };
+
+  /**
+   * 增加星光
+   */
+  GU.addStars = function (amount) {
+    try {
+      var cur = this.getStars();
+      cur += amount;
+      localStorage.setItem(this.KEY_STARS, String(cur));
+      return cur;
+    } catch (e) { return 0; }
+  };
+
+  /**
+   * 减少星光（购买用）
+   */
+  GU.spendStars = function (amount) {
+    try {
+      var cur = this.getStars();
+      if (cur < amount) return false;
+      cur -= amount;
+      localStorage.setItem(this.KEY_STARS, String(cur));
+      return true;
+    } catch (e) { return false; }
+  };
+
+  /**
+   * 获取商城商品列表（含已拥有状态）
+   */
+  GU.getShopList = function () {
+    try {
+      var owned = this.getOwnedDecor();
+      return this.SHOP_ITEMS.map(function (item) {
+        return {
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          icon: item.icon,
+          category: item.category,
+          desc: item.desc,
+          owned: owned.indexOf(item.id) !== -1
+        };
+      });
+    } catch (e) { return []; }
+  };
+
+  /**
+   * 获取已拥有的装饰
+   */
+  GU.getOwnedDecor = function () {
+    try {
+      return this._readJSON(this.KEY_DECOR, []);
+    } catch (e) { return []; }
+  };
+
+  /**
+   * 购买装饰
+   */
+  GU.buyDecor = function (itemId) {
+    try {
+      var owned = this.getOwnedDecor();
+      if (owned.indexOf(itemId) !== -1) return 'owned';
+      var item = null;
+      for (var i = 0; i < this.SHOP_ITEMS.length; i++) {
+        if (this.SHOP_ITEMS[i].id === itemId) { item = this.SHOP_ITEMS[i]; break; }
+      }
+      if (!item) return 'not_found';
+      if (!this.spendStars(item.price)) return 'no_stars';
+      owned.push(itemId);
+      this._writeJSON(this.KEY_DECOR, owned);
+      return 'ok';
+    } catch (e) { return 'error'; }
+  };
+
   // 注入全局动画 keyframes（仅一次）
   if (!document.getElementById('__gu_anim')) {
     const style = document.createElement('style');
@@ -1228,6 +1528,103 @@
     `;
     document.head.appendChild(style);
   }
+
+  // ============================================================
+  // 模块18：小屋场景状态存档（A1）
+  // ============================================================
+  GU.KEY_COTTAGE_STATE = 'cottage_state_v1';
+  GU.KEY_COLLECTIBLES = 'cottage_collectibles_v1'; // 已拾取收集品ID
+  GU.KEY_EASTER_EGGS = 'cottage_easter_eggs_v1';   // 已触发彩蛋ID
+  GU.KEY_VISIT_COUNT = 'cottage_visit_count_v1';   // 访问次数
+
+  /**
+   * 保存小屋场景状态
+   * @param {Object} state - { fpPos:{x,y,z}, fpYaw, fpPitch, isNight, weatherState,
+   *                           doorOpen, lampStates:{tableLamp,floorLamp}, catPos:{x,z} }
+   */
+  GU.saveCottageState = function (state) {
+    try {
+      this._writeJSON(this.KEY_COTTAGE_STATE, Object.assign({ t: Date.now() }, state));
+    } catch (e) {}
+  };
+
+  /**
+   * 读取小屋场景状态
+   * @returns {Object|null}
+   */
+  GU.loadCottageState = function () {
+    try {
+      return this._readJSON(this.KEY_COTTAGE_STATE, null);
+    } catch (e) { return null; }
+  };
+
+  /** 标记收集品已拾取 */
+  GU.markCollected = function (id) {
+    try {
+      var arr = this._readJSON(this.KEY_COLLECTIBLES, []);
+      if (arr.indexOf(id) === -1) { arr.push(id); this._writeJSON(this.KEY_COLLECTIBLES, arr); }
+    } catch (e) {}
+  };
+  /** 查询已拾取的收集品 */
+  GU.getCollected = function () {
+    try { return this._readJSON(this.KEY_COLLECTIBLES, []); } catch (e) { return []; }
+  };
+  /** 标记彩蛋已触发 */
+  GU.markEgg = function (id) {
+    try {
+      var arr = this._readJSON(this.KEY_EASTER_EGGS, []);
+      if (arr.indexOf(id) === -1) { arr.push(id); this._writeJSON(this.KEY_EASTER_EGGS, arr); }
+    } catch (e) {}
+  };
+  /** 查询已触发的彩蛋 */
+  GU.getEggs = function () {
+    try { return this._readJSON(this.KEY_EASTER_EGGS, []); } catch (e) { return []; }
+  };
+  /** 增加访问计数 */
+  GU.incVisit = function () {
+    try {
+      var n = parseInt(localStorage.getItem(this.KEY_VISIT_COUNT) || '0', 10) + 1;
+      localStorage.setItem(this.KEY_VISIT_COUNT, String(n));
+      return n;
+    } catch (e) { return 1; }
+  };
+  GU.getVisitCount = function () {
+    try { return parseInt(localStorage.getItem(this.KEY_VISIT_COUNT) || '0', 10); } catch (e) { return 0; }
+  };
+  /** 是否首次访问 */
+  GU.isFirstVisit = function () { return this.getVisitCount() <= 1; };
+
+  /**
+   * 获取某游戏最高分（从历史记录推算）
+   * @param {string} slug
+   * @param {boolean} [lowerBetter=false]
+   * @returns {number|null}
+   */
+  GU.getHighScore = function (slug, lowerBetter) {
+    try {
+      var lb = this.loadLeaderboard(slug);
+      if (!lb.length) {
+        var hist = this.getHistory(slug);
+        if (!hist.length) return null;
+        var vals = hist.map(function (h) { return h.score; });
+        return lowerBetter ? Math.min.apply(null, vals) : Math.max.apply(null, vals);
+      }
+      return lowerBetter ? lb[lb.length - 1].score : lb[0].score;
+    } catch (e) { return null; }
+  };
+
+  /**
+   * 获取所有游戏的最高分汇总（用于奖杯架/电视显示）
+   * @returns {Object<string,number|null>}
+   */
+  GU.getAllHighScores = function () {
+    var slugs = ['snake', 'mine', 'puzzle', 'memory', 'prism', 'sonic', 'gravity', 'eco', 'cube2048', 'rhythm'];
+    var result = {};
+    for (var i = 0; i < slugs.length; i++) {
+      result[slugs[i]] = this.getHighScore(slugs[i], slugs[i] === 'mine');
+    }
+    return result;
+  };
 
   global.GameUtils = GU;
 })(window);

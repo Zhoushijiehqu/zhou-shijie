@@ -400,6 +400,7 @@ window.ProfileData = {
     { label: '关于', href: 'about' },
     { label: '成长', href: 'timeline' },
     { label: '联系', href: 'contact' },
-    { label: '游戏', href: 'games.html', external: true }
+    { label: '游戏', href: 'games.html', external: true },
+    { label: '实验室', href: 'lab.html', external: true }
   ]
 };

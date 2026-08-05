@@ -72,8 +72,6 @@ const App = {
 
     // 初始化鼠标跟随光效
     this.initMouseGlow();
-
-    console.log('✨ 个人数字名片已加载完成');
   },
 
   /**

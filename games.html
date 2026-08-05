@@ -693,6 +693,9 @@
   </style>
 </head>
 <body>
+  <!-- 键盘用户：首个 Tab 可跳过导航直达正文 -->
+  <a class="skip-link" href="#main-content">跳至主内容</a>
+
   <!-- 顶部 sticky 导航条：返回主页 + 中间标题 + 主题切换 -->
   <header class="sub-header">
     <div class="sub-header-inner">
@@ -716,7 +719,7 @@
     </div>
   </header>
 
-  <main>
+  <main id="main-content" tabindex="-1">
     <!-- 标题区：编辑体小帽 + 大标题 + 副标题 -->
     <section class="sub-hero">
       <div class="container">

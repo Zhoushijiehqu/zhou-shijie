@@ -483,19 +483,11 @@
 
   <script src="../assets/js/game-utils.js"></script>
 
-  <!-- Three.js 模块 -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-    }
-  }
-  </script>
-
+  <!-- Three.js 模块：使用本地内置副本（相对路径），避免运行环境注入的
+       null importmap 把裸 'three' 拦截导致 "blocked by a null value" 报错 -->
   <script type="module">
-    import * as THREE from 'three';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import * as THREE from '../assets/vendor/three/three.module.js';
+    import { OrbitControls } from '../assets/vendor/three/addons/controls/OrbitControls.js';
 
     /* ============================================================
      *  配置层

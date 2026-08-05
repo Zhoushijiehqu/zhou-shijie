@@ -269,15 +269,25 @@
     },
 
     /**
-     * 显示教学弹层（一次性，可勾选不再提示）
+     * 显示教学弹层（首次自动弹出，可勾选不再提示）
+     *
+     * 同时会记住本页的教程内容并安装"帮助入口"（右下角 ? 悬浮按钮 +
+     * 快捷键 ? / F1），让玩家在勾选"不再显示"之后仍能随时回看操作说明。
+     * 此前教程被 hasSeenTutorial 一次性门禁挡住，看过一次就永远无法再查，
+     * 是 10 个游戏共有的体验缺口。
+     *
      * @param {string} slug - 游戏标识
      * @param {string} title - 标题
      * @param {Array<{step:string,desc:string}>} steps - 步骤
      * @param {Function} onClose - 关闭回调
+     * @param {boolean} [force] - 强制显示（忽略"已看过"记录），供帮助按钮调用
      */
-    showTutorial(slug, title, steps, onClose) {
-      if (this.hasSeenTutorial(slug)) { if (onClose) onClose(); return; }
+    showTutorial(slug, title, steps, onClose, force) {
       if (!Array.isArray(steps) || steps.length === 0) { if (onClose) onClose(); return; }
+      // 记住内容并装好帮助入口，之后随时可回看
+      this._installHelpEntry(slug, title, steps);
+      if (!force && this.hasSeenTutorial(slug)) { if (onClose) onClose(); return; }
+      if (document.querySelector('.__gu_tut_modal')) { if (onClose) onClose(); return; }
       const modal = document.createElement('div');
       modal.className = '__gu_tut_modal';
       modal.style.cssText = [
@@ -301,11 +311,12 @@
             <h3 style="margin:0;font:600 22px 'Fraunces',serif;color:#f5e6c8">${this._esc(title)}</h3>
           </div>
           <div>${stepsHtml}</div>
+          ${force ? '<div style="margin:16px 0;color:#8a96b8;font:12px Manrope,sans-serif;text-align:center">随时按 <b style="color:#d4ab6a">?</b> 或点右下角按钮可再次查看</div>' : `
           <label style="display:flex;align-items:center;gap:8px;margin:16px 0;color:#8a96b8;font:12px Manrope,sans-serif;cursor:pointer">
             <input type="checkbox" id="__gu_tut_noagain" style="cursor:pointer">
             <span>不再显示此教程</span>
-          </label>
-          <button id="__gu_tut_ok" style="width:100%;background:#d4ab6a;border:none;color:#1a1f2e;padding:12px;border-radius:10px;cursor:pointer;font:700 14px Manrope,sans-serif">开始游戏</button>
+          </label>`}
+          <button id="__gu_tut_ok" style="width:100%;background:#d4ab6a;border:none;color:#1a1f2e;padding:12px;border-radius:10px;cursor:pointer;font:700 14px Manrope,sans-serif">${force ? '返回游戏' : '开始游戏'}</button>
         </div>
       `;
       document.body.appendChild(modal);
@@ -315,8 +326,9 @@
       const close = () => {
         if (closed) return;
         closed = true;
-        const noAgain = modal.querySelector('#__gu_tut_noagain').checked;
-        if (noAgain) this.markTutorialSeen(slug);
+        // 回看模式下没有该勾选框，需判空
+        const cb = modal.querySelector('#__gu_tut_noagain');
+        if (cb && cb.checked) this.markTutorialSeen(slug);
         document.removeEventListener('keydown', escHandler);
         modal.style.transition = 'opacity .2s';
         modal.style.opacity = '0';
@@ -325,6 +337,65 @@
       modal.querySelector('#__gu_tut_ok').onclick = close;
       modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
       document.addEventListener('keydown', escHandler);
+    },
+
+    /**
+     * 安装统一的"帮助入口"：右下角 ? 悬浮按钮 + 快捷键 ? / F1。
+     * 幂等——重复调用只会更新教程内容，不会重复插入 DOM 或事件。
+     * 由 showTutorial 自动调用，10 个游戏无需改动各自代码。
+     * @private
+     */
+    _installHelpEntry(slug, title, steps) {
+      this._help = { slug, title, steps };
+      if (this._helpReady) return;
+      this._helpReady = true;
+
+      const open = () => {
+        const h = this._help;
+        if (!h) return;
+        // 已有弹层时不重复打开（showTutorial 内部亦有防重入）
+        if (document.querySelector('.__gu_tut_modal')) return;
+        this.showTutorial(h.slug, h.title, h.steps, null, true);
+      };
+
+      const btn = document.createElement('button');
+      btn.className = '__gu_help_btn';
+      btn.type = 'button';
+      btn.textContent = '?';
+      btn.setAttribute('aria-label', '查看操作说明（快捷键 ?）');
+      btn.title = '操作说明（? 键）';
+      btn.style.cssText = [
+        'position:fixed', 'right:18px', 'bottom:18px', 'z-index:9998',
+        'width:40px', 'height:40px', 'border-radius:50%',
+        'background:rgba(26,31,46,0.82)', 'color:#d4ab6a',
+        'border:1px solid rgba(212,171,106,0.45)',
+        'font:700 18px Manrope,sans-serif', 'cursor:pointer',
+        'display:flex', 'align-items:center', 'justify-content:center',
+        'backdrop-filter:blur(6px)', 'box-shadow:0 6px 18px rgba(0,0,0,.28)',
+        'opacity:0.55', 'transition:opacity .2s,transform .2s'
+      ].join(';');
+      // 平时半透明不干扰游戏画面，悬停/聚焦时才凸显
+      const hi = () => { btn.style.opacity = '1'; btn.style.transform = 'scale(1.08)'; };
+      const lo = () => { btn.style.opacity = '0.55'; btn.style.transform = 'scale(1)'; };
+      btn.addEventListener('mouseenter', hi);
+      btn.addEventListener('mouseleave', lo);
+      btn.addEventListener('focus', hi);
+      btn.addEventListener('blur', lo);
+      btn.addEventListener('click', open);
+      const mount = () => document.body && document.body.appendChild(btn);
+      if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
+
+      // 快捷键：? (Shift+/) 与 F1。选这两个键是因为全部 10 个游戏都未占用，
+      // 不会和各自的 WASD/方向键/R/Esc 等操作冲突。
+      document.addEventListener('keydown', (e) => {
+        if (e.key === '?' || e.key === 'F1') {
+          const t = e.target;
+          // 正在输入时不拦截
+          if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+          e.preventDefault();
+          open();
+        }
+      });
     },
 
     /* ============================================================
@@ -728,16 +799,9 @@
     },
 
     /* ============================================================
-     *  11. PWA Service Worker 注册（在根目录页面调用一次即可）
+     *  11. （原 PWA registerSW 已并入第 16 节，该处定义会被后者覆盖，
+     *       属死代码，已移除，避免维护时改错地方）
      * ============================================================ */
-    registerSW() {
-      if (!('serviceWorker' in navigator)) return;
-      // 仅在 https 或 localhost 下生效；相对路径以适应当前目录深度
-      const swUrl = (document.documentElement.getAttribute('data-sw-root') || '') + 'sw.js';
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.register(swUrl, { scope: './' }).catch(function () {});
-      });
-    },
 
     /* ============================================================
      *  12. 用户反馈入口（注入到页面底部）
@@ -1040,9 +1104,15 @@
      */
     registerSW() {
       if (!('serviceWorker' in navigator)) return;
-      const swUrl = (document.documentElement.getAttribute('data-sw-root') || '') + 'sw.js';
+      // sw.js 位于站点根目录。优先用显式声明的 data-sw-root；
+      // 未声明时自动推断——本站唯一的子目录是 games/，据此判断即可，
+      // 这样即使部署在 GitHub Pages 子路径（/repo/games/x.html）也不会算错。
+      // （修复：prism.html 曾漏写该属性，导致静默请求 games/sw.js → 404）
+      let root = document.documentElement.getAttribute('data-sw-root');
+      if (root === null) root = /\/games\//.test(location.pathname) ? '../' : '';
+      const swUrl = root + 'sw.js';
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register(swUrl, { scope: './' })
+        navigator.serviceWorker.register(swUrl, { scope: root || './' })
           .then((reg) => {
             // 监听更新
             reg.addEventListener('updatefound', () => {

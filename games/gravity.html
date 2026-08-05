@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
 <title>引力弹弓航天挑战 | Gravity Slingshot</title>
+<meta name="description" content="引力弹弓航天挑战 - 利用行星引力完成太空弹弓机动，规划最优航行轨道将探测器送抵目标星体">
 <link rel="manifest" href="../manifest.webmanifest">
 <meta name="theme-color" content="#d4ab6a">
 <style>
@@ -336,6 +338,18 @@
   .lb-item .score { font-family: var(--font-family-display); font-weight: 700; color: var(--color-text-primary); }
   .lb-item .meta { font-size: 10px; color: var(--color-text-tertiary); }
   .lb-empty { text-align: center; color: var(--color-text-tertiary); font-size: 12px; padding: 16px 0; }
+  /* 返回游戏小屋（修复直接打开本页时的死胡同：原仅有各覆盖层的"返回菜单"按钮，无法回到站点其余部分） */
+  .hub-back-link {
+    position: absolute; top: 14px; left: 14px; z-index: 20;
+    display: inline-flex; align-items: center; gap: 4px;
+    min-height: 40px;
+    padding: 6px 13px; border-radius: 999px;
+    background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.3);
+    color: var(--cyan); font: 600 12px/1 'Manrope', system-ui, sans-serif; letter-spacing: 1px;
+    text-decoration: none; backdrop-filter: blur(6px);
+    transition: background .2s, transform .2s;
+  }
+  .hub-back-link:hover { background: rgba(0,229,255,0.18); transform: translateX(-2px); }
 </style>
 </head>
 <body>
@@ -359,6 +373,7 @@
 
   <!-- Menu Overlay -->
   <div class="overlay active" id="overlayMenu">
+    <a href="../games.html" class="hub-back-link" aria-label="返回游戏小屋">← 游戏小屋</a>
     <div class="panel">
       <h1>🌌 引力弹弓航天挑战</h1>
       <p>利用行星引力场进行弹弓变轨，<br>将探测器精准送达目标区域。</p>
@@ -488,8 +503,10 @@ const CSS_H = 600;
 const dpr = Math.min(window.devicePixelRatio || 1, 2); // 上限2x防性能问题
 canvas.width = CSS_W * dpr;
 canvas.height = CSS_H * dpr;
-canvas.style.width = CSS_W + 'px';
-canvas.style.height = CSS_H + 'px';
+// 不再用内联样式写死 800×600：CSS 已有 #game-wrapper{max-width:100vw} + canvas{width:100%}
+// 的响应式规则，内联样式优先级更高会把它覆盖，导致窄屏（如 375px）横向溢出、画面被切掉。
+// 缓冲区仍是 CSS_W*dpr，逻辑坐标仍是 800×600，且 getCanvasPos() 已按 rect.width 换算，
+// 因此等比缩小后输入坐标依旧准确。
 ctx.scale(dpr, dpr);
 
 // ─── 物理常量 ───────────────────────────────────────────────

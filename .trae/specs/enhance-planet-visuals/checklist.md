@@ -1,0 +1,35 @@
+# Checklist
+
+- [x] V1: 所有程序化纹理分辨率为 512px（grep cv2d 调用确认无 256 残留）
+- [x] V1: 小屋玻璃窗为半透明 + emissive 暖光（transparent: true, emissiveIntensity > 0）
+- [x] V1: 金顶/门把手 metalness = 0.6（非 0）
+- [x] V2: 10 个小屋存在 3 种不同屋顶造型（尖塔/圆顶/平顶）
+- [x] V2: 小屋有随机装饰构件（至少 porchCanopy/chimney/flowerBox/signFlag 中 2 种）
+- [x] V2: 门上方有门牌号贴花（1-10 数字可见）
+- [x] V3: 角色有眼睛和刘海和嘴（面部特征可见）
+- [x] V3: 角色移动时四肢摆动（sin 动画），静止时归位
+- [x] V3: 奔跑时身体前倾约 15°
+- [x] V4: 天空天顶区域有星点
+- [x] V4: 穹顶内侧有月亮球体且参与 Bloom
+- [x] V4: 街道低空有萤火虫粒子飘动闪烁
+- [x] V4: 树附近有落叶粒子旋转下落
+- [x] V5: renderer.toneMapping = ACESFilmicToneMapping
+- [x] V5: Bloom strength=0.7, threshold=0.75
+- [x] V5: 桌面端启用 SMAA Pass
+- [x] V5: 雾色为 0x6b4a5c
+- [x] V6: 树冠为 3 层错落锥
+- [x] V6: 草丛为 3-5 簇聚团（非单锥）
+- [x] V6: 地面有彩色小花散布
+- [x] V6: 桌面端树/草有风感（scale 起伏，非 rotation），移动端无
+- [x] B2: 路灯灯罩有 emissive 自发光
+- [x] B3: 窗户 emissiveIntensity 随时间呼吸
+- [x] C2: 小屋底部有碎石地基围边
+- [x] D3: 画面有 Vignette 暗角效果
+- [x] B1: 桌面端启用 SSAO 环境光遮蔽
+- [x] C1: 星球表面有 2 个池塘水面（高 metalness 反射 + 边缘石）
+- [x] D1: 桌面端启用 BokehPass 景深，focus 跟随相机-角色距离
+- [x] BUG修复: 落叶改为径向下落（指向球心），原世界-y速度在球面下方会远离球心
+- [x] BUG修复: 小花 InstancedMesh material 添加 vertexColors:true 使 instanceColor 生效
+- [x] BUG修复: 植被风感从 rotation.z 改为 scale.setScalar（rotation 会让球面实例绕世界原点摆动偏离地面）
+- [x] 语法验证：括号配平 OK
+- [x] 移动端档位：IS_COARSE 下粒子/SMAA/SSAO/Bokeh/风感均被跳过

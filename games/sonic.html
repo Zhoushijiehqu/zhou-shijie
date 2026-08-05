@@ -6,7 +6,9 @@
 <meta name="copyright" content="© 2026 周世杰. 代码 MIT, 创意 CC-BY-NC 4.0.">
 <meta name="generator" content="周世杰个人作品集 v7.0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👂</text></svg>">
 <title>声波盲境探路 | Sonic Blind Maze</title>
+<meta name="description" content="声波盲境探路 - 在黑暗中以声波回声感知地形，凭听觉引导角色穿越迷宫，一场专注与耐心的听觉解谜">
 <link rel="manifest" href="../manifest.webmanifest">
 <meta name="theme-color" content="#d4ab6a">
 <style>
@@ -383,6 +385,19 @@
   .level-card.unlocked:hover { background: rgba(0,255,255,0.12); box-shadow: var(--glow-cyan); }
   .level-card.locked { opacity: 0.35; cursor: not-allowed; }
   .level-card .lv-stars { font-size: 10px; color: var(--gold); margin-top: 2px; }
+
+  /* 返回游戏小屋（修复直接打开本页时的死胡同：原仅有"返回菜单"按钮，无法回到站点其余部分） */
+  .hub-back-link {
+    position: absolute; top: 14px; left: 14px; z-index: 20;
+    display: inline-flex; align-items: center; gap: 4px;
+    min-height: 40px;
+    padding: 6px 13px; border-radius: 999px;
+    background: rgba(0,255,255,0.08); border: 1px solid rgba(0,255,255,0.3);
+    color: var(--cyan); font: 600 12px/1 'Manrope', system-ui, sans-serif; letter-spacing: 1px;
+    text-decoration: none; backdrop-filter: blur(6px);
+    transition: background .2s, transform .2s;
+  }
+  .hub-back-link:hover { background: rgba(0,255,255,0.18); transform: translateX(-2px); }
 </style>
 </head>
 <body>
@@ -393,6 +408,7 @@
 
   <!-- 主菜单 -->
   <div class="ui-overlay active" id="menu-overlay">
+    <a href="../games.html" class="hub-back-link" aria-label="返回游戏小屋">← 游戏小屋</a>
     <div class="menu-panel visible" id="menu-panel">
       <div class="game-title">声波盲境探路<span class="sub">SONIC BLIND MAZE</span></div>
       <div class="difficulty-row" id="difficulty-row">

@@ -1,16 +1,21 @@
 /**
  * sw.js - 游戏小屋 Service Worker
  * 策略：
- *   - 同源静态资源（HTML/CSS/JS/SVG/数据）：stale-while-revalidate
+ *   - HTML 文档（含 iframe 内嵌页）：network-first，离线回退缓存
+ *   - 其余同源静态资源（CSS/JS/SVG/数据）：stale-while-revalidate
  *   - Google Fonts：network-first，失败时尝试缓存
- *   - 导航请求：network-first，离线回退缓存
+ *
+ * 注意：改版后请务必递增 CACHE_VERSION，否则旧缓存不会被清理。
  */
-const CACHE_VERSION = 'game-house-v1';
+const CACHE_VERSION = 'game-house-v3';
 const CORE_ASSETS = [
   './',
   './index.html',
   './games.html',
   './projects.html',
+  './lab.html',
+  './planet.html',
+  './cottage.html',
   './manifest.webmanifest',
   './assets/css/base.css',
   './assets/css/layout.css',
@@ -73,8 +78,14 @@ self.addEventListener('fetch', function (e) {
 
   const url = new URL(req.url);
 
-  // 导航请求（HTML 页面）：network-first，离线回退缓存
-  if (req.mode === 'navigate') {
+  // HTML 文档：network-first，离线回退缓存。
+  // 除了 navigate（含 iframe 内嵌），还显式匹配 .html 结尾的请求，
+  // 避免页面改动被 stale-while-revalidate 拖慢一个版本（用户需刷两次才看到新内容）。
+  const isHTML = req.mode === 'navigate' ||
+                 req.destination === 'document' ||
+                 req.destination === 'iframe' ||
+                 url.pathname.endsWith('.html');
+  if (isHTML) {
     e.respondWith(
       fetch(req).then(function (res) {
         const clone = res.clone();

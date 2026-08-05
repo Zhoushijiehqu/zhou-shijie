@@ -3,24 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪐</text></svg>">
 <title>球形星球 · 游戏小屋街道</title>
-<!-- U6：预连接 CDN，加速 three.js 与 addons 模块加载 -->
-<link rel="preconnect" href="https://unpkg.com" crossorigin />
-<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
 
-<!-- es-module-shims：让 importmap 在 file:// 协议下也能工作（polyfill 绕过浏览器对 file:// ESM 的 CORS 限制） -->
-<script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
-<!-- Three.js r160（ES Module，CDN） -->
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-<!-- Cannon.js 物理引擎（UMD 全局 CANNON，经典脚本先于 module 执行） -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+<!-- Three.js r160（ES Module，本地 vendor，相对路径直接 import，无需 importmap / CDN） -->
+<!-- Cannon.js 物理引擎（UMD 全局 CANNON，本地 vendor，经典脚本先于 module 执行） -->
+<script src="assets/vendor/cannon/cannon.min.js"></script>
 
 <!-- F4：加载失败兜底。若 three.js 模块/CDN 不可达，模块脚本不会执行到初始化，
      8 秒超时或脚本错误时给出明确提示，避免“永久卡在加载屏”且无任何报错。 -->
@@ -28,7 +16,7 @@
   window.__planetReady = false;
   window.__planetFile = (location.protocol === 'file:'); // file:// 直开标记
   // 屏闪根因修复：错误只显示一次。原代码每收到一个 error 事件就改写 #loading 文本，
-  // file:// 下 es-module-shims 加载模块可能触发多次 error → 文本反复跳变 = "背景板乱跳"。
+  // file:// 下浏览器原生拦截模块加载可能触发多次 error → 文本反复跳变 = "背景板乱跳"。
   var __planetErrShown = false;
   window.addEventListener('error', function (e) {
     if (window.__planetReady || __planetErrShown) return;
@@ -37,8 +25,8 @@
     if (!el) return;
     var msg = e.message || '资源加载错误';
     el.querySelector('div:last-child').textContent = window.__planetFile
-      ? '场景加载失败：file:// 下 ES 模块加载不稳定，建议用本地服务器打开（如 python3 -m http.server，再访问 http://localhost:8000/planet.html）。错误：' + msg
-      : '场景加载失败：' + msg + '，请检查网络 / CDN';
+      ? '场景加载失败：浏览器直接打开本地文件（file://）时 ES 模块会被安全策略拦截。请用本地服务器打开：在项目目录执行 python3 -m http.server，再访问 http://localhost:8000/planet.html。错误：' + msg
+      : '场景加载失败：' + msg;
   });
   setTimeout(function () {
     if (window.__planetReady || __planetErrShown) return;
@@ -46,16 +34,16 @@
     var el = document.getElementById('loading');
     if (!el) return;
     el.querySelector('div:last-child').textContent = window.__planetFile
-      ? '场景加载超时：file:// 下 ES 模块加载不稳定，建议用本地服务器打开（http://localhost:8000/planet.html）'
-      : '场景加载超时，请检查网络或 three.js CDN 是否可达';
+      ? '场景加载超时：file:// 直开不支持 ES 模块。请用本地服务器打开（python3 -m http.server → http://localhost:8000/planet.html）'
+      : '场景加载超时，请检查控制台报错';
   }, 8000);
 </script>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@200..800&display=swap');
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #1A1510;
+ * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #cdd9e0;
     font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
     -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
   #app { position: fixed; inset: 0; }
@@ -70,72 +58,74 @@
   }
 
   /* 顶部标题与控制说明 - Editorial Atelier 风格 */
-  #hud-top {
-    position: fixed; top: 20px; left: 24px; z-index: 30;
-    color: #ECE5D8; pointer-events: none; user-select: none;
-  }
-  #hud-top .title {
-    font-family: 'Fraunces', Georgia, serif;
-    font-size: 20px; font-weight: 500;
-    font-variation-settings: 'opsz' 48, 'SOFT' 50;
-    letter-spacing: -0.01em;
-    font-style: italic;
-  }
-  #hud-top .title::before {
-    content: '◆';
-    display: inline-block;
-    font-size: 10px;
-    color: #D4AB6A;
-    margin-right: 10px;
-    font-style: normal;
-    vertical-align: middle;
+#hud-top {
+  position: fixed; top: 56px; left: 24px; z-index: 30;
+  color: #e8eef4; pointer-events: none; user-select: none;
+}
+#hud-top .title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 20px; font-weight: 500;
+  font-variation-settings: 'opsz' 48, 'SOFT' 50;
+  letter-spacing: -0.01em;
+  font-style: italic;
+  text-shadow: 0 1px 8px rgba(8,16,26,0.6);
+}
+#hud-top .title::before {
+  content: '◆';
+  display: inline-block;
+  font-size: 10px;
+  color: #aecbe0;
+  margin-right: 10px;
+  font-style: normal;
+  vertical-align: middle;
     transform: translateY(-2px);
   }
   #hud-top .tips {
-    font-size: 11px; opacity: .72; margin-top: 6px;
-    line-height: 1.7;
-    letter-spacing: 0.02em;
-    font-weight: 500;
-  }
-  #hud-top .tips span {
-    display: inline-block;
-    padding: 2px 8px;
-    margin: 0 2px;
-    background: rgba(212, 171, 106, 0.12);
-    border: 1px solid rgba(212, 171, 106, 0.2);
-    border-radius: 999px;
-    font-size: 10px;
-    font-weight: 600;
-    color: #D4AB6A;
-    letter-spacing: 0.04em;
-  }
+  font-size: 11px; opacity: .72; margin-top: 6px;
+  line-height: 1.7;
+  letter-spacing: 0.02em;
+  font-weight: 500;
+  text-shadow: 0 1px 6px rgba(8,16,26,0.6);
+}
+#hud-top .tips span {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 0 2px;
+  background: rgba(174,203,224,0.12);
+  border: 1px solid rgba(174,203,224,0.22);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #cdd9e6;
+  letter-spacing: 0.04em;
+}
 
   /* 右下角进入提示 - Editorial 风格 */
-  #enter-prompt {
-    position: fixed; right: 28px; bottom: 32px; z-index: 30;
-    padding: 12px 22px; border-radius: 999px;
-    background: rgba(26, 21, 16, 0.88); color: #ECE5D8;
-    font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
-    box-shadow: 0 8px 32px rgba(0,0,0,.45);
-    backdrop-filter: blur(12px) saturate(180%); -webkit-backdrop-filter: blur(12px) saturate(180%);
-    opacity: 0; transform: translateY(10px) scale(0.96);
-    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-    pointer-events: none;
-    border: 1px solid rgba(212, 171, 106, 0.25);
-  }
-  #enter-prompt::before {
-    content: '→';
-    display: inline-block;
-    margin-right: 8px;
-    color: #D4AB6A;
-    font-style: italic;
-    font-family: 'Fraunces', serif;
-    font-weight: 500;
-  }
-  #enter-prompt b {
-    color: #D4AB6A;
-    font-weight: 700;
-  }
+#enter-prompt {
+  position: fixed; right: 28px; bottom: 32px; z-index: 30;
+  padding: 12px 22px; border-radius: 999px;
+  background: rgba(18, 30, 44, 0.8); color: #e8eef4;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
+  box-shadow: 0 8px 32px rgba(0,0,0,.45);
+  backdrop-filter: blur(12px) saturate(180%); -webkit-backdrop-filter: blur(12px) saturate(180%);
+  opacity: 0; transform: translateY(10px) scale(0.96);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  border: 1px solid rgba(174,203,224,0.22);
+}
+#enter-prompt::before {
+  content: '→';
+  display: inline-block;
+  margin-right: 8px;
+  color: #aecbe0;
+  font-style: italic;
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+}
+#enter-prompt b {
+  color: #aecbe0;
+  font-weight: 700;
+}
   #enter-prompt.show {
     opacity: 1; transform: translateY(0) scale(1);
   }
@@ -153,42 +143,42 @@
   }
   #game-frame { width: 100%; height: 100%; border: 0; }
   /* 小游戏加载失败提示覆盖层 */
-  #game-error {
-    position: absolute; inset: 0; z-index: 5; display: none;
-    flex-direction: column; align-items: center; justify-content: center;
-    background: #1A1510; color: #ECE5D8; text-align: center; padding: 32px;
-  }
-  #game-error .ge-title {
+#game-error {
+  position: absolute; inset: 0; z-index: 5; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  background: #11202e; color: #e8eef4; text-align: center; padding: 32px;
+}
+#game-error .ge-title {
     font-family: 'Fraunces', serif;
     font-size: 22px; font-weight: 500; margin-bottom: 12px;
     font-style: italic;
   }
   #game-error .ge-desc {
     font-size: 13px; opacity: .75; margin-bottom: 24px;
-    max-width: 320px; line-height: 1.7;
-  }
-  #game-error button {
-    border: 0; border-radius: 999px; padding: 10px 24px; cursor: pointer;
-    background: rgba(212, 171, 106, 0.15); color: #D4AB6A;
-    font-size: 13px; font-weight: 600;
-    border: 1px solid rgba(212, 171, 106, 0.3);
-    transition: all 0.3s ease;
-    letter-spacing: 0.02em;
-  }
-  #game-error button:hover {
-    background: rgba(212, 171, 106, 0.25);
-    transform: translateY(-2px);
-  }
+  max-width: 320px; line-height: 1.7;
+}
+#game-error button {
+  border: 0; border-radius: 999px; padding: 10px 24px; cursor: pointer;
+  background: rgba(174,203,224,0.15); color: #cdd9e6;
+  font-size: 13px; font-weight: 600;
+  border: 1px solid rgba(174,203,224,0.3);
+  transition: all 0.3s ease;
+  letter-spacing: 0.02em;
+}
+#game-error button:hover {
+  background: rgba(174,203,224,0.25);
+  transform: translateY(-2px);
+}
 
   /* 游戏页“返回星球”按钮 */
   #return-btn {
     position: fixed; top: 18px; right: 18px; z-index: 110; display: none;
     padding: 10px 20px; border: 0; border-radius: 999px; cursor: pointer;
-    background: rgba(26, 21, 16, 0.88); color: #ECE5D8;
+    background: rgba(18, 30, 44, 0.88); color: #e8eef4;
     font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
     box-shadow: 0 6px 24px rgba(0,0,0,.45);
     backdrop-filter: blur(12px) saturate(180%); -webkit-backdrop-filter: blur(12px) saturate(180%);
-    border: 1px solid rgba(212, 171, 106, 0.2);
+    border: 1px solid rgba(174, 203, 224, 0.2);
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
   #return-btn::before {
@@ -197,11 +187,32 @@
     margin-right: 6px;
     font-family: 'Fraunces', serif;
     font-style: italic;
-    color: #D4AB6A;
+    color: #aecbe0;
   }
   #return-btn:hover {
-    background: rgba(26, 21, 16, 0.95);
-    border-color: rgba(212, 171, 106, 0.4);
+    background: rgba(18, 30, 44, 0.95);
+    border-color: rgba(174, 203, 224, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 32px rgba(0,0,0,.5);
+  }
+
+  /* 常驻返回链接：从星球回到主站，消除"直接打开即死胡同"的问题（照 cottage 的 back-btn 思路） */
+  .planet-back-link {
+    position: fixed; top: 14px; left: 14px; z-index: 120;
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 8px 14px; border: 0; border-radius: 999px; cursor: pointer;
+    background: rgba(18, 30, 44, 0.88); color: #e8eef4;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
+    box-shadow: 0 6px 24px rgba(0,0,0,.45);
+    backdrop-filter: blur(12px) saturate(180%); -webkit-backdrop-filter: blur(12px) saturate(180%);
+    text-decoration: none;
+  }
+  .planet-back-link::before {
+    content: '←'; display: inline-block; margin-right: 4px;
+    font-family: 'Fraunces', serif; font-style: italic; color: #aecbe0;
+  }
+  .planet-back-link:hover {
+    background: rgba(18, 30, 44, 0.95);
     transform: translateY(-2px);
     box-shadow: 0 10px 32px rgba(0,0,0,.5);
   }
@@ -210,8 +221,8 @@
   #minimap {
     position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 30;
     width: 140px; height: 140px; border-radius: 50%;
-    background: rgba(26, 21, 16, 0.65);
-    border: 1px solid rgba(212, 171, 106, 0.2);
+    background: rgba(18, 30, 44, 0.65);
+    border: 1px solid rgba(174, 203, 224, 0.2);
     box-shadow: 0 6px 28px rgba(0,0,0,.4), inset 0 0 40px rgba(0,0,0,.3);
     backdrop-filter: blur(8px) saturate(160%); -webkit-backdrop-filter: blur(8px) saturate(160%);
     pointer-events: none;
@@ -220,7 +231,7 @@
     content: '';
     position: absolute; inset: 4px;
     border-radius: 50%;
-    border: 1px solid rgba(212, 171, 106, 0.1);
+    border: 1px solid rgba(174, 203, 224, 0.1);
     pointer-events: none;
   }
   #minimap::after {
@@ -230,7 +241,7 @@
     transform: translate(-50%, -50%);
     width: 60%; height: 60%;
     border-radius: 50%;
-    border: 1px dashed rgba(212, 171, 106, 0.15);
+    border: 1px dashed rgba(174, 203, 224, 0.15);
     pointer-events: none;
   }
 
@@ -238,28 +249,28 @@
   #settings-btn {
     position: fixed; top: 54px; right: 20px; z-index: 31;
     width: 36px; height: 36px; border: 0; border-radius: 50%; cursor: pointer;
-    background: rgba(26, 21, 16, 0.75); color: #ECE5D8; font-size: 16px;
+    background: rgba(18, 30, 44, 0.75); color: #e8eef4; font-size: 16px;
     box-shadow: 0 4px 16px rgba(0,0,0,.35);
     backdrop-filter: blur(10px) saturate(160%); -webkit-backdrop-filter: blur(10px) saturate(160%);
-    border: 1px solid rgba(212, 171, 106, 0.18);
+    border: 1px solid rgba(174, 203, 224, 0.18);
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     display: flex; align-items: center; justify-content: center;
   }
   #settings-btn:hover {
-    background: rgba(26, 21, 16, 0.9);
-    border-color: rgba(212, 171, 106, 0.35);
+    background: rgba(18, 30, 44, 0.9);
+    border-color: rgba(174, 203, 224, 0.35);
     transform: rotate(30deg) scale(1.05);
-    color: #D4AB6A;
+    color: #aecbe0;
   }
   #settings-panel {
     position: fixed; top: 98px; right: 20px; z-index: 31; display: none;
     flex-direction: column; gap: 10px;
     padding: 16px 18px; border-radius: 14px;
-    background: rgba(26, 21, 16, 0.92); color: #ECE5D8;
+    background: rgba(18, 30, 44, 0.92); color: #e8eef4;
     font-size: 12px;
     box-shadow: 0 12px 40px rgba(0,0,0,.5);
     backdrop-filter: blur(16px) saturate(180%); -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border: 1px solid rgba(212, 171, 106, 0.18);
+    border: 1px solid rgba(174, 203, 224, 0.18);
     min-width: 180px;
     transform-origin: top right;
     animation: panelIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -275,10 +286,10 @@
     font-size: 14px;
     font-weight: 500;
     font-style: italic;
-    color: #D4AB6A;
+    color: #aecbe0;
     margin-bottom: 6px;
     padding-bottom: 10px;
-    border-bottom: 1px solid rgba(212, 171, 106, 0.15);
+    border-bottom: 1px solid rgba(174, 203, 224, 0.15);
     letter-spacing: 0.02em;
   }
   #settings-panel label {
@@ -288,7 +299,7 @@
     font-weight: 500;
   }
   #settings-panel label:hover {
-    color: #D4AB6A;
+    color: #aecbe0;
   }
   #settings-panel input[type="checkbox"] {
     appearance: none; -webkit-appearance: none;
@@ -309,74 +320,74 @@
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
   #settings-panel input[type="checkbox"]:checked {
-    background: rgba(212, 171, 106, 0.3);
-    border-color: rgba(212, 171, 106, 0.5);
+    background: rgba(174, 203, 224, 0.3);
+    border-color: rgba(174, 203, 224, 0.5);
   }
   #settings-panel input[type="checkbox"]:checked::before {
     left: 15px;
-    background: #D4AB6A;
-    box-shadow: 0 0 10px rgba(212, 171, 106, 0.5);
+    background: #aecbe0;
+    box-shadow: 0 0 10px rgba(174, 203, 224, 0.5);
   }
   #settings-panel button {
     border: 0; border-radius: 10px; padding: 8px 14px; cursor: pointer;
-    background: rgba(212, 171, 106, 0.12); color: #D4AB6A;
+    background: rgba(174, 203, 224, 0.12); color: #aecbe0;
     font-size: 12px; font-weight: 600;
-    border: 1px solid rgba(212, 171, 106, 0.2);
+    border: 1px solid rgba(174, 203, 224, 0.2);
     transition: all 0.3s ease;
     margin-top: 4px;
     letter-spacing: 0.02em;
   }
   #settings-panel button:hover {
-    background: rgba(212, 171, 106, 0.22);
-    border-color: rgba(212, 171, 106, 0.4);
+    background: rgba(174, 203, 224, 0.22);
+    border-color: rgba(174, 203, 224, 0.4);
     transform: translateY(-1px);
   }
   #settings-panel button:active { transform: translateY(0); }
 
   /* FPS */
-  #fps {
-    position: fixed; top: 22px; right: 24px; z-index: 30;
-    font-size: 11px; color: #7A7160; opacity: .9; pointer-events: none;
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    padding: 4px 10px;
-    background: rgba(26, 21, 16, 0.5);
-    border-radius: 999px;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(212, 171, 106, 0.1);
-  }
+#fps {
+  position: fixed; top: 22px; right: 24px; z-index: 30;
+  font-size: 11px; color: #cdd9e6; opacity: .85; pointer-events: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  background: rgba(18, 30, 44, 0.5);
+  border-radius: 999px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(174,203,224,0.15);
+}
 
   /* 加载屏 - Editorial Atelier 风格 */
-  #loading {
-    position: fixed; inset: 0; z-index: 200; display: flex;
-    flex-direction: column; align-items: center; justify-content: center;
-    background:
-      radial-gradient(ellipse at 30% 20%, rgba(181, 168, 216, 0.15) 0%, transparent 55%),
-      radial-gradient(ellipse at 80% 80%, rgba(212, 171, 106, 0.1) 0%, transparent 60%),
-      linear-gradient(160deg, #1A1510, #0d0a07);
-    color: #ECE5D8;
-    transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  #loading.hide { opacity: 0; pointer-events: none; }
-  #loading .spin {
-    width: 48px; height: 48px; border-radius: 50%;
-    border: 2px solid rgba(212, 171, 106, 0.2);
-    border-top-color: #D4AB6A;
-    animation: spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-    margin-bottom: 20px;
-    position: relative;
-  }
-  #loading .spin::before {
-    content: '';
-    position: absolute;
-    inset: 6px;
-    border-radius: 50%;
-    border: 1px solid rgba(181, 168, 216, 0.15);
-    border-left-color: #B5A8D8;
-    animation: spin 2s cubic-bezier(0.4, 0, 0.2, 1) infinite reverse;
-  }
-  #loading .loading-title {
+#loading {
+  position: fixed; inset: 0; z-index: 200; display: flex;
+  flex-direction: column; align-items: center; justify-content: center;
+   background:
+     radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.5) 0%, transparent 55%),
+     radial-gradient(ellipse at 80% 80%, rgba(120,160,190,0.25) 0%, transparent 60%),
+     linear-gradient(160deg, #eef4f8 0%, #cdd9e0 45%, #9fb8c8 100%);
+   color: #1a2738;
+   transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#loading.hide { opacity: 0; pointer-events: none; }
+#loading .spin {
+   width: 46px; height: 46px; border-radius: 50%;
+   border: 2px solid rgba(26,39,56,0.12);
+   border-top-color: #3f6fa3;
+  animation: spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  margin-bottom: 20px;
+  position: relative;
+}
+#loading .spin::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+   border: 1px solid rgba(26,39,56,0.10);
+   border-left-color: #5b8fc4;
+  animation: spin 2s cubic-bezier(0.4, 0, 0.2, 1) infinite reverse;
+}
+#loading .loading-title {
     font-family: 'Fraunces', Georgia, serif;
     font-size: 24px;
     font-weight: 500;
@@ -389,7 +400,7 @@
     content: '◆';
     display: inline-block;
     font-size: 10px;
-    color: #D4AB6A;
+   color: #3f6fa3;
     margin-right: 10px;
     font-style: normal;
     vertical-align: middle;
@@ -405,53 +416,53 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* 移动端虚拟摇杆与按钮 - Editorial 风格 */
-  #joystick {
-    position: fixed; left: 28px; bottom: 28px; z-index: 35;
-    width: 130px; height: 130px; border-radius: 50%;
-    background: rgba(26, 21, 16, 0.5);
-    border: 1px solid rgba(212, 171, 106, 0.25);
-    touch-action: none; display: none;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 4px 20px rgba(0,0,0,.3);
-  }
-  #joystick .knob {
-    position: absolute; left: 50%; top: 50%; width: 54px; height: 54px;
-    margin: -27px 0 0 -27px; border-radius: 50%;
-    background: rgba(236, 229, 216, 0.9);
-    box-shadow: 0 4px 16px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,0.5);
-    border: 2px solid rgba(212, 171, 106, 0.4);
-  }
-  #mob-btns { position: fixed; right: 24px; bottom: 28px; z-index: 35;
-    display: none; flex-direction: column; gap: 12px; align-items: flex-end; }
-  #mob-btns button {
-    width: 62px; height: 62px; border-radius: 50%; border: 0; cursor: pointer;
-    background: rgba(26, 21, 16, 0.75);
-    color: #D4AB6A; font-size: 11px; font-weight: 700;
-    box-shadow: 0 4px 18px rgba(0,0,0,.35);
-    border: 1px solid rgba(212, 171, 106, 0.25);
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    transition: all 0.2s ease;
-    letter-spacing: 0.04em;
-  }
-  #mob-btns button:active {
-    transform: scale(0.94);
-    background: rgba(212, 171, 106, 0.2);
-  }
+#joystick {
+  position: fixed; left: 28px; bottom: 28px; z-index: 35;
+  width: 130px; height: 130px; border-radius: 50%;
+  background: rgba(18, 30, 44, 0.45);
+  border: 1px solid rgba(174,203,224,0.2);
+  touch-action: none; display: none;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0,0,0,.3);
+}
+#joystick .knob {
+  position: absolute; left: 50%; top: 50%; width: 54px; height: 54px;
+  margin: -27px 0 0 -27px; border-radius: 50%;
+  background: rgba(220, 232, 242, 0.85);
+  box-shadow: 0 4px 16px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,0.5);
+  border: 2px solid rgba(174,203,224,0.4);
+}
+#mob-btns { position: fixed; right: 24px; bottom: 28px; z-index: 35;
+  display: none; flex-direction: column; gap: 12px; align-items: flex-end; }
+#mob-btns button {
+  width: 62px; height: 62px; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(18, 30, 44, 0.6);
+  color: #cdd9e6; font-size: 11px; font-weight: 700;
+  box-shadow: 0 4px 18px rgba(0,0,0,.35);
+  border: 1px solid rgba(174,203,224,0.2);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+  letter-spacing: 0.04em;
+}
+#mob-btns button:active {
+  transform: scale(0.94);
+  background: rgba(174,203,224,0.2);
+}
   @media (pointer: coarse) {
     #joystick { display: block; }
     #mob-btns { display: flex; }
   }
   /* Vignette 暗角 - 更柔和的电影感暗角 */
-  #vignette {
-    position: fixed; inset: 0; z-index: 25; pointer-events: none;
-    background: radial-gradient(ellipse at center, transparent 50%, rgba(10,6,4,0.45) 100%);
-  }
+#vignette {
+  position: fixed; inset: 0; z-index: 25; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(8,16,26,0.4) 100%);
+}
 
   /* 响应式调整 */
   @media (max-width: 520px) {
     #return-btn { top: 12px; right: 12px; padding: 8px 16px; font-size: 12px; }
     #enter-prompt { right: 16px; bottom: 20px; font-size: 12px; padding: 10px 18px; }
-    #hud-top { top: 14px; left: 16px; }
+    #hud-top { top: 50px; left: 16px; }
     #hud-top .title { font-size: 17px; }
     #hud-top .tips { font-size: 10px; max-width: 65vw; }
     #fps { top: 16px; right: 16px; font-size: 10px; }
@@ -467,7 +478,7 @@
 
   <div id="hud-top">
     <div class="title">球形星球 · 游戏小屋街道</div>
-    <div class="tips"><span>WASD</span> 移动 · <span>Shift</span> 奔跑 · <span>空格</span> 踢球 · <span>C</span> 切换视角 · 靠近小屋按 <span>Enter</span> 进入</div>
+    <div class="tips"><span>鼠标</span> 看视角(点击锁定/拖拽) · <span>WASD</span> 移动 · <span>Shift</span> 奔跑 · <span>空格</span> 踢球 · <span>C</span> 切换视角 · 靠近小屋按 <span>Enter</span> 进入</div>
   </div>
 
   <div id="fps">-- FPS</div>
@@ -484,6 +495,9 @@
       <button id="game-error-btn">← 返回星球</button>
     </div>
   </div>
+  <!-- 常驻返回链接：直接打开星球也能回到主站（消除死胡同） -->
+  <a href="games.html" class="planet-back-link" aria-label="返回游戏小屋" title="返回游戏小屋">游戏小屋</a>
+
   <button id="return-btn">← 返回星球</button>
 
   <!-- 小地图（环形 10 屋 + 玩家朝向） -->
@@ -492,9 +506,6 @@
   <button id="settings-btn" aria-label="设置">⚙</button>
   <div id="settings-panel">
     <label><input type="checkbox" id="set-shadow" checked /> 阴影</label>
-    <label><input type="checkbox" id="set-bloom" /> 泛光</label>
-    <label><input type="checkbox" id="set-ssao" /> 环境光遮蔽</label>
-    <label><input type="checkbox" id="set-dof" /> 景深</label>
     <button id="set-reset">重置角色位置</button>
   </div>
 
@@ -513,21 +524,13 @@
   </div>
 
 <script type="module">
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-// 后处理（U6 泛光/Bloom）—— 增强门/灯箱的霓虹观感；带 try 兜底，失败则退回普通渲染
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
-import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
-import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+import * as THREE from './assets/vendor/three/three.module.js';
+import { mergeGeometries } from './assets/vendor/three/addons/utils/BufferGeometryUtils.js';
 
 // BUG-13 修复：Cannon.js 加载失败时在模块入口立即检测，避免中途 ReferenceError 后被超时兜底覆盖为 three.js 错误
 if (typeof CANNON === 'undefined') {
   const el = document.getElementById('loading');
-  if (el) el.querySelector('div:last-child').textContent = 'Cannon.js 物理引擎加载失败，请检查网络或 CDN 是否可达';
+  if (el) el.querySelector('div:last-child').textContent = 'Cannon.js 物理引擎加载失败，请检查 assets/vendor/cannon/cannon.min.js 是否存在';
   window.__planetReady = true; // 锁定兜底，避免超时覆盖此精确提示
   throw new Error('CANNON not loaded');
 }
@@ -568,12 +571,7 @@ const CONFIG = {
     shadowHalf: 14,                                // P2/P3：阴影视锥半宽（跟随角色，局部视锥提高有效分辨率）
     planetSeg: IS_COARSE ? [48, 36] : [48, 36],    // 性能复位：统一 48/36（草地纹理球无需高面数，街道为独立网格）
     subSteps: IS_COARSE ? 2 : 3,                    // P6：物理子步数
-    fogDensity: 0.0058,
-    // 性能治理：后处理默认全关。SSAO/Bokeh 是 GPU 杀手，Bloom 也有开销。
-    // 用户可在设置面板按需开启。这是卡顿主因。
-    bloom: false,
-    ssao: false,   // 默认关闭，设置面板可开
-    dof: false     // 默认关闭，设置面板可开
+    fogDensity: 0.0058
   },
   enterDist: 2.0,               // 距门进入触发距离
   ballRecallDist: 45,           // BUG-08 修复：球面最大 3D 距离约 51m，原值 60 永不触发
@@ -598,10 +596,10 @@ const CONFIG = {
   },
   clouds: 4,                    // 云朵数量
   scatter: { trees: 24, grass: 280, rocks: 40 }, // 自然景观散落数量（移动端会按比例减量）
-  // 马卡龙调色板（区分度高）
+  // 写实材质调色板：天然灰泥/土坯/砂岩墙面色（区分度高、低饱和自然）
   palette: [
-    '#AEE0F5', '#FBC8D4', '#BDECCB', '#FFF1B0', '#D9C2F0',
-    '#FFD9B0', '#C2E9E9', '#F5C6E0', '#C9E8C0', '#FFE0A3'
+    '#E5D9C8', '#C97B5A', '#A9B48C', '#D9B97E', '#BD6B5E',
+    '#D8C7A6', '#9AA6A0', '#C98C6B', '#CFD3C4', '#B89C76'
   ],
   // ⚠ 单一来源说明（C7）：本数组为 planet.html 内小屋配置的“副本”，
   //   项目另有 data/profile.js 的 games 列表。当前为保证“单文件可直接运行”而各自维护，
@@ -643,59 +641,19 @@ try {
 renderer.setPixelRatio(Math.min(devicePixelRatio, CONFIG.render.pixelRatioMax));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-// 屏闪根因修复：设 clearColor 匹配 body 背景。原默认 clearColor 黑色，
-// #loading 渐隐时 canvas 露出黑屏 → 与紫色 loading 叠加闪烁。设为 body 紫色平滑过渡。
-renderer.setClearColor(0x2a1d4d, 1);
+// 屏闪根因修复：设 clearColor 匹配天空地平线色。原默认 clearColor 黑色，
+// #loading 渐隐时 canvas 露出黑屏 → 与 loading 叠加闪烁。设冷蓝灰与天空地平线平滑过渡。
+renderer.setClearColor(0xcdd9e0, 1);
 renderer.shadowMap.enabled = true;          // ✦ 开启阴影贴图
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;  // ✦ 柔和软阴影
 // A2：ACESFilmic 电影感色调映射，增强暗部细节与高光过渡
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.12;
 container.appendChild(renderer.domElement);
 
-// U6：后处理管线（Bloom 泛光）。始终构建（移动端默认 bloomEnabled=false → 走普通渲染，无额外开销）；
-// 任何导入/构建失败均安全退回普通渲染。
-let composer = null;
-let bloomEnabled = CONFIG.render.bloom;
-// P1：仅当泛光启用（桌面）时才构建后处理管线，移动端不分配 FBO，省显存/开销
-function buildComposer() {
-  try {
-    composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    // B1：桌面端 SSAO 环境光遮蔽 — 增强小屋角落/底部空间纵深感
-    let ssaoPass = null;
-    if (!IS_COARSE) {
-      try {
-        ssaoPass = new SSAOPass(scene, camera, innerWidth, innerHeight);
-        ssaoPass.kernelRadius = 8;
-        ssaoPass.minDistance = 0.005;
-        ssaoPass.maxDistance = 0.1;
-        composer.addPass(ssaoPass);
-      } catch (e) { /* SSAO 不可用则跳过，不影响其余管线 */ }
-    }
-    // A2：Bloom 增强 — strength 0.55→0.7, radius 0.7→0.6, threshold 0.82→0.75
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.7, 0.6, 0.75));
-    // D1：桌面端景深 DoF — 远处小屋轻微模糊，突出主角
-    let bokehPass = null;
-    if (!IS_COARSE) {
-      try {
-        bokehPass = new BokehPass(scene, camera, {
-          focus: 8.0, aperture: 0.0025, maxblur: 0.6
-        });
-        composer.addPass(bokehPass);
-      } catch (e) { /* BokehPass 不可用则跳过 */ }
-    }
-    composer._bokehPass = bokehPass; // 供每帧更新 focus 用
-    composer._ssaoPass = ssaoPass;   // #3：供设置面板运行时开关
-    // A2：桌面端 SMAA 抗锯齿（移动端 antialias:true 已够）
-    if (!IS_COARSE) composer.addPass(new SMAAPass(innerWidth, innerHeight));
-    composer.addPass(new OutputPass());
-  } catch (e) { composer = null; }
-}
-if (bloomEnabled) buildComposer();
-// 颜色空间切换：普通渲染时天空 Shader 需手动 sRGB；经 Bloom+OutputPass 时输出应为线性（uConvert=0）
+// 颜色空间切换：天空 Shader 需手动 sRGB 转换（无后处理时直接输出）
 function applyColorMode() {
-  if (skyMat.uniforms.uConvert) skyMat.uniforms.uConvert.value = (composer && bloomEnabled) ? 0 : 1;
+  if (skyMat.uniforms.uConvert) skyMat.uniforms.uConvert.value = 1;
 }
 
 // U1：移动端显示对应操作提示（而非桌面 WASD 文案）
@@ -823,16 +781,77 @@ function makeAsphaltTexture() {
 function makeGrassTexture() {
   const S = 512;
   const { cv, ctx } = cv2d(S);
-  ctx.fillStyle = '#cfe6bf'; ctx.fillRect(0, 0, S, S);
+  // 写实风：改为近中性灰细节贴图（不再偏绿），作为全生物群系的
+  // 通用地面颗粒/肌理叠加，避免把岩石/积雪染成绿色。
+  ctx.fillStyle = '#cfcfcf'; ctx.fillRect(0, 0, S, S);
   const img = ctx.getImageData(0, 0, S, S);
   for (let i = 0; i < img.data.length; i += 4) {
-    const n = (vnoise(i, i >> 1, 9.3) - 0.5) * 34;
-    img.data[i] += n * 0.6; img.data[i + 1] += n; img.data[i + 2] += n * 0.4;
+    const n = (vnoise(i, i >> 1, 9.3) - 0.5) * 30;
+    img.data[i] += n; img.data[i + 1] += n; img.data[i + 2] += n;
   }
   ctx.putImageData(img, 0, 0);
-  return finalizeTex(cv, 8, 4);
+  return finalizeTex(cv, 16, 10);
 }
 // 皮肤（角色头部）：细微肤色颗粒 + 淡淡雀斑/毛孔（V1：512px）
+// 地面法线贴图：由多 octave 高度场求梯度得到法线，赋予星球表面微起伏
+// （草皮颗粒/砂砾感），让光照产生真实的明暗细节，打破光滑球体感。
+function makeGroundNormalTexture() {
+  const S = 512;
+  const { cv, ctx } = cv2d(S);
+  const img = ctx.createImageData(S, S);
+  const H = (x, y) => {
+    const ax = ((x % S) + S) % S, ay = ((y % S) + S) % S;
+    let h = 0, a = 0.5, f = 1;
+    for (let o = 0; o < 4; o++) {
+      h += a * vnoise(ax * f, ay * f, o * 13.7 + 1.3);
+      a *= 0.5; f *= 2.1;
+    }
+    return h;
+  };
+  const str = 2.2;
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const dx = (H(x + 1, y) - H(x - 1, y)) * str;
+      const dy = (H(x, y + 1) - H(x, y - 1)) * str;
+      let nx = -dx, ny = -dy, nz = 1;
+      const inv = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+      nx *= inv; ny *= inv; nz *= inv;
+      const i = (y * S + x) * 4;
+      img.data[i]     = (nx * 0.5 + 0.5) * 255;
+      img.data[i + 1] = (ny * 0.5 + 0.5) * 255;
+      img.data[i + 2] = (nz * 0.5 + 0.5) * 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(24, 14);
+  t.anisotropy = 4;
+  return t;
+}
+// 地面粗糙度贴图：与法线同频的高度场调制，砂砾处偏粗糙、低洼处微湿偏光滑，
+// 写实风需要表面反射率有空间变化，而非单一 roughness。
+function makeGroundRoughnessTexture() {
+  const S = 512;
+  const { cv, ctx } = cv2d(S);
+  const img = ctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      let h = 0, a = 0.5, f = 1;
+      for (let o = 0; o < 4; o++) { h += a * vnoise(x * f, y * f, o * 9.1 + 4.4); a *= 0.5; f *= 2.1; }
+      const r = Math.round(255 * (0.78 + 0.22 * h));
+      const i = (y * S + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = r; img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(24, 14);
+  t.anisotropy = 4;
+  return t;
+}
 function makeSkinTexture() {
   const S = 512;
   const { cv, ctx } = cv2d(S);
@@ -875,28 +894,100 @@ function makeLeatherTexture() {
   }
   return finalizeTex(cv, 2, 2);
 }
+// 水面涟漪法线贴图：同心圆波纹，贴到池塘 normalMap 并滚动 offset 模拟流水
+function makeWaterRippleTexture() {
+  const S = 256;
+  const { cv, ctx } = cv2d(S);
+  const img = ctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const u = (x / S) - 0.5, v = (y / S) - 0.5;
+      const d = Math.sqrt(u * u + v * v);
+      const wave = Math.sin(d * 26) * 0.5 + 0.5;
+      const dx = -u * Math.cos(d * 26) * 6;
+      const dy = -v * Math.cos(d * 26) * 6;
+      let nx = dx, ny = dy, nz = 1;
+      const inv = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+      nx *= inv; ny *= inv; nz *= inv;
+      const i = (y * S + x) * 4;
+      img.data[i]     = (nx * 0.5 + 0.5) * 255;
+      img.data[i + 1] = (ny * 0.5 + 0.5) * 255;
+      img.data[i + 2] = 200 + wave * 55;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 3);
+  t.anisotropy = 4;
+  return t;
+}
+// 织物经纬编织法线贴图：模拟衬衫/短裤的布纹微起伏，让 cloth 在光照下呈现编织纹理而非塑料感
+function makeFabricWeaveTexture() {
+  const S = 256;
+  const { cv, ctx } = cv2d(S);
+  const img = ctx.createImageData(S, S);
+  const threads = 14;                 // 每方向纱线数
+  const f = S / threads;              // 单根纱线像素宽
+  const H = (x, y) => {
+    // 经纬纱交替上下的“编织”高度场：经纱沿 x、纬纱沿 y，交错处上下交替
+    const cx = x % f, cy = y % f;
+    const warpOnTop = (Math.floor(x / f) + Math.floor(y / f)) % 2 === 0;
+    const d = warpOnTop ? (f - cx) : cx;          // 到纱线边缘的距离
+    const along = warpOnTop ? cy : (f - cy);      // 沿纱线方向的弧面
+    const edge = Math.min(d, f * 0.5) / (f * 0.5);
+    const arc = Math.sin(Math.min(along, f - along) / f * Math.PI);
+    return arc * (0.55 + 0.45 * edge);
+  };
+  const str = 1.6;
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const dx = (H(x + 1, y) - H(x - 1, y)) * str;
+      const dy = (H(x, y + 1) - H(x, y - 1)) * str;
+      let nx = -dx, ny = -dy, nz = 1;
+      const inv = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+      nx *= inv; ny *= inv; nz *= inv;
+      const i = (y * S + x) * 4;
+      img.data[i]     = (nx * 0.5 + 0.5) * 255;
+      img.data[i + 1] = (ny * 0.5 + 0.5) * 255;
+      img.data[i + 2] = (nz * 0.5 + 0.5) * 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 3);
+  t.anisotropy = 4;
+  return t;
+}
 const TEX = {
+  fabricNormal: makeFabricWeaveTexture(),
   plaster: makePlasterTexture(),
   wood: makeWoodTexture(),
   roof: makeRoofTexture(),
   asphalt: makeAsphaltTexture(),
   grass: makeGrassTexture(),
   skin: makeSkinTexture(),
-  leather: makeLeatherTexture()
+  leather: makeLeatherTexture(),
+  groundNormal: makeGroundNormalTexture(),
+  groundRough: makeGroundRoughnessTexture(),
+  waterRipple: makeWaterRippleTexture()
 };
 
 // 轻量雾效：增强画面纵深与空间层次（自定义天空 Shader 不含 fog，不受影响）
-// 暖调暮霭（A3：0x6b4a5c 偏紫，与天空更协调）：与地面草绿、地平线橙融合，减弱星球轮廓处的色带
-scene.fog = new THREE.FogExp2(0x6b4a5c, CONFIG.render.fogDensity); // P5/A5：雾浓度可配置
+// 写实暮霭：冷蓝灰雾与天际线暖白/柔蓝衔接，减弱星球轮廓处的色带，增强大气纵深感
+scene.fog = new THREE.FogExp2(0x9fb6c6, CONFIG.render.fogDensity); // P5/A5：雾浓度可配置
 
 /* ============================================================
- * 2. 灯光（黄昏故事感氛围：半球光 + 暖色平行光 + 环境补光 + 冷色背光）
- *    平行光开启阴影投射，路灯 PointLight 仅照明不参与阴影（保性能）。
+ * 2. 灯光（写实日光：半球天光 + 暖白主光平行光 + 环境补光 + 冷色背光）
+ *    主光方向与天空可见太阳一致 → 阴影背向太阳；平行光开启阴影投射，路灯 PointLight 仅照明不参与阴影（保性能）。
  * ============================================================ */
-scene.add(new THREE.HemisphereLight(0x9ab8d8, 0x4a3855, 0.5));
-scene.add(new THREE.AmbientLight(0x404a66, 0.25));
+scene.add(new THREE.HemisphereLight(0x9fc0dd, 0x6b5d4a, 0.55)); // 天光柔蓝 + 地面暖棕反射
+scene.add(new THREE.AmbientLight(0x4a5668, 0.22));
 
-const sun = new THREE.DirectionalLight(0xffd9a0, 1.2);  // 暖色夕阳，低角度 → 长投影
+const sun = new THREE.DirectionalLight(0xfff1da, 1.35);  // 暖白日光
 sun.position.set(48, 30, 22); // 初始位（每帧由 update 跟随角色）
 sun.castShadow = true;
 sun.shadow.mapSize.set(CONFIG.render.shadowSize, CONFIG.render.shadowSize);
@@ -909,7 +1000,8 @@ sun.shadow.camera.bottom = -CONFIG.render.shadowHalf;
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.03;
 // P2：阴影相机跟随角色（局部视锥），提高有效分辨率、降低整球阴影开销；光照方向用固定 SUN_DIR 保持
-const SUN_DIR = new THREE.Vector3(48, 30, 22).normalize();
+// 与天空 shader 的 sunDir 一致，确保阴影方向背离可见太阳
+const SUN_DIR = new THREE.Vector3(0.7, 0.32, 0.3).normalize();
 const SUN_DIST = 70;
 scene.add(sun);
 
@@ -921,21 +1013,23 @@ scene.add(rimLight);
 scene.add(sun.target);  // target 每帧跟随角色位置更新
 
 /* ============================================================
- * 3. 天空穹顶（魔幻晚霞渐变 ShaderMaterial，BackSide）
- *    地平线暖橙 → 天顶深靛蓝，营造故事感氛围。
+ * 3. 天空穹顶（写实大气散射 ShaderMaterial，BackSide）
+ *    基于瑞利/米氏散射启发：暖白地平线 → 柔蓝中天 → 深蓝天顶，
+ *    太阳带米氏前向辉光，云层受阳光单向照明（迎光暖、背光阴），白昼无星。
  * ============================================================ */
 const skyMat = new THREE.ShaderMaterial({
   side: THREE.BackSide,
   depthWrite: false,
   uniforms: {
-    horizon: { value: new THREE.Color('#ff8c5a') },
-    midSky:  { value: new THREE.Color('#6b4a7a') },
-    zenith:  { value: new THREE.Color('#0d0a26') },
-    sunDir:  { value: new THREE.Vector3(0.7, 0.35, 0.3).normalize() },
+    horizon: { value: new THREE.Color('#dfe6ec') }, // 地平线：暖白（大气散射长光程）
+    midSky:  { value: new THREE.Color('#5b8fc4') }, // 中天：柔蓝
+    zenith:  { value: new THREE.Color('#1b4f8a') }, // 天顶：深蓝
+    sunCol:  { value: new THREE.Color('#fff4e0') }, // 阳光色
+    sunDir:  { value: new THREE.Vector3(0.7, 0.32, 0.3).normalize() },
     uConvert: { value: 1.0 }
   },
   vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `varying vec3 vP; uniform vec3 horizon; uniform vec3 midSky; uniform vec3 zenith; uniform vec3 sunDir; uniform float uConvert;
+  fragmentShader: `varying vec3 vP; uniform vec3 horizon; uniform vec3 midSky; uniform vec3 zenith; uniform vec3 sunCol; uniform vec3 sunDir; uniform float uConvert;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float hash3(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
     float fbm(vec3 p){
@@ -947,34 +1041,36 @@ const skyMat = new THREE.ShaderMaterial({
       vec3 dir = normalize(vP);
       float h = dir.y * 0.5 + 0.5;
       vec3 col;
+      // 瑞利式分段梯度：地平线暖白 → 中天柔蓝 → 天顶深蓝
+      float up = clamp(dir.y, 0.0, 1.0);
       if(h < 0.5){
-        col = mix(horizon, midSky, smoothstep(0.25, 0.5, h));
+        col = mix(horizon, midSky, smoothstep(0.15, 0.5, h));
       } else {
-        col = mix(midSky, zenith, smoothstep(0.5, 0.95, h));
+        col = mix(midSky, zenith, smoothstep(0.5, 0.92, h));
       }
+      // 太阳：米氏前向散射辉光（宽泛光晕 + 紧致日冕 + 日盘）
       float sunDot = dot(dir, sunDir);
-      float mie = pow(max(0.0, sunDot), 8.0) * 0.35
-                 + pow(max(0.0, sunDot), 32.0) * 0.5;
-      col += vec3(1.0, 0.65, 0.35) * mie * smoothstep(-0.1, 0.3, dir.y);
-      col += horizon * (1.0 - smoothstep(0.30, 0.52, h)) * 0.25;
-      col += vec3(1.0, 0.5, 0.25) * (1.0 - smoothstep(0.40, 0.48, h)) * 0.15;
-      if(dir.y > -0.1 && dir.y < 0.6){
+      float mie  = pow(max(0.0, sunDot), 6.0) * 0.22;   // 宽泛暖光晕
+      float glow = pow(max(0.0, sunDot), 64.0) * 0.6;   // 紧致日冕
+      float disk = smoothstep(0.9975, 0.9990, sunDot);   // 日盘
+      float day  = smoothstep(-0.05, 0.25, dir.y);
+      col += sunCol * mie * day;
+      col += sunCol * glow * day;
+      col = mix(col, vec3(1.05, 1.0, 0.96), disk * day);
+      // 地平线附近暖色带（低角度大气散射残余）
+      col += sunCol * (1.0 - smoothstep(0.0, 0.18, up)) * 0.10;
+      // 写实云层：受阳光单向照明，迎光面暖白、背光面蓝灰阴影
+      if(dir.y > -0.05 && dir.y < 0.55){
         vec3 cloudP = dir * 3.0;
         cloudP.y *= 0.5;
-        float cloudMask = smoothstep(0.0, 0.2, dir.y) * (1.0 - smoothstep(0.3, 0.6, dir.y));
+        float cloudMask = smoothstep(0.02, 0.18, dir.y) * (1.0 - smoothstep(0.28, 0.55, dir.y));
         float cloud = fbm(cloudP);
-        cloud = smoothstep(0.45, 0.65, cloud);
-        col = mix(col, vec3(1.0, 0.92, 0.88), cloud * cloudMask * 0.5);
-      }
-      if(dir.y > 0.3){
-        vec2 starUV = vec2(atan(dir.z, dir.x) * 25.0, dir.y * 50.0);
-        vec2 sid = floor(starUV);
-        float star = hash(sid);
-        if(star > 0.985){
-          float twinkle = 0.6 + 0.4 * sin(starUV.x * 4.0 + starUV.y * 3.0);
-          float starVal = (star - 0.985) / 0.015 * twinkle;
-          col += vec3(starVal) * smoothstep(0.3, 0.8, dir.y);
-        }
+        cloud = smoothstep(0.42, 0.68, cloud);
+        float lit = smoothstep(0.2, 0.8, dot(normalize(cloudP), sunDir) * 0.5 + 0.5);
+        vec3 cloudLit = vec3(1.0, 0.98, 0.94);            // 迎光：暖白
+        vec3 cloudShd = vec3(0.55, 0.62, 0.72);           // 背光：蓝灰
+        vec3 cloudCol = mix(cloudShd, cloudLit, lit);
+        col = mix(col, cloudCol, cloud * cloudMask * 0.65);
       }
       col = clamp(col, 0.0, 1.0);
       col = mix(col, pow(col, vec3(1.0 / 2.2)), uConvert);
@@ -982,7 +1078,7 @@ const skyMat = new THREE.ShaderMaterial({
     }`
 });
 scene.add(new THREE.Mesh(new THREE.SphereGeometry(400, 32, 24), skyMat));
-applyColorMode(); // 依据 bloom 是否启用设置天空色彩空间转换方式
+applyColorMode(); // 设置天空色彩空间转换方式
 
 // #1 环境贴图 — 用 PMREMGenerator 从天空 ShaderMaterial 烘焙 envMap，赋给 scene.environment。
 // 金属材质(金顶 metalness 0.6 / 池塘 0.9 / 小球)有了环境反射，不再发暗发平；池塘至少能反射天空。
@@ -1030,7 +1126,7 @@ if (!IS_COARSE) {
     const lat = (Math.random() - 0.5) * 0.3;
     const r = R + 1 + Math.random() * 2;
     ffPos[i * 3] = Math.cos(lat) * Math.cos(lon) * r;
-    ffPos[i * 3 + 1] = Math.sin(lat) * r + R;
+    ffPos[i * 3 + 1] = Math.sin(lat) * r;
     ffPos[i * 3 + 2] = Math.cos(lat) * Math.sin(lon) * r;
     ffPhase[i] = Math.random() * Math.PI * 2;
   }
@@ -1090,32 +1186,53 @@ planetBody.addShape(new CANNON.Sphere(R));
 world.addBody(planetBody);
 
 /* ============================================================
- * 5. 高细节星球本体（高密度 SphereGeometry + 顶点色草地渐变）
- *    移除 flatShading，启用平滑法线；南北极偏深、赤道偏亮绿。
+ * 5. 高细节星球本体（高密度 SphereGeometry + 顶点色生物群系）
+ *    写实风：赤道茂密绿 → 中纬干草地 → 高地岩砾 → 极地积雪，
+ *    用多段纬度 + 多 octave 噪声打破干净渐变，模拟自然地貌。移除 flatShading，启用平滑法线。
  * ============================================================ */
 const planetGeo = new THREE.SphereGeometry(R, CONFIG.render.planetSeg[0], CONFIG.render.planetSeg[1]); // P5
 {
   const pos = planetGeo.attributes.position;
   const colors = new Float32Array(pos.count * 3);
-  const cEq = new THREE.Color('#7fc56b');   // 赤道草绿
-  const cPole = new THREE.Color('#3f7a44'); // 极地深绿
+  // 生物群系色板（写实自然色调，去卡通高饱和）
+  const cLush  = new THREE.Color('#3f6d33'); // 赤道茂密绿
+  const cGrass = new THREE.Color('#6f8a3e'); // 浅草绿
+  const cDry   = new THREE.Color('#9c8a4e'); // 干草地/麦黄
+  const cRock  = new THREE.Color('#6f665a'); // 岩砾
+  const cSnow  = new THREE.Color('#d8dbe0'); // 积雪
   const tmp = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const lat = Math.asin(THREE.MathUtils.clamp(pos.getY(i) / R, -1, 1)); // -π/2..π/2
     const f = Math.abs(lat) / (Math.PI / 2);   // 0 赤道 → 1 极地
-    tmp.copy(cEq).lerp(cPole, f);
-    // 轻微随机扰动，避免大片纯色（C2：用 fract 替代 %1，避免负数）
-    const n = fract(Math.sin(i * 12.9898) * 43758.5453);
-    const j = 0.94 + 0.06 * n;
-    colors[i * 3] = tmp.r * j;
-    colors[i * 3 + 1] = tmp.g * j;
-    colors[i * 3 + 2] = tmp.b * j;
+    // 多 octave 低频频谱噪声：扰动生物群系边界，避免整齐纬度带
+    const lon = Math.atan2(pos.getZ(i), pos.getX(i));
+    const n0 = fract(Math.sin(i * 12.9898) * 43758.5453);
+    const n1 = fract(Math.sin(lat * 7.3 + lon * 3.1 + 1.7) * 27134.211);
+    const n2 = fract(Math.cos(lat * 13.7 - lon * 5.9 + 4.2) * 15831.009);
+    const warp = (n1 - 0.5) * 0.35 + (n2 - 0.5) * 0.12; // 纬度翘曲
+    const bf = THREE.MathUtils.clamp(f + warp, 0, 1);
+    // 四段生物群系混合
+    if (bf < 0.35) {
+      tmp.copy(cLush).lerp(cGrass, bf / 0.35);
+    } else if (bf < 0.62) {
+      tmp.copy(cGrass).lerp(cDry, (bf - 0.35) / 0.27);
+    } else if (bf < 0.85) {
+      tmp.copy(cDry).lerp(cRock, (bf - 0.62) / 0.23);
+    } else {
+      tmp.copy(cRock).lerp(cSnow, (bf - 0.85) / 0.15);
+    }
+    // 高频斑块噪声：模拟草丛/裸岩/斑驳积雪的细碎变化
+    const patch = 0.86 + 0.14 * n0;
+    const patch2 = 0.92 + 0.08 * n2;
+    colors[i * 3]     = tmp.r * patch * patch2;
+    colors[i * 3 + 1] = tmp.g * patch * patch2;
+    colors[i * 3 + 2] = tmp.b * patch * patch2;
   }
   planetGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
 const planet = new THREE.Mesh(
   planetGeo,
-  new THREE.MeshStandardMaterial({ map: TEX.grass, vertexColors: true, roughness: 0.92, metalness: 0 })
+  new THREE.MeshStandardMaterial({ map: TEX.grass, vertexColors: true, roughness: 0.95, metalness: 0, envMapIntensity: 0.55, normalMap: TEX.groundNormal, normalScale: new THREE.Vector2(0.8, 0.8), roughnessMap: TEX.groundRough })
 );
 planet.receiveShadow = true;
 scene.add(planet);
@@ -1184,10 +1301,22 @@ scene.add(street);
  * ============================================================ */
 const cloudGroup = new THREE.Group();
 scene.add(cloudGroup);
+// 写实积云：中性白色，由天光/主光自然照明（不再自发光暖橙）
 const cloudMat = new THREE.MeshStandardMaterial({
-  color: 0xffffff, transparent: true, opacity: 0.62, roughness: 1, depthWrite: false,
-  emissive: 0xffd9b0, emissiveIntensity: 0.15
+  color: 0xf4f8fb, transparent: true, opacity: 0.82, roughness: 1, depthWrite: false,
+  emissive: 0x9fb6c8, emissiveIntensity: 0.18
 });
+// 云层体积感：基于法线朝向做“暖日顶 + 冷天底”半球着色，模拟光照体积云（廉价写实）
+cloudMat.onBeforeCompile = (shader) => {
+  shader.uniforms.uSunDir = { value: SUN_DIR };
+  shader.uniforms.uSunCol = { value: new THREE.Color('#fff1da') };
+  shader.uniforms.uSkyCol = { value: new THREE.Color('#9fc0dd') };
+  shader.fragmentShader = 'uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uSkyCol;\n' + shader.fragmentShader;
+  shader.fragmentShader = shader.fragmentShader.replace(
+    '#include <emissivemap_fragment>',
+    '#include <emissivemap_fragment>\n  float _up = dot(normalize(vNormal), normalize(uSunDir));\n  vec3 _hemi = mix(uSkyCol, uSunCol, smoothstep(-0.15, 0.6, _up));\n  totalEmissiveRadiance += _hemi * 0.18;'
+  );
+};
 const clouds = [];
 for (let i = 0; i < CONFIG.clouds; i++) {
   const parts = [];
@@ -1303,14 +1432,18 @@ function makeDoorNumberTexture(n, accentColor) {
 CONFIG.huts.forEach((cfg, i) => {
   const colorHex = cfg.color || CONFIG.palette[i % CONFIG.palette.length];
   const baseColor = new THREE.Color(colorHex);
+  // 写实风：墙面用天然灰泥/土坯色 × 石膏纹理；屋顶用独立天然材质色（赤陶/石板/铜绿），
+  // 而非简单压暗墙色；点缀暖木、青石门沿、暖光窗户，门/招牌霓虹为暖灯笼光。
   const wallColor = '#' + baseColor.getHexString();
-  const roofColor = '#' + baseColor.clone().multiplyScalar(0.82).getHexString();
-  const roofColor2 = '#' + baseColor.clone().multiplyScalar(0.68).getHexString();
-  const trim = '#F3ECDD';       // 窗框 / 门框浅色
-  const glass = '#FFE6A8';       // 暖色“亮灯”窗
-  const stone = '#b9b2a6';      // 台阶 / 路沿
-  const gold = '#E8C36B';       // 金顶 / 门把手
-  const signGlow = '#FFC36B';   // 侧面灯箱
+  const roofPalette = ['#b5634a', '#5c6b73', '#9c5a3c', '#4f6b6b', '#8a4f3e', '#6b7780', '#a86a3d', '#576872', '#b06a4a', '#647478'];
+  const roofBase = new THREE.Color(roofPalette[i % roofPalette.length]);
+  const roofColor = '#' + roofBase.getHexString();
+  const roofColor2 = '#' + roofBase.clone().multiplyScalar(0.72).getHexString();
+  const trim = '#c9b79b';       // 窗框 / 门框：暖木
+  const glass = '#ffe9b0';       // 暖色“亮灯”窗
+  const stone = '#9a948c';      // 台阶 / 路沿：青石
+  const gold = '#caa45e';       // 金顶 / 门把手：仿铜
+  const signGlow = '#ffcf8a';   // 侧面灯箱：暖灯笼光
 
   // 球面坐标 → 世界方向
   const lat = cfg.side * (CONFIG.streetHalfWidth / R);
@@ -1710,9 +1843,10 @@ pondPositions.forEach(pp => {
   const { n, east } = surfFrame(pp.lat, pp.lon);
   const pondGeo = new THREE.CircleGeometry(2.2, 32);
   const pondMat = new THREE.MeshStandardMaterial({
-    color: 0x2a4a6a, transparent: true, opacity: 0.78,
-    roughness: 0.08, metalness: 0.9,
-    emissive: 0x1a2a3a, emissiveIntensity: 0.15
+    color: 0x244e6e, transparent: true, opacity: 0.82,
+    roughness: 0.05, metalness: 0.95,
+    emissive: 0x123040, emissiveIntensity: 0.12,
+    normalMap: TEX.waterRipple, normalScale: new THREE.Vector2(0.35, 0.35)
   });
   const pond = new THREE.Mesh(pondGeo, pondMat);
   pond.position.copy(n.clone().multiplyScalar(R + 0.02));
@@ -1767,8 +1901,8 @@ charBody.updateMassProperties();
 charBody.linearDamping = 0.0;
 world.addBody(charBody);
 
-const SKIN = '#F2C9A0', SHIRT = '#FFFFFF', SHORTS = '#4A90D9';
-const SHOE = '#2C2C3A', BELT = '#3a2a1a';
+const SKIN = '#e8b48f', SHIRT = '#f3efe6', SHORTS = '#3f6fa3';
+const SHOE = '#2a2a30', BELT = '#5a4326';
 const char = new THREE.Group();
 // V3：躯干 + 头部合并为主体网格（不含四肢，四肢独立以便行走动画）
 const charParts = [];
@@ -1784,17 +1918,55 @@ part(charParts, new THREE.BoxGeometry(0.3, 0.08, 0.52), SHIRT, T(0, 0.97, 0));
 part(charParts, new THREE.SphereGeometry(0.03, 8, 6), BELT, T(0, 0.75, 0.26));
 part(charParts, new THREE.SphereGeometry(0.03, 8, 6), BELT, T(0, 0.6, 0.26));
 part(charParts, new THREE.SphereGeometry(0.03, 8, 6), BELT, T(0, 0.45, 0.26));
+// 写实材质：布料（经纬法线 + sheen 织物光泽）、皮肤（清漆 + 微弱皮下暖光）、皮革、湿润眼球、毛发
+const clothMat = new THREE.MeshPhysicalMaterial({
+  vertexColors: true, roughness: 0.9, metalness: 0,
+  normalMap: TEX.fabricNormal, normalScale: new THREE.Vector2(0.4, 0.4),
+  sheen: 0.6, sheenRoughness: 0.85, sheenColor: new THREE.Color('#ffffff'),
+  clearcoat: 0.06, clearcoatRoughness: 0.6
+});
+const armMat = new THREE.MeshPhysicalMaterial({
+  color: SHIRT, roughness: 0.9, metalness: 0,
+  normalMap: TEX.fabricNormal, normalScale: new THREE.Vector2(0.4, 0.4),
+  sheen: 0.6, sheenRoughness: 0.85, sheenColor: new THREE.Color('#ffffff'),
+  clearcoat: 0.06, clearcoatRoughness: 0.6
+});
+const skinMat = new THREE.MeshPhysicalMaterial({
+  color: SKIN, roughness: 0.62, metalness: 0,
+  clearcoat: 0.28, clearcoatRoughness: 0.5,
+  emissive: new THREE.Color('#3a1206'), emissiveIntensity: 0.1,
+  envMapIntensity: 0.85
+});
+const headMat = new THREE.MeshPhysicalMaterial({
+  color: SKIN, map: TEX.skin, roughness: 0.58, metalness: 0,
+  clearcoat: 0.32, clearcoatRoughness: 0.45,
+  emissive: new THREE.Color('#3a1206'), emissiveIntensity: 0.12,
+  envMapIntensity: 0.9
+});
+const shoeMat = new THREE.MeshPhysicalMaterial({
+  color: SHOE, roughness: 0.45, metalness: 0.05,
+  clearcoat: 0.6, clearcoatRoughness: 0.3, envMapIntensity: 0.7
+});
+const eyeMat = new THREE.MeshPhysicalMaterial({
+  color: '#1a1a2e', roughness: 0.08, metalness: 0,
+  clearcoat: 1.0, clearcoatRoughness: 0.06, envMapIntensity: 1.2
+});
+const hairMat = new THREE.MeshPhysicalMaterial({
+  color: '#3a2818', roughness: 0.5, metalness: 0,
+  clearcoat: 0.5, clearcoatRoughness: 0.35,
+  sheen: 0.5, sheenRoughness: 0.4, sheenColor: new THREE.Color('#6b4a2e')
+});
+const mouthMat = new THREE.MeshPhysicalMaterial({
+  color: '#9B6A4A', roughness: 0.3, metalness: 0,
+  clearcoat: 0.4, clearcoatRoughness: 0.3, envMapIntensity: 0.8
+});
 const charMesh = new THREE.Mesh(
   mergeGeometries(charParts, false),
-  new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })
+  clothMat
 );
 charMesh.castShadow = true;
 char.add(charMesh);
 // V3：四肢独立 Mesh（行走动画用）
-const limbMat = new THREE.MeshStandardMaterial({ color: SKIN, vertexColors: true, roughness: 0.8 });
-const armMat = new THREE.MeshStandardMaterial({ color: SHIRT, vertexColors: true, roughness: 0.85 });
-const legMat = new THREE.MeshStandardMaterial({ color: SKIN, vertexColors: true, roughness: 0.8 });
-const shoeMat = new THREE.MeshStandardMaterial({ color: SHOE, roughness: 0.7 });
 // 左臂（pivot 在肩部）
 const leftArm = new THREE.Group();
 leftArm.position.set(-0.5, 0.95, 0);
@@ -1812,7 +1984,7 @@ char.add(rightArm);
 // 左腿（pivot 在髋部）
 const leftLeg = new THREE.Group();
 leftLeg.position.set(-0.2, 0.0, 0);
-const leftLegMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.5, 0.22), legMat);
+const leftLegMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.5, 0.22), skinMat);
 leftLegMesh.position.y = -0.25; leftLegMesh.castShadow = true;
 leftLeg.add(leftLegMesh);
 const leftShoe = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.32), shoeMat);
@@ -1822,7 +1994,7 @@ char.add(leftLeg);
 // 右腿
 const rightLeg = new THREE.Group();
 rightLeg.position.set(0.2, 0.0, 0);
-const rightLegMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.5, 0.22), legMat);
+const rightLegMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.5, 0.22), skinMat);
 rightLegMesh.position.y = -0.25; rightLegMesh.castShadow = true;
 rightLeg.add(rightLegMesh);
 const rightShoe = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.32), shoeMat);
@@ -1832,12 +2004,11 @@ char.add(rightLeg);
 // V3：头部 — 平滑球 + 皮肤纹理
 const head = new THREE.Mesh(
   new THREE.SphereGeometry(0.34, 24, 18),
-  new THREE.MeshStandardMaterial({ color: SKIN, map: TEX.skin, roughness: 0.8 })
+  headMat
 );
 head.position.y = 1.15; head.castShadow = true;
 char.add(head);
 // V3：面部特征 — 眼睛 + 刘海
-const eyeMat = new THREE.MeshStandardMaterial({ color: '#1a1a2e', roughness: 0.3 });
 const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), eyeMat);
 leftEye.position.set(-0.1, 1.18, 0.3);
 char.add(leftEye);
@@ -1847,14 +2018,14 @@ char.add(rightEye);
 // 刘海（半球覆盖头顶前部）
 const bangs = new THREE.Mesh(
   new THREE.SphereGeometry(0.35, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2.5),
-  new THREE.MeshStandardMaterial({ color: '#3a2818', roughness: 0.9 })
+  hairMat
 );
 bangs.position.set(0, 1.2, 0.05); bangs.rotation.x = -0.3;
 char.add(bangs);
 // A5：嘴 — 眼睛下方小弧条
 const mouth = new THREE.Mesh(
   new THREE.BoxGeometry(0.1, 0.025, 0.02),
-  new THREE.MeshStandardMaterial({ color: '#9B6A4A', roughness: 0.7 })
+  mouthMat
 );
 mouth.position.set(0, 1.05, 0.32);
 char.add(mouth);
@@ -1866,12 +2037,31 @@ scene.add(char);
 const keys = {};
 let running = false;       // Shift 奔跑
 let firstPerson = false;
+// FPS 控制：鼠标看视角、WASD 移动
+let camPitch = 0;            // 俯仰角（rad），由鼠标上下控制
+let lookActive = false;      // 指针锁定时为 true，才处理 mousemove
+let pendingYaw = 0, pendingPitch = 0;  // 鼠标移动增量，每帧消费
+const MOUSE_SENS = 0.0022;   // 鼠标灵敏度
+const PITCH_LIMIT = 1.25;    // 俯仰限位（约 ±72°）
 let inGame = false;        // 是否正在游戏（iframe 中）
 let nearHut = null;        // 当前靠近的小屋
 let returnHut = null;      // 返回后要归位的小屋
 const forward = new THREE.Vector3(0, 0, 1); // 角色当前前进切向（每帧重正交化）
 
-const TURN = CONFIG.physics.turn;          // 转向角速度 (rad/s)
+  // 【开局修复】相机不再默认落在球心 (0,0,0) 后逐帧 lerp 出球面，
+  // 否则首帧渲染的是球内漆黑 → 玩家看到"角色悬浮太空、背景闪烁、无法落回星球"。
+  // 直接算出第三人称机位并 lookAt 角色，确保第一帧就是角色站在星球上的画面。
+  {
+    const _spawnUp = charBody.position.clone().normalize();
+    const _cam = CONFIG.camera;
+    camera.position.copy(charBody.position)
+      .addScaledVector(_spawnUp, _cam.thirdUp)
+      .addScaledVector(forward, -_cam.thirdBack);
+    camera.up.copy(_spawnUp);
+    camera.lookAt(new THREE.Vector3(charBody.position.x, charBody.position.y, charBody.position.z).addScaledVector(_spawnUp, _cam.eyeUp));
+  }
+
+  const TURN = CONFIG.physics.turn;          // 转向角速度 (rad/s)
 const SPEED = CONFIG.physics.speed, RUN_SPEED = CONFIG.physics.runSpeed;
 
 const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight']; // C7：模块级常量，避免每次按键重建数组
@@ -1894,6 +2084,27 @@ addEventListener('blur', () => {
   for (const k in keys) keys[k] = false;
   running = false;
   joyVec = { x: 0, y: 0 }; if (joyKnob) joyKnob.style.transform = 'translate(-50%,-50%)'; // BUG-11：失焦时也清空摇杆
+});
+
+// FPS 鼠标看视角：点击画布锁定指针（标准 FPS 自由视角），Esc 退出后可正常点击 UI；
+// 若环境不支持/拒绝指针锁定，按住左键拖拽同样可转视角（拖拽兜底），两种都喂给同一套视角增量。
+const _canvasEl = renderer.domElement;
+let _dragging = false;
+_canvasEl.addEventListener('click', () => {
+  if (inGame) return;
+  if (document.pointerLockElement !== _canvasEl && _canvasEl.requestPointerLock) _canvasEl.requestPointerLock();
+});
+_canvasEl.addEventListener('mousedown', e => {
+  if (e.button === 0 && document.pointerLockElement !== _canvasEl) _dragging = true;
+});
+window.addEventListener('mouseup', () => { _dragging = false; });
+document.addEventListener('pointerlockchange', () => {
+  lookActive = (document.pointerLockElement === _canvasEl);
+});
+document.addEventListener('mousemove', e => {
+  if (!lookActive && !_dragging) return;
+  pendingYaw   -= e.movementX * MOUSE_SENS;   // 右移 → 视角右转
+  pendingPitch -= e.movementY * MOUSE_SENS;   // 上移 → 抬头（标准 FPS）
 });
 
 // 移动端摇杆
@@ -2048,11 +2259,11 @@ function fadeTo(on, cb) {
 // 进入小屋动画：镜头推向门 + 门发光扩散 + 渐黑，分三步完成更有仪式感
 // 总时长 ≈ 700ms（推近 200ms + 发光扩散 300ms + 渐黑 500ms，部分重叠）
 function enterAnim(hut, cb) {
-  if (!hut || !hut.doorMesh || !camera) { fadeTo(true, cb); return; }
+  if (!hut || !hut.door || !camera) { fadeTo(true, cb); return; }
   const startPos = camera.position.clone();
   const startFov = camera.fov;
-  const doorPos = hut.doorMesh.getWorldPosition(new THREE.Vector3());
-  const doorNormal = hut.doorMesh.getWorldDirection(new THREE.Vector3()).negate();
+  const doorPos = hut.door.getWorldPosition(new THREE.Vector3());
+  const doorNormal = hut.door.getWorldDirection(new THREE.Vector3()).negate();
   const targetPos = doorPos.clone().addScaledVector(doorNormal, 1.5);
   const targetFov = 35;
   const pushStart = performance.now();
@@ -2138,8 +2349,8 @@ function _exitAnim(hut, spawnPos) {
   const startFov = 35;
   const endFov = camera.fov;
   // 起点：靠近门的近距离视角
-  const doorPos = hut.doorMesh.getWorldPosition(new THREE.Vector3());
-  const doorNormal = hut.doorMesh.getWorldDirection(new THREE.Vector3()).negate();
+  const doorPos = hut.door.getWorldPosition(new THREE.Vector3());
+  const doorNormal = hut.door.getWorldDirection(new THREE.Vector3()).negate();
   const startCam = doorPos.clone().addScaledVector(doorNormal, 1.5);
   // 终点：当前相机位置（loop 已开始更新）
   const origEmissive = hut.doorMat.emissiveIntensity;
@@ -2150,7 +2361,8 @@ function _exitAnim(hut, spawnPos) {
     const t = Math.min(1, (performance.now() - animStart) / dur);
     const e = 1 - Math.pow(1 - t, 2.5); // easeOutQuart
     // 相机从近拉远
-    const currentTarget = charBody.position.clone().addScaledVector(tmpUp, 1.5);
+    const _spawnUp = charBody.position.clone().normalize();
+    const currentTarget = new THREE.Vector3(charBody.position.x, charBody.position.y, charBody.position.z).addScaledVector(_spawnUp, 1.5);
     const camTarget = startCam.clone().lerp(currentTarget, e);
     camera.position.lerp(camTarget, 0.3);
     camera.fov = startFov + (endFov - startFov) * e;
@@ -2178,7 +2390,7 @@ addEventListener('message', e => {
   if (e.data && e.data.action === 'returnToPlanet') leaveGame();
 });
 
-// U7：设置面板（阴影 / 泛光 / 重置角色）
+// U7：设置面板（阴影 / 重置角色）
 const setBtn = document.getElementById('settings-btn');
 const setPanel = document.getElementById('settings-panel');
 setBtn.addEventListener('click', () => {
@@ -2192,15 +2404,11 @@ addEventListener('keydown', e => {
 });
 // #4：设置持久化 — 读写 localStorage，跨会话保留偏好
 const SETTINGS_KEY = 'planet.settings';
-// 性能复位：版本号变更时，丢弃旧的高开销设置（bloom/ssao/dof），强制走保守默认。
-// 之前测试时手动开启的 SSAO/景深会持久化导致刷新后仍卡，此处一次性清除。
 const SETTINGS_VERSION = 2;
 function loadSettings() {
   try {
     const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
     if (raw._v !== SETTINGS_VERSION) {
-      // 版本不匹配：清除高开销项，仅保留无害的 shadow 偏好
-      delete raw.bloom; delete raw.ssao; delete raw.dof;
       raw._v = SETTINGS_VERSION;
       try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(raw)); } catch (e) {}
     }
@@ -2212,49 +2420,16 @@ function saveSettings(s) {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch (e) { /* 隐私模式无 localStorage 静默 */ }
 }
 const savedSettings = loadSettings();
-// 性能治理：SSAO/景深默认关闭（CONFIG.render.ssao/dof = false），仅当用户曾手动开启才保持
-let ssaoEnabled = savedSettings.ssao !== undefined ? savedSettings.ssao : CONFIG.render.ssao;
-let dofEnabled = savedSettings.dof !== undefined ? savedSettings.dof : CONFIG.render.dof;
 if (savedSettings.shadow !== undefined) {
   document.getElementById('set-shadow').checked = savedSettings.shadow;
   sun.castShadow = savedSettings.shadow; // BUG修复：同步实际阴影状态，否则刷新后 checkbox 与 sun.castShadow 不一致
 }
-if (savedSettings.bloom !== undefined) bloomEnabled = savedSettings.bloom;
 
 document.getElementById('set-shadow').addEventListener('change', e => {
   sun.castShadow = e.target.checked;
   renderer.shadowMap.needsUpdate = true;
   saveSettings(Object.assign(loadSettings(), { shadow: e.target.checked }));
 });
-const setBloom = document.getElementById('set-bloom');
-setBloom.checked = bloomEnabled;
-setBloom.addEventListener('change', e => {
-  bloomEnabled = e.target.checked;
-  if (bloomEnabled && !composer) buildComposer();
-  if (composer && composer._ssaoPass) composer._ssaoPass.enabled = ssaoEnabled; // 重建后同步 SSAO 状态
-  if (composer && composer._bokehPass) composer._bokehPass.enabled = dofEnabled; // 重建后同步景深状态
-  applyColorMode();
-  saveSettings(Object.assign(loadSettings(), { bloom: bloomEnabled }));
-});
-// #3：SSAO 运行时开关 — pass.enabled=false 跳过该 Pass，无需重建管线
-const setSsao = document.getElementById('set-ssao');
-setSsao.checked = ssaoEnabled;
-setSsao.addEventListener('change', e => {
-  ssaoEnabled = e.target.checked;
-  if (composer && composer._ssaoPass) composer._ssaoPass.enabled = ssaoEnabled;
-  saveSettings(Object.assign(loadSettings(), { ssao: ssaoEnabled }));
-});
-// #3：景深运行时开关
-const setDof = document.getElementById('set-dof');
-setDof.checked = dofEnabled;
-setDof.addEventListener('change', e => {
-  dofEnabled = e.target.checked;
-  if (composer && composer._bokehPass) composer._bokehPass.enabled = dofEnabled;
-  saveSettings(Object.assign(loadSettings(), { dof: dofEnabled }));
-});
-// 初始化时同步 Pass 开关状态（buildComposer 在此之前已执行）
-if (composer && composer._ssaoPass) composer._ssaoPass.enabled = ssaoEnabled;
-if (composer && composer._bokehPass) composer._bokehPass.enabled = dofEnabled;
 document.getElementById('set-reset').addEventListener('click', () => {
   const sn = surfFrame(SPAWN_LAT, 0).n;
   charBody.position.set(sn.x * (R + charR), sn.y * (R + charR), sn.z * (R + charR));
@@ -2277,6 +2452,9 @@ const _m = new THREE.Matrix4();
 const _ballUp = new THREE.Vector3();
 const _look = new THREE.Vector3();
 const _camPos = new THREE.Vector3(); // #7：相机目标位置临时向量（lerp 过渡用）
+const _moveDir = new THREE.Vector3();   // FPS：合成移动方向（前/后/左/右）
+const _rightAxis = new THREE.Vector3(); // FPS：角色右方向(=forward×up)，兼作俯仰轴
+const _lookDir = new THREE.Vector3();   // FPS：含俯仰的视线方向
 const _ringZ = new THREE.Vector3(0, 0, 1); // #11：Ring 默认法线常量（避免每帧 new）
 const _gf = new CANNON.Vec3(0, 0, 0);
 const _bg = new CANNON.Vec3(0, 0, 0);
@@ -2288,26 +2466,63 @@ let _lastDoorBreathQ = -1;     // 上次门呼吸量化值
 
 function update(dt) {
   const pos = charBody.position;
+
+  // BUG-FIX：角色被甩飞/NaN 时自动复位（物理振荡会导致坐标爆炸）
+  if (Number.isNaN(pos.x) || Number.isNaN(pos.y) || Number.isNaN(pos.z) || pos.length() > 1e6) {
+    const sn = surfFrame(SPAWN_LAT, 0).n;
+    pos.set(sn.x * (R + charR), sn.y * (R + charR), sn.z * (R + charR));
+    charBody.velocity.set(0, 0, 0);
+    charBody.angularVelocity.set(0, 0, 0);
+  }
+
   tmpUp.set(pos.x, pos.y, pos.z).normalize();          // 星球法线 = 角色“上”
+
+  // 前进向量异常时重新初始化（避免零向量/NaN 导致后续矩阵失效）
+  if (Number.isNaN(forward.x) || forward.lengthSq() < 1e-8) {
+    forward.set(0, 0, 1).addScaledVector(tmpUp, -tmpUp.z).normalize();
+    if (forward.lengthSq() < 1e-8) forward.set(1, 0, 0);
+  }
+
   // 重正交化前进向量，使其严格切于球面
   forward.addScaledVector(tmpUp, -forward.dot(tmpUp)).normalize();
 
-  // 输入：A/D 转向，W/S 前后（摇杆 y 为前后、x 为转向）
-  let turn = 0, move = 0;
-  if (keys['KeyA']) turn += 1;
-  if (keys['KeyD']) turn -= 1;
-  if (keys['KeyW']) move += 1;
-  if (keys['KeyS']) move -= 1;
-  turn -= joyVec.x;          // 摇杆左右 = 转向
-  move -= joyVec.y;          // 摇杆上下 = 前后
-  if (turn !== 0) {
-    _q.setFromAxisAngle(tmpUp, turn * TURN * dt);
+  // —— FPS 控制：鼠标偏航(yaw)+俯仰(pitch) 控制视角；WASD 相对朝向移动 ——
+  // 偏航：消费鼠标累积增量（绕表面法线旋转 forward）
+  if (pendingYaw !== 0) {
+    _q.setFromAxisAngle(tmpUp, pendingYaw);
+    forward.applyQuaternion(_q);
+    pendingYaw = 0;
+  }
+  // 俯仰：累积到 camPitch 并限位
+  if (pendingPitch !== 0) {
+    camPitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, camPitch + pendingPitch));
+    pendingPitch = 0;
+  }
+  camPitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, camPitch)); // 双重保险
+  // 移动端摇杆：x = 偏航(看左右，按帧缩放避免高速抖动)，y = 前后
+  if (joyVec.x !== 0) {
+    _q.setFromAxisAngle(tmpUp, -joyVec.x * TURN * dt);
     forward.applyQuaternion(_q);
   }
 
+  // 右方向 = forward × up（标准 FPS：前×上=右）
+  _rightAxis.crossVectors(forward, tmpUp);
+  if (_rightAxis.lengthSq() < 1e-8) _rightAxis.set(1, 0, 0); else _rightAxis.normalize();
+
+  // WASD 合成移动向量：W/S = 前后(沿 forward)，D/A = 右/左(沿 _rightAxis)
+  let mx = 0, mz = 0;
+  if (keys['KeyW']) mz += 1;
+  if (keys['KeyS']) mz -= 1;
+  if (keys['KeyD']) mx += 1;
+  if (keys['KeyA']) mx -= 1;
+  mz -= joyVec.y;                       // 摇杆上下 = 前后
+  _moveDir.set(0, 0, 0).addScaledVector(forward, mz).addScaledVector(_rightAxis, mx);
+  const moving = _moveDir.lengthSq() > 1e-8;
+  if (moving) _moveDir.normalize();
+  const speed = (running ? RUN_SPEED : SPEED) * (moving ? 1 : 0);
+
   // 设定切向速度（保留径向分量，使物理重力维持贴地）
-  const speed = (running ? RUN_SPEED : SPEED) * Math.max(-1, Math.min(1, move));
-  tmpFwd.copy(forward).multiplyScalar(speed);
+  tmpFwd.copy(_moveDir).multiplyScalar(speed);
   tmpRight.crossVectors(tmpUp, forward);
   if (tmpRight.lengthSq() < 1e-8) tmpRight.set(1, 0, 0); else tmpRight.normalize();
   const radial = charBody.velocity.dot(tmpUp);
@@ -2327,6 +2542,25 @@ function update(dt) {
 
   // 物理步进
   world.step(1 / 60, dt, CONFIG.render.subSteps); // P6
+
+  // BUG-FIX：强制角色严格贴在星球表面行走，消除径向振荡、穿透与甩飞。
+  // 原代码只靠速度投影，重力+碰撞会让角色沿径向反复弹跳甚至穿心爆炸。
+  const _cr = pos.length();
+  if (_cr > 0.001) {
+    const targetR = R + charR;
+    const _s = targetR / _cr;
+    pos.x *= _s; pos.y *= _s; pos.z *= _s;
+    const ux = pos.x / targetR, uy = pos.y / targetR, uz = pos.z / targetR;
+    const radial = charBody.velocity.x * ux + charBody.velocity.y * uy + charBody.velocity.z * uz;
+    charBody.velocity.x -= ux * radial;
+    charBody.velocity.y -= uy * radial;
+    charBody.velocity.z -= uz * radial;
+    // BUG-FIX：Cannon 的 interpolatedPosition/previousPosition 仍记录着未 clamp 的旧值，
+    // 渲染和相机都读 interpolatedPosition，导致角色飘在空中、画面抽搐；
+    // 强制同步，确保渲染与物理一致。
+    charBody.interpolatedPosition.copy(charBody.position);
+    charBody.previousPosition.copy(charBody.position);
+  }
 
   // P2：阴影相机跟随角色（局部视锥），提高有效分辨率、降低整球阴影开销
   sun.target.position.copy(charBody.interpolatedPosition);
@@ -2441,11 +2675,6 @@ function update(dt) {
     grassMesh.scale.setScalar(s);
   }
 
-  // D1：景深 focus 跟随相机到角色的距离，保持主角清晰、远处模糊
-  if (composer && composer._bokehPass) {
-    composer._bokehPass.uniforms.focus.value = camera.position.distanceTo(charBody.interpolatedPosition);
-  }
-
   // #11：踢球瞄准环 — 在踢球范围内时显示在球下方，平贴球面
   // 用 interpolatedPosition 与小球渲染位置一致，避免物理步进抖动
   const _ballDist = charBody.position.distanceTo(ballBody.interpolatedPosition);
@@ -2471,16 +2700,17 @@ function update(dt) {
     else if (performance.now() - ballFarSince > 10000) { recallBall(); ballFarSince = 0; }
   } else ballFarSince = 0;
 
-  // 相机（第三人称：角色身后上方；第一人称：角色眼位）
-  // #7：切换时位置 lerp 过渡（系数 0.15，约 0.2s 完成），避免视角突变眩晕
-  // #9：参数从 CONFIG.camera 读取
+  // 相机（FPS 风格：鼠标控制视角，含俯仰；第三人称在角色身后上方，第一人称在眼位）
+  // #7/#9：位置 lerp 过渡、参数从 CONFIG.camera 读取
   const cam = CONFIG.camera;
+  // 含俯仰的视线方向：绕右轴(_rightAxis)把 forward 抬起/压下；+camPitch = 抬头
+  _lookDir.copy(forward).applyAxisAngle(_rightAxis, camPitch);
   if (firstPerson) {
     char.visible = false; // F8：第一人称隐藏自身模型，避免看到身体/头部内部穿模
-    camTarget.copy(charBody.interpolatedPosition).addScaledVector(tmpUp, cam.eyeUp).addScaledVector(forward, cam.eyeFwd);
+    camTarget.copy(charBody.interpolatedPosition).addScaledVector(tmpUp, cam.eyeUp);
     camera.position.lerp(camTarget, cam.lerp);
     camera.up.copy(tmpUp);
-    _look.copy(camTarget).add(forward);
+    _look.copy(camTarget).add(_lookDir);
     camera.lookAt(_look);
   } else {
     char.visible = true;
@@ -2488,7 +2718,18 @@ function update(dt) {
     _camPos.copy(charBody.interpolatedPosition).addScaledVector(tmpUp, cam.thirdUp).addScaledVector(forward, -cam.thirdBack);
     camera.position.lerp(_camPos, cam.lerp);
     camera.up.copy(tmpUp);
-    camera.lookAt(camTarget);
+    // 第三人称看向角色前方(含俯仰)，使上下看生效
+    _look.copy(charBody.interpolatedPosition).addScaledVector(tmpUp, cam.eyeUp).addScaledVector(_lookDir, 10);
+    camera.lookAt(_look);
+  }
+
+  // BUG-FIX（第三道保险）：上一帧相机若已是 NaN，立刻从角色位置重算，
+  // 否则 camera.position.lerp(...) 会一直把 NaN 往下传，永远黑屏。
+  if (Number.isNaN(camera.position.x) || Number.isNaN(camera.position.y) || Number.isNaN(camera.position.z)) {
+    camera.position.copy(charBody.interpolatedPosition).addScaledVector(tmpUp, cam.thirdUp).addScaledVector(forward, -cam.thirdBack);
+    camera.up.copy(tmpUp);
+    _look.copy(charBody.interpolatedPosition).addScaledVector(tmpUp, cam.eyeUp).addScaledVector(_lookDir, 10);
+    camera.lookAt(_look);
   }
 
   // 交互判定：距门 < enterDist → 霓虹呼吸发光 + 提示
@@ -2531,13 +2772,13 @@ function drawMinimap() {
   c.clearRect(0, 0, S, S);
 
   const innerR = Rr * 0.6;
-  c.strokeStyle = 'rgba(212, 171, 106, 0.15)';
+  c.strokeStyle = 'rgba(174, 203, 224, 0.15)';
   c.lineWidth = 1;
   c.setLineDash([2, 3]);
   c.beginPath(); c.arc(cx, cy, innerR, 0, Math.PI * 2); c.stroke();
   c.setLineDash([]);
 
-  c.strokeStyle = 'rgba(212, 171, 106, 0.25)';
+  c.strokeStyle = 'rgba(174, 203, 224, 0.25)';
   c.lineWidth = 1.5;
   c.beginPath(); c.arc(cx, cy, Rr, 0, Math.PI * 2); c.stroke();
 
@@ -2555,11 +2796,11 @@ function drawMinimap() {
     if (h === nearHut) {
       const t = performance.now() / 300;
       const pulse = 0.5 + 0.5 * Math.sin(t);
-      c.strokeStyle = `rgba(212, 171, 106, ${0.4 + 0.6 * pulse})`;
+      c.strokeStyle = `rgba(174, 203, 224, ${0.4 + 0.6 * pulse})`;
       c.lineWidth = 2;
       c.beginPath(); c.arc(x, y, 9 + pulse * 2, 0, Math.PI * 2); c.stroke();
 
-      c.strokeStyle = 'rgba(212, 171, 106, 0.8)';
+      c.strokeStyle = 'rgba(174, 203, 224, 0.8)';
       c.lineWidth = 1.5;
       c.beginPath(); c.arc(x, y, 7, 0, Math.PI * 2); c.stroke();
     }
@@ -2574,8 +2815,8 @@ function drawMinimap() {
   c.beginPath(); c.moveTo(8, 1); c.lineTo(-4, -3); c.lineTo(-4, 5); c.closePath(); c.fill();
 
   const grad = c.createLinearGradient(-5, 0, 8, 0);
-  grad.addColorStop(0, '#D4AB6A');
-  grad.addColorStop(1, '#E8D4A8');
+  grad.addColorStop(0, '#aecbe0');
+  grad.addColorStop(1, '#d8e4ee');
   c.fillStyle = grad;
   c.beginPath(); c.moveTo(8, 0); c.lineTo(-5, -4); c.lineTo(-5, 4); c.closePath(); c.fill();
 
@@ -2625,13 +2866,24 @@ function loop(now) {
   // 云朵缓慢飘动 + 呼吸缩放
   // #12：REDUCE 时关闭呼吸缩放（保留缓慢飘动，因移动幅度小不影响前庭觉）
   cloudGroup.rotation.y += dt * 0.015;
+
+  // 水面涟漪滚动：随时间偏移 normalMap，模拟流水（REDUCE 下停演）
+  if (!REDUCE) {
+    pondMeshes.forEach((pm, i) => {
+      if (pm.material.normalMap) {
+        const o = pm.material.normalMap.offset;
+        o.x += dt * (0.012 + i * 0.004);
+        o.y += dt * (0.008 + i * 0.003);
+      }
+    });
+  }
   clouds.forEach((c, i) => {
     if (!REDUCE) c.position.y = c.userData.baseY + Math.sin(now * 0.0004 + i) * 0.6; // 围绕基准高度振荡，不累积漂移
     c.scale.setScalar(REDUCE ? c.userData.base : c.userData.base * (1 + 0.04 * Math.sin(now * 0.0006 + i)));
   });
 
-  // U6：泛光开启且管线可用时走后处理，否则普通渲染
-  if (composer && bloomEnabled) composer.render(); else renderer.render(scene, camera);
+  // 普通渲染（无后处理管线）
+  renderer.render(scene, camera);
 
   // 屏闪修复：首帧渲染完成（canvas 已有场景内容）后再渐隐 loading，
   // 避免渐隐期间露出空 canvas（黑/紫）造成闪烁
@@ -2657,7 +2909,6 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(Math.min(devicePixelRatio, CONFIG.render.pixelRatioMax)); // P6/F-10：跨屏 DPR 变化时同步
   renderer.setSize(innerWidth, innerHeight);
-  if (composer) composer.setSize(innerWidth, innerHeight);
 });
 
 /* ============================================================

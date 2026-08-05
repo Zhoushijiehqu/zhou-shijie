@@ -914,11 +914,15 @@
     <div class="loading-text">正在搭建小屋...</div>
   </div>
 
-  <script src="assets/js/three.min.js"></script>
-  <script src="assets/js/OrbitControls.js"></script>
   <script src="assets/js/game-utils.js"></script>
 
-  <script>
+  <!-- Three.js r160（ESM，本地 vendor），与 planet.html / cube2048.html 共用同一份。
+       刻意不使用 importmap：运行环境会注入 three→null 的 importmap 覆盖页面配置，
+       导致 "blocked by a null value"，故一律用相对路径直接导入。 -->
+  <script type="module">
+  import * as THREE from './assets/vendor/three/three.module.js';
+  import { OrbitControls } from './assets/vendor/three/addons/controls/OrbitControls.js';
+
   (function () {
     // ============ 游戏数据（与 profile.js 保持一致） ============
     const GAMES = [
@@ -948,11 +952,17 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
-    renderer.outputEncoding = THREE.sRGBEncoding;
+    // r152 起 outputEncoding/sRGBEncoding 已移除，改用 outputColorSpace/SRGBColorSpace。
+    // （旧代码在 r128 下 THREE.SRGBColorSpace 为 undefined，纹理实际未被标记为 sRGB，
+    //   导致贴图偏灰；升级到 r160 后这些 colorSpace 赋值才真正生效。）
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
+    // r155 起光照默认改为物理单位，会让沿用 r128 调好的灯光整体变暗。
+    // 这里保持旧的光照模型，确保迁移前后观感一致（灯光强度无需重调）。
+    renderer.useLegacyLights = true;
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.enablePan = false;

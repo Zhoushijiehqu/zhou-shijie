@@ -6,7 +6,9 @@
 <meta name="copyright" content="© 2026 周世杰. 代码 MIT, 创意 CC-BY-NC 4.0.">
 <meta name="generator" content="周世杰个人作品集 v7.0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌈</text></svg>">
 <title>光影棱镜 · 周世杰</title>
+<meta name="description" content="光影棱镜 - 调整镜面与棱镜折射、反射与分光光束，点亮所有目标，一场关于光路与空间的逻辑解谜">
 <link rel="manifest" href="../manifest.webmanifest">
 <meta name="theme-color" content="#d4ab6a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -195,11 +197,15 @@ body {
 img, video { max-width: 100%; height: auto; display: block; }
 body { overflow-wrap: break-word; }
 
+/* 响应式容器：默认 800×450，窄屏时按 16:9 等比收缩，避免横向溢出
+   （原写死 800px + flex-shrink:0，在手机上被 flex 居中后右侧溢出到 ~588px）
+   内部 #game-viewport 仍用绝对定位 + transform:scale 适配，输入坐标已按 rect 换算，无需改动 */
 #viewport-wrapper {
   position: relative;
-  width: 800px;
-  height: 450px;
-  flex-shrink: 0;
+  width: 100%;
+  max-width: 800px;
+  aspect-ratio: 16 / 9;
+  margin: 0 auto;
 }
 
 #game-viewport {
@@ -217,7 +223,7 @@ body { overflow-wrap: break-word; }
 
 #game-viewport canvas {
   display: block; position: absolute; top: 0; left: 0;
-  width: 800px; height: 450px;
+  width: 100%; height: 100%;
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
 }
@@ -2052,7 +2058,6 @@ body { overflow-wrap: break-word; }
   loadColorblind();
   progress = loadProgress();
   showMenu();
-  console.log('光影棱镜解谜 v2 · 30关 · Light & Prism Puzzle · Ready');
 
   // ============ 新手引导 / 提示 / 截图 / 成就接入 ============
   function updateHintCount() {
@@ -2829,6 +2834,8 @@ body { overflow-wrap: break-word; }
       });
     }
     // Service Worker 注册（PWA）
+    // 本页位于 games/ 子目录，必须声明 sw 根目录，否则会去请求 games/sw.js 导致 404
+    document.documentElement.setAttribute('data-sw-root', '../');
     GameUtils.registerSW();
   })();
 </script>

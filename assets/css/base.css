@@ -390,6 +390,60 @@ main {
   transform: translateY(0);
 }
 
+/* ========== 键盘可访问性：焦点可见 ==========
+ * 此前全站没有任何 :focus-visible 规则，用 Tab 键导航时完全看不到
+ * 当前焦点在哪里，键盘用户与屏幕阅读器用户无法使用。
+ * 使用 :focus-visible 而非 :focus，鼠标点击不会出现描边，仅键盘导航时显示。
+ */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+/* 交互元素给更醒目的双层焦点环（描边 + 柔光），确保在任意背景上都可辨识 */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px var(--color-accent-lighter);
+}
+
+/* 移除 UA 默认的 :focus 实线框，避免与上面的样式叠加成双框 */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ========== 跳至主内容（Skip Link） ==========
+ * 键盘用户按下第一个 Tab 即可跳过导航直达正文，
+ * 平时完全不可见，不影响视觉设计。
+ */
+.skip-link {
+  position: absolute;
+  left: var(--spacing-md);
+  top: 0;
+  z-index: 9999;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  text-decoration: none;
+  transform: translateY(-120%);
+  transition: transform var(--transition-base);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
 /* ========== 响应式基础 ========== */
 @media (max-width: 768px) {
   :root {

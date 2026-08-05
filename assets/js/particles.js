@@ -211,8 +211,6 @@ const Particles = (function() {
 
     // 开始动画
     animate();
-
-    console.log('Particles initialized with', config.particleCount, 'particles');
   }
 
   /**
@@ -283,9 +281,7 @@ const Particles = (function() {
     if (!animationId) {
       animate();
     }
-    
-    console.log('Particles shown');
-  }
+      }
 
   /**
    * 隐藏粒子（停止动画）
@@ -308,9 +304,7 @@ const Particles = (function() {
     if (ctx) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-    
-    console.log('Particles hidden');
-  }
+      }
 
   /**
    * 销毁粒子系统
@@ -326,9 +320,7 @@ const Particles = (function() {
     
     particles = [];
     isVisible = false;
-    
-    console.log('Particles destroyed');
-  }
+      }
 
   // 公开 API
   const Particles = {
